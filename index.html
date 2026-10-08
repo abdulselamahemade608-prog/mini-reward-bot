@@ -12,8 +12,10 @@
 
 <title>Reward Mini App</title>
 
+<!-- Telegram Mini App -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+<!-- AdsGram -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
 <style>
@@ -23,30 +25,35 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+html,
 body {
     margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
     font-family:
-        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
         Arial,
         sans-serif;
 
-    background:
-        #f4f7fb;
-
-    color:
-        #172033;
+    background: #f4f7fb;
+    color: #172033;
 }
 
 button {
     font-family: inherit;
+    cursor: pointer;
 }
 
-.app {
-    max-width: 520px;
-    margin: auto;
-    min-height: 100vh;
-    padding: 16px;
-    padding-bottom: 100px;
+button:disabled {
+    opacity: .55;
+    cursor: not-allowed;
 }
 
 .hidden {
@@ -54,103 +61,160 @@ button {
 }
 
 
-/* LOADING */
+/* =========================================================
+   APP
+========================================================= */
+
+.app {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+
+    padding: 16px;
+    padding-bottom: 110px;
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
 
 .loading {
-    min-height: 80vh;
+    min-height: 100vh;
+
     display: flex;
     align-items: center;
     justify-content: center;
+
     text-align: center;
 }
 
 .spinner {
-    width: 42px;
-    height: 42px;
-    border: 4px solid #dce3ef;
+    width: 44px;
+    height: 44px;
+
+    border: 4px solid #dce4ef;
     border-top-color: #1877f2;
+
     border-radius: 50%;
-    animation: spin .8s linear infinite;
+
+    animation:
+        spin .8s linear infinite;
 }
 
 @keyframes spin {
+
     to {
         transform: rotate(360deg);
     }
+
 }
 
 
-/* HEADER */
+/* =========================================================
+   MESSAGE
+========================================================= */
+
+.message {
+    margin-bottom: 14px;
+
+    padding: 13px 15px;
+
+    border-radius: 15px;
+
+    background: #fff4d6;
+    color: #715300;
+
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
 
 .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
 
-    margin-bottom: 18px;
+    margin-bottom: 16px;
 }
 
 .user {
     display: flex;
     align-items: center;
-    gap: 10px;
+
+    gap: 11px;
 }
 
 .avatar {
     width: 48px;
     height: 48px;
+
     border-radius: 50%;
+
     object-fit: cover;
-    background: #dce3ef;
+
+    background: #dfe6f0;
 }
 
 .user-name {
-    font-weight: 800;
     font-size: 16px;
+    font-weight: 800;
 }
 
 .user-id {
-    font-size: 12px;
-    color: #7d8798;
+    margin-top: 3px;
+
+    color: #7e899b;
+
+    font-size: 11px;
 }
 
 
-/* BALANCE */
+/* =========================================================
+   BALANCE
+========================================================= */
 
 .balance {
+    padding: 22px;
+
+    margin-bottom: 14px;
+
+    border-radius: 23px;
+
+    color: white;
+
     background:
         linear-gradient(
             135deg,
             #1769e0,
-            #3c8df7
+            #3d91fa
         );
-
-    color: white;
-
-    border-radius: 24px;
-
-    padding: 22px;
-
-    margin-bottom: 16px;
 
     box-shadow:
         0 12px 30px
-        rgba(24,105,224,.18);
+        rgba(24, 105, 224, .18);
 }
 
 .balance-label {
-    opacity: .85;
     font-size: 13px;
+    opacity: .85;
 }
 
 .balance-value {
+    margin-top: 5px;
+
     font-size: 34px;
     font-weight: 900;
-    margin-top: 4px;
 }
 
 
-/* CARDS */
+/* =========================================================
+   GRID
+========================================================= */
 
 .grid {
     display: grid;
@@ -158,21 +222,21 @@ button {
     grid-template-columns:
         repeat(2, minmax(0, 1fr));
 
-    gap: 12px;
+    gap: 11px;
 
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 }
 
 .card {
+    padding: 17px;
+
+    border-radius: 19px;
+
     background: white;
-
-    border-radius: 20px;
-
-    padding: 18px;
 
     box-shadow:
         0 5px 18px
-        rgba(22,34,55,.06);
+        rgba(22, 34, 55, .055);
 }
 
 .card-icon {
@@ -180,59 +244,118 @@ button {
 }
 
 .card-title {
+    margin-top: 8px;
+
+    font-size: 15px;
     font-weight: 800;
-    margin-top: 10px;
 }
 
 .card-value {
-    color: #6c7789;
-    font-size: 13px;
-    margin-top: 4px;
+    margin-top: 5px;
+
+    color: #7e899b;
+
+    font-size: 12px;
 }
 
 
-/* ACTION */
+/* =========================================================
+   ACTION BUTTON
+========================================================= */
 
 .action {
-    border: 0;
-
     width: 100%;
 
-    background:
-        #1877f2;
-
-    color: white;
+    border: 0;
 
     padding: 15px;
 
     border-radius: 16px;
 
-    font-size: 16px;
+    background: #1877f2;
 
+    color: white;
+
+    font-size: 15px;
     font-weight: 800;
-
-    cursor: pointer;
 }
 
-.action:disabled {
-    opacity: .55;
+.action:active {
+    transform: scale(.98);
 }
 
 
-/* SECTIONS */
+/* =========================================================
+   SECTION
+========================================================= */
 
 .section {
-    margin-top: 18px;
+    margin-top: 20px;
 }
 
 .section-title {
+    margin-bottom: 10px;
+
     font-size: 18px;
     font-weight: 900;
-    margin-bottom: 10px;
 }
 
 
-/* LEADERBOARD */
+/* =========================================================
+   CHANNEL
+========================================================= */
+
+.channel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 10px;
+
+    padding: 13px;
+
+    margin-bottom: 8px;
+
+    border-radius: 15px;
+
+    background: white;
+}
+
+.channel-name {
+    min-width: 0;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    overflow-wrap: anywhere;
+}
+
+.channel-status {
+    color: #1d9b55;
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.join-btn {
+    border: 0;
+
+    padding: 9px 13px;
+
+    border-radius: 11px;
+
+    background: #1877f2;
+
+    color: white;
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   LEADERBOARD
+========================================================= */
 
 .leader {
     display: flex;
@@ -240,19 +363,21 @@ button {
 
     gap: 10px;
 
-    background: white;
-
     padding: 12px;
+
+    margin-bottom: 8px;
 
     border-radius: 16px;
 
-    margin-bottom: 8px;
+    background: white;
 }
 
 .rank {
-    width: 30px;
-    font-weight: 900;
+    width: 28px;
+
     text-align: center;
+
+    font-weight: 900;
 }
 
 .leader-avatar {
@@ -263,221 +388,50 @@ button {
 
     object-fit: cover;
 
-    background: #e6ebf3;
+    background: #e3e9f2;
 }
 
 .leader-info {
-    flex: 1;
     min-width: 0;
+    flex: 1;
 }
 
 .leader-name {
-    font-weight: 800;
-
     overflow: hidden;
 
+    white-space: nowrap;
     text-overflow: ellipsis;
 
-    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 800;
 }
 
 .leader-stats {
-    color: #8993a4;
-    font-size: 11px;
+    margin-top: 3px;
+
+    color: #8993a3;
+
+    font-size: 10px;
 }
 
 .points {
+    font-size: 13px;
     font-weight: 900;
 }
 
 
-/* CHANNELS */
-
-.channel {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 10px;
-
-    background: white;
-
-    border-radius: 16px;
-
-    padding: 13px;
-
-    margin-bottom: 8px;
-}
-
-.channel-name {
-    font-weight: 700;
-    overflow-wrap: anywhere;
-}
-
-.channel-status {
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.join-btn {
-    border: 0;
-
-    background: #1877f2;
-
-    color: white;
-
-    padding: 10px 14px;
-
-    border-radius: 12px;
-
-    font-weight: 800;
-}
-
-
-/* NAV */
-
-.nav {
-    position: fixed;
-
-    left: 50%;
-
-    bottom: 12px;
-
-    transform: translateX(-50%);
-
-    width:
-        min(
-            calc(100% - 24px),
-            500px
-        );
-
-    background: rgba(
-        255,
-        255,
-        255,
-        .96
-    );
-
-    backdrop-filter:
-        blur(14px);
-
-    border-radius: 22px;
-
-    padding: 8px;
-
-    display: grid;
-
-    grid-template-columns:
-        repeat(4, 1fr);
-
-    gap: 4px;
-
-    box-shadow:
-        0 8px 30px
-        rgba(0,0,0,.12);
-
-    z-index: 100;
-}
-
-.nav button {
-    border: 0;
-
-    background: transparent;
-
-    padding: 9px 3px;
-
-    border-radius: 15px;
-
-    color: #7a8495;
-
-    font-size: 11px;
-
-    font-weight: 800;
-}
-
-.nav button.active {
-    background: #e9f2ff;
-    color: #1877f2;
-}
-
-
-/* MODAL */
-
-.modal {
-    position: fixed;
-
-    inset: 0;
-
-    background:
-        rgba(0,0,0,.42);
-
-    display: flex;
-
-    align-items: flex-end;
-
-    justify-content: center;
-
-    z-index: 200;
-}
-
-.modal-box {
-    width:
-        min(
-            100%,
-            520px
-        );
-
-    background: white;
-
-    border-radius:
-        25px
-        25px
-        0
-        0;
-
-    padding: 22px;
-
-    max-height: 85vh;
-
-    overflow-y: auto;
-}
-
-.modal-title {
-    font-size: 21px;
-    font-weight: 900;
-
-    margin-bottom: 14px;
-}
-
-.close {
-    border: 0;
-
-    width: 100%;
-
-    padding: 13px;
-
-    border-radius: 14px;
-
-    margin-top: 12px;
-
-    font-weight: 800;
-
-    background: #edf1f6;
-}
-
-
-/* PROFILE */
+/* =========================================================
+   PROFILE
+========================================================= */
 
 .profile-head {
-    text-align: center;
-
-    background: white;
-
     padding: 25px;
 
     border-radius: 22px;
+
+    background: white;
+
+    text-align: center;
 }
 
 .profile-avatar {
@@ -488,36 +442,157 @@ button {
 
     object-fit: cover;
 
-    background: #e4eaf3;
+    background: #e3e9f2;
 }
 
 .profile-name {
+    margin-top: 10px;
+
     font-size: 21px;
     font-weight: 900;
-
-    margin-top: 10px;
 }
 
 .profile-id {
-    color: #818b9c;
-    font-size: 12px;
+    margin-top: 4px;
+
+    color: #8791a1;
+
+    font-size: 11px;
 }
 
 
-/* MESSAGE */
+/* =========================================================
+   REFERRAL
+========================================================= */
 
-.message {
+.referral-link {
+    margin-top: 12px;
+
     padding: 13px;
+
+    border-radius: 13px;
+
+    background: #f1f4f8;
+
+    font-size: 12px;
+
+    overflow-wrap: anywhere;
+}
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+.nav {
+    position: fixed;
+
+    left: 50%;
+    bottom: 10px;
+
+    transform: translateX(-50%);
+
+    width:
+        min(
+            calc(100% - 20px),
+            510px
+        );
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 4px;
+
+    padding: 8px;
+
+    border-radius: 22px;
+
+    background:
+        rgba(255,255,255,.96);
+
+    backdrop-filter:
+        blur(15px);
+
+    box-shadow:
+        0 8px 30px
+        rgba(0,0,0,.13);
+
+    z-index: 100;
+}
+
+.nav button {
+    border: 0;
+
+    padding: 8px 3px;
 
     border-radius: 14px;
 
-    background: #fff4d7;
+    background: transparent;
 
-    color: #775600;
+    color: #7c8798;
 
-    font-size: 13px;
+    font-size: 10px;
+    font-weight: 800;
+}
 
-    margin-bottom: 12px;
+.nav button.active {
+    background: #e8f2ff;
+    color: #1877f2;
+}
+
+
+/* =========================================================
+   ADMIN
+========================================================= */
+
+.admin-input {
+    width: 100%;
+
+    margin-top: 8px;
+
+    padding: 13px;
+
+    border:
+        1px solid
+        #dce2ea;
+
+    border-radius: 12px;
+
+    outline: none;
+
+    font-size: 14px;
+}
+
+.admin-input:focus {
+    border-color: #1877f2;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 360px) {
+
+    .app {
+        padding: 12px;
+        padding-bottom: 105px;
+    }
+
+    .card {
+        padding: 14px;
+    }
+
+    .balance {
+        padding: 18px;
+    }
+
+    .balance-value {
+        font-size: 29px;
+    }
+
 }
 
 </style>
@@ -527,14 +602,22 @@ button {
 
 <body>
 
-<div id="loading" class="loading">
+
+<!-- ======================================================
+     LOADING
+======================================================= -->
+
+<div
+    id="loading"
+    class="loading"
+>
 
     <div>
 
         <div class="spinner"></div>
 
         <p>
-            Connecting to Telegram...
+            Connecting...
         </p>
 
     </div>
@@ -542,10 +625,17 @@ button {
 </div>
 
 
+<!-- ======================================================
+     APP
+======================================================= -->
+
 <div
     id="app"
     class="app hidden"
 >
+
+
+    <!-- MESSAGE -->
 
     <div
         id="message"
@@ -578,7 +668,7 @@ button {
                     id="headerId"
                     class="user-id"
                 >
-                    ID
+                    Telegram ID
                 </div>
 
             </div>
@@ -588,7 +678,9 @@ button {
     </div>
 
 
-    <!-- VERIFICATION -->
+    <!-- ==================================================
+         VERIFICATION
+    =================================================== -->
 
     <section
         id="verification"
@@ -603,7 +695,7 @@ button {
 
             <p>
                 Join all required channels
-                before using the Mini App.
+                to continue.
             </p>
 
             <div id="channels"></div>
@@ -612,7 +704,7 @@ button {
                 id="checkChannels"
                 class="action"
             >
-                🔄 Check Again
+                🔄 Check Membership
             </button>
 
         </div>
@@ -620,9 +712,13 @@ button {
     </section>
 
 
-    <!-- MAIN -->
+    <!-- ==================================================
+         MAIN CONTENT
+    =================================================== -->
 
-    <main id="mainContent">
+    <main
+        id="mainContent"
+    >
 
 
         <!-- HOME -->
@@ -649,6 +745,7 @@ button {
 
 
             <div class="grid">
+
 
                 <div class="card">
 
@@ -704,7 +801,7 @@ button {
                         id="rank"
                         class="card-value"
                     >
-                        #
+                        #-
                     </div>
 
                 </div>
@@ -721,13 +818,13 @@ button {
                     </div>
 
                     <div
-                        id="rewardCount"
                         class="card-value"
                     >
                         Top 30
                     </div>
 
                 </div>
+
 
             </div>
 
@@ -769,19 +866,13 @@ button {
                 </div>
 
                 <p>
-                    Invite friends using your
-                    personal referral link.
+                    Share your referral link
+                    with your friends.
                 </p>
 
                 <div
                     id="refLink"
-                    style="
-                        padding:13px;
-                        background:#f1f4f8;
-                        border-radius:14px;
-                        overflow-wrap:anywhere;
-                        font-size:13px;
-                    "
+                    class="referral-link"
                 ></div>
 
                 <button
@@ -795,7 +886,10 @@ button {
             </div>
 
 
-            <div class="grid">
+            <div
+                class="grid"
+                style="margin-top:12px"
+            >
 
                 <div class="card">
 
@@ -813,10 +907,11 @@ button {
 
                 </div>
 
+
                 <div class="card">
 
                     <div class="card-title">
-                        Reward Points
+                        Points
                     </div>
 
                     <div
@@ -882,7 +977,10 @@ button {
             </div>
 
 
-            <div class="grid" style="margin-top:12px">
+            <div
+                class="grid"
+                style="margin-top:12px"
+            >
 
                 <div class="card">
 
@@ -926,7 +1024,7 @@ button {
                         id="profileRank"
                         class="card-value"
                     >
-                        #
+                        #-
                     </div>
 
                 </div>
@@ -960,8 +1058,9 @@ button {
         >
 
             <div class="section-title">
-                👑 Admin
+                👑 Admin Panel
             </div>
+
 
             <div class="card">
 
@@ -971,23 +1070,20 @@ button {
 
                 <input
                     id="adminAdReward"
+                    class="admin-input"
                     type="number"
                     min="0"
                     step="0.01"
                     value="1"
-                    style="
-                        width:100%;
-                        margin-top:10px;
-                        padding:13px;
-                        border:1px solid #dce2ea;
-                        border-radius:12px;
-                    "
                 >
 
             </div>
 
 
-            <div class="card" style="margin-top:10px">
+            <div
+                class="card"
+                style="margin-top:10px"
+            >
 
                 <div class="card-title">
                     Invite Reward
@@ -995,40 +1091,31 @@ button {
 
                 <input
                     id="adminInviteReward"
+                    class="admin-input"
                     type="number"
                     min="0"
                     step="0.01"
                     value="1"
-                    style="
-                        width:100%;
-                        margin-top:10px;
-                        padding:13px;
-                        border:1px solid #dce2ea;
-                        border-radius:12px;
-                    "
                 >
 
             </div>
 
 
-            <div class="card" style="margin-top:10px">
+            <div
+                class="card"
+                style="margin-top:10px"
+            >
 
                 <div class="card-title">
-                    Daily Ad Limit
+                    Daily Ads Limit
                 </div>
 
                 <input
                     id="adminAdLimit"
+                    class="admin-input"
                     type="number"
                     min="1"
                     value="100"
-                    style="
-                        width:100%;
-                        margin-top:10px;
-                        padding:13px;
-                        border:1px solid #dce2ea;
-                        border-radius:12px;
-                    "
                 >
 
             </div>
@@ -1047,7 +1134,7 @@ button {
                 class="section-title"
                 style="margin-top:25px"
             >
-                🎁 Leaderboard Rewards
+                🎁 Edit Leaderboard Reward
             </div>
 
 
@@ -1055,42 +1142,25 @@ button {
 
                 <input
                     id="rewardPosition"
+                    class="admin-input"
                     type="number"
                     min="1"
                     max="30"
-                    placeholder="Position"
-                    style="
-                        width:100%;
-                        padding:13px;
-                        margin-bottom:8px;
-                        border:1px solid #dce2ea;
-                        border-radius:12px;
-                    "
+                    placeholder="Position 1-30"
                 >
 
                 <input
                     id="rewardTitle"
+                    class="admin-input"
                     type="text"
                     placeholder="Reward title"
-                    style="
-                        width:100%;
-                        padding:13px;
-                        margin-bottom:8px;
-                        border:1px solid #dce2ea;
-                        border-radius:12px;
-                    "
                 >
 
                 <input
                     id="rewardDescription"
+                    class="admin-input"
                     type="text"
-                    placeholder="Description"
-                    style="
-                        width:100%;
-                        padding:13px;
-                        border:1px solid #dce2ea;
-                        border-radius:12px;
-                    "
+                    placeholder="Reward description"
                 >
 
                 <button
@@ -1098,19 +1168,23 @@ button {
                     class="action"
                     style="margin-top:10px"
                 >
-                    Save Reward
+                    💾 Save Reward
                 </button>
 
             </div>
 
         </section>
 
+
     </main>
+
 
 </div>
 
 
-<!-- NAVIGATION -->
+<!-- ======================================================
+     NAVIGATION
+======================================================= -->
 
 <nav
     id="nav"
@@ -1161,11 +1235,49 @@ button {
 <script>
 
 /* =========================================================
+   CONFIGURATION
+========================================================= */
+
+/*
+ * IMPORTANT:
+ * GitHub Pages frontend talks to Vercel backend.
+ */
+
+const API_BASE =
+    "https://mini-reward-bot.vercel.app";
+
+
+/*
+ * Put your bot username here.
+ *
+ * Example:
+ * const BOT_USERNAME = "my_reward_bot";
+ *
+ * Do NOT put @.
+ */
+
+const BOT_USERNAME =
+    "YOUR_BOT_USERNAME";
+
+
+/*
+ * Your AdsGram block.
+ */
+
+const ADSGRAM_BLOCK_ID =
+    "52614";
+
+
+/* =========================================================
    TELEGRAM
 ========================================================= */
 
 const tg =
-    window.Telegram?.WebApp;
+    window.Telegram &&
+    window.Telegram.WebApp
+        ? window.Telegram.WebApp
+        : null;
+
 
 if (tg) {
 
@@ -1182,61 +1294,18 @@ if (tg) {
 
 let currentUser = null;
 
-let AdController = null;
+let adController = null;
 
-let adInProgress = false;
-
-
-/* =========================================================
-   ELEMENTS
-========================================================= */
-
-const $ = id =>
-    document.getElementById(id);
+let adBusy = false;
 
 
 /* =========================================================
-   API
+   SHORT SELECTOR
 ========================================================= */
 
-async function api(
-    endpoint,
-    options = {}
-) {
+function $(id) {
 
-    const headers = {
-        "Content-Type":
-            "application/json",
-
-        "X-Telegram-Init-Data":
-            tg?.initData || ""
-    };
-
-    const response =
-        await fetch(
-            endpoint,
-            {
-                ...options,
-                headers: {
-                    ...headers,
-                    ...(options.headers || {})
-                }
-            }
-        );
-
-    const data =
-        await response.json();
-
-    if (!response.ok) {
-
-        throw new Error(
-            data.error ||
-            "Request failed"
-        );
-
-    }
-
-    return data;
+    return document.getElementById(id);
 
 }
 
@@ -1247,12 +1316,15 @@ async function api(
 
 function showMessage(text) {
 
-    $("message").textContent =
-        text;
+    const element =
+        $("message");
 
-    $("message")
-        .classList
-        .remove("hidden");
+    element.textContent =
+        String(text);
+
+    element.classList.remove(
+        "hidden"
+    );
 
 }
 
@@ -1267,7 +1339,77 @@ function hideMessage() {
 
 
 /* =========================================================
-   AVATAR
+   API REQUEST
+========================================================= */
+
+async function api(
+    endpoint,
+    options = {}
+) {
+
+    const initData =
+        tg
+            ? tg.initData
+            : "";
+
+    const headers = {
+
+        "Content-Type":
+            "application/json",
+
+        "X-Telegram-Init-Data":
+            initData
+
+    };
+
+
+    const response =
+        await fetch(
+            API_BASE + endpoint,
+            {
+                ...options,
+
+                headers: {
+                    ...headers,
+                    ...(options.headers || {})
+                }
+            }
+        );
+
+
+    let data;
+
+    try {
+
+        data =
+            await response.json();
+
+    } catch {
+
+        throw new Error(
+            "Server returned invalid response."
+        );
+
+    }
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.error ||
+            `Server error ${response.status}`
+        );
+
+    }
+
+
+    return data;
+
+}
+
+
+/* =========================================================
+   IMAGE
 ========================================================= */
 
 function setImage(
@@ -1275,9 +1417,13 @@ function setImage(
     url
 ) {
 
-    if (url) {
+    if (
+        url &&
+        typeof url === "string"
+    ) {
 
-        element.src = url;
+        element.src =
+            url;
 
     } else {
 
@@ -1290,79 +1436,103 @@ function setImage(
 
 
 /* =========================================================
-   INIT
+   ESCAPE HTML
 ========================================================= */
 
-async function init() {
+function escapeHtml(
+    value
+) {
 
-    try {
-
-        if (!tg?.initData) {
-
-            throw new Error(
-                "Open this Mini App from Telegram."
-            );
-
-        }
-
-        const ref =
-            new URLSearchParams(
-                window.location.search
-            ).get("ref");
-
-        const query =
-            ref
-                ? `?ref=${encodeURIComponent(ref)}`
-                : "";
-
-        const data =
-            await api(
-                `/api/me${query}`
-            );
-
-        currentUser =
-            data.user;
-
-        renderUser();
-
-        setupAds(
-            data.adsgram.blockId
+    return String(value)
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
         );
 
-        if (!data.allJoined) {
+}
 
-            showVerification(
-                data.channels
-            );
 
-        } else {
+/* =========================================================
+   NUMBER
+========================================================= */
 
-            showMain();
+function formatNumber(
+    value
+) {
 
-            loadRewards();
+    const number =
+        Number(value);
 
-        }
+    if (
+        !Number.isFinite(
+            number
+        )
+    ) {
 
-        $("loading")
-            .classList
-            .add("hidden");
-
-        $("app")
-            .classList
-            .remove("hidden");
-
-    } catch (error) {
-
-        $("loading").innerHTML = `
-            <div>
-                <h3>Unable to open app</h3>
-                <p>${escapeHtml(
-                    error.message
-                )}</p>
-            </div>
-        `;
+        return "0";
 
     }
+
+
+    return number.toLocaleString();
+
+}
+
+
+/* =========================================================
+   RANDOM KEY
+========================================================= */
+
+function createRewardKey() {
+
+    if (
+        window.crypto &&
+        window.crypto.getRandomValues
+    ) {
+
+        const array =
+            new Uint32Array(4);
+
+        window.crypto
+            .getRandomValues(
+                array
+            );
+
+        return Array.from(
+            array
+        )
+        .map(
+            x =>
+                x.toString(36)
+        )
+        .join("-");
+
+    }
+
+
+    return (
+        Date.now() +
+        "-" +
+        Math.random()
+            .toString(36)
+            .slice(2)
+    );
 
 }
 
@@ -1373,85 +1543,131 @@ async function init() {
 
 function renderUser() {
 
-    const u =
+    if (!currentUser) {
+        return;
+    }
+
+
+    const user =
         currentUser;
 
-    $("headerName").textContent =
-        u.first_name ||
-        u.username ||
+
+    const name =
+        user.first_name ||
+        user.username ||
         "User";
 
-    $("headerId").textContent =
-        `ID: ${u.telegram_id}`;
 
-    $("points").textContent =
-        formatNumber(u.points);
+    $("headerName")
+        .textContent =
+        name;
 
-    $("adsCount").textContent =
-        `${u.total_ads} watched`;
 
-    $("inviteCount").textContent =
-        `${u.total_invites} invited`;
+    $("headerId")
+        .textContent =
+        `ID: ${user.telegram_id}`;
 
-    $("rank").textContent =
-        `#${u.rank}`;
 
-    $("inviteTotal").textContent =
-        u.total_invites;
+    $("points")
+        .textContent =
+        formatNumber(
+            user.points
+        );
 
-    $("invitePoints").textContent =
-        formatNumber(u.points);
 
-    $("profileName").textContent =
-        u.first_name ||
-        u.username ||
-        "User";
+    $("adsCount")
+        .textContent =
+        `${user.total_ads} watched`;
 
-    $("profileId").textContent =
-        `Telegram ID: ${u.telegram_id}`;
 
-    $("profileAds").textContent =
-        u.total_ads;
+    $("inviteCount")
+        .textContent =
+        `${user.total_invites} invited`;
 
-    $("profileInvites").textContent =
-        u.total_invites;
 
-    $("profileRank").textContent =
-        `#${u.rank}`;
+    $("rank")
+        .textContent =
+        `#${user.rank}`;
 
-    $("profilePoints").textContent =
-        formatNumber(u.points);
+
+    $("inviteTotal")
+        .textContent =
+        user.total_invites;
+
+
+    $("invitePoints")
+        .textContent =
+        formatNumber(
+            user.points
+        );
+
+
+    $("profileName")
+        .textContent =
+        name;
+
+
+    $("profileId")
+        .textContent =
+        `Telegram ID: ${user.telegram_id}`;
+
+
+    $("profileAds")
+        .textContent =
+        user.total_ads;
+
+
+    $("profileInvites")
+        .textContent =
+        user.total_invites;
+
+
+    $("profileRank")
+        .textContent =
+        `#${user.rank}`;
+
+
+    $("profilePoints")
+        .textContent =
+        formatNumber(
+            user.points
+        );
+
 
     setImage(
         $("headerAvatar"),
-        u.photo_url
+        user.photo_url
     );
+
 
     setImage(
         $("profileAvatar"),
-        u.photo_url
+        user.photo_url
     );
 
 
-    const botUsername =
-        window.BOT_USERNAME ||
-        "YOUR_BOT_USERNAME";
-
-    const code =
-        u.referral_code;
-
-    const link =
-        `https://t.me/${botUsername}?start=ref_${code}`;
-
-    $("refLink").textContent =
-        link;
+    const referralLink =
+        `https://t.me/${BOT_USERNAME}?start=ref_${encodeURIComponent(
+            user.referral_code
+        )}`;
 
 
-    if (u.is_admin) {
+    $("refLink")
+        .textContent =
+        referralLink;
+
+
+    if (user.is_admin) {
 
         $("adminNav")
             .classList
             .remove("hidden");
+
+    } else {
+
+        $("adminNav")
+            .classList
+            .add("hidden");
 
     }
 
@@ -1459,172 +1675,196 @@ function renderUser() {
 
 
 /* =========================================================
-   VERIFICATION
+   SHOW VERIFICATION
 ========================================================= */
 
 function showVerification(
     channels
 ) {
 
+    $("verification")
+        .classList
+        .remove("hidden");
+
+
     $("mainContent")
         .classList
         .add("hidden");
+
 
     $("nav")
         .classList
         .add("hidden");
 
-    $("verification")
-        .classList
-        .remove("hidden");
 
-    renderChannels(channels);
-
-}
-
-
-function renderChannels(
-    channels
-) {
-
-    $("channels").innerHTML = "";
-
-    for (
-        const channel
-        of channels
-    ) {
-
-        const row =
-            document.createElement("div");
-
-        row.className =
-            "channel";
-
-        const name =
-            document.createElement("div");
-
-        name.className =
-            "channel-name";
-
-        name.textContent =
-            channel.channel;
-
-        const right =
-            document.createElement("div");
-
-        if (channel.joined) {
-
-            const status =
-                document.createElement("span");
-
-            status.className =
-                "channel-status";
-
-            status.textContent =
-                "✅ Joined";
-
-            right.appendChild(status);
-
-        } else {
-
-            const button =
-                document.createElement("button");
-
-            button.className =
-                "join-btn";
-
-            button.textContent =
-                "JOIN";
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    const username =
-                        channel.channel
-                            .replace("@", "");
-
-                    if (tg) {
-
-                        tg.openTelegramLink(
-                            `https://t.me/${username}`
-                        );
-
-                    }
-
-                }
-            );
-
-            right.appendChild(button);
-
-        }
-
-        row.appendChild(name);
-
-        row.appendChild(right);
-
-        $("channels")
-            .appendChild(row);
-
-    }
+    renderChannels(
+        channels
+    );
 
 }
 
 
 /* =========================================================
-   RECHECK CHANNELS
+   RENDER CHANNELS
 ========================================================= */
 
-$("checkChannels")
-    .addEventListener(
-        "click",
-        async () => {
+function renderChannels(
+    channels
+) {
 
-            try {
+    const container =
+        $("channels");
 
-                $("checkChannels")
-                    .disabled = true;
 
-                const data =
-                    await api(
-                        "/api/channels"
+    container.innerHTML =
+        "";
+
+
+    if (
+        !channels ||
+        channels.length === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="message">
+                No required channels configured.
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    channels.forEach(
+        channel => {
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            row.className =
+                "channel";
+
+
+            const name =
+                document.createElement(
+                    "div"
+                );
+
+
+            name.className =
+                "channel-name";
+
+
+            name.textContent =
+                channel.channel;
+
+
+            const right =
+                document.createElement(
+                    "div"
+                );
+
+
+            if (
+                channel.joined
+            ) {
+
+                const status =
+                    document.createElement(
+                        "span"
                     );
 
-                renderChannels(
-                    data.channels
+
+                status.className =
+                    "channel-status";
+
+
+                status.textContent =
+                    "✅ Joined";
+
+
+                right.appendChild(
+                    status
                 );
 
-                if (data.allJoined) {
+            } else {
 
-                    const me =
-                        await api("/api/me");
+                const button =
+                    document.createElement(
+                        "button"
+                    );
 
-                    currentUser =
-                        me.user;
 
-                    renderUser();
+                button.className =
+                    "join-btn";
 
-                    showMain();
 
-                    loadRewards();
+                button.textContent =
+                    "JOIN";
 
-                }
 
-            } catch (error) {
+                button.addEventListener(
+                    "click",
+                    () => {
 
-                showMessage(
-                    error.message
+                        const username =
+                            String(
+                                channel.channel
+                            )
+                            .replace(
+                                /^@/,
+                                ""
+                            );
+
+
+                        if (tg) {
+
+                            tg.openTelegramLink(
+                                `https://t.me/${username}`
+                            );
+
+                        } else {
+
+                            window.open(
+                                `https://t.me/${username}`,
+                                "_blank"
+                            );
+
+                        }
+
+                    }
                 );
 
-            } finally {
 
-                $("checkChannels")
-                    .disabled = false;
+                right.appendChild(
+                    button
+                );
 
             }
 
+
+            row.appendChild(
+                name
+            );
+
+
+            row.appendChild(
+                right
+            );
+
+
+            container.appendChild(
+                row
+            );
+
         }
     );
+
+}
 
 
 /* =========================================================
@@ -1637,9 +1877,11 @@ function showMain() {
         .classList
         .add("hidden");
 
+
     $("mainContent")
         .classList
         .remove("hidden");
+
 
     $("nav")
         .classList
@@ -1649,35 +1891,123 @@ function showMain() {
 
 
 /* =========================================================
-   ADSGRAM
+   CHECK CHANNELS
 ========================================================= */
 
-function setupAds(
-    blockId
-) {
+async function checkChannels() {
 
     try {
 
-        if (!window.Adsgram) {
+        $("checkChannels")
+            .disabled = true;
+
+
+        hideMessage();
+
+
+        const data =
+            await api(
+                "/api/channels"
+            );
+
+
+        renderChannels(
+            data.channels
+        );
+
+
+        if (
+            data.allJoined
+        ) {
+
+            const me =
+                await api(
+                    "/api/me"
+                );
+
+
+            currentUser =
+                me.user;
+
+
+            renderUser();
+
+
+            showMain();
+
+
+            await loadRewards();
+
+        } else {
+
+            showMessage(
+                "You still need to join all required channels."
+            );
+
+        }
+
+
+    } catch (error) {
+
+        showMessage(
+            error.message
+        );
+
+    } finally {
+
+        $("checkChannels")
+            .disabled = false;
+
+    }
+
+}
+
+
+$("checkChannels")
+    .addEventListener(
+        "click",
+        checkChannels
+    );
+
+
+/* =========================================================
+   ADSGRAM
+========================================================= */
+
+function initializeAds() {
+
+    try {
+
+        if (
+            !window.Adsgram
+        ) {
 
             console.error(
-                "AdsGram SDK not loaded"
+                "AdsGram SDK not available."
             );
 
             return;
 
         }
 
-        AdController =
+
+        adController =
             window.Adsgram.init({
-                blockId: String(
-                    blockId || "52614"
-                )
+                blockId:
+                    ADSGRAM_BLOCK_ID
             });
+
+
+        console.log(
+            "AdsGram initialized:",
+            ADSGRAM_BLOCK_ID
+        );
+
 
     } catch (error) {
 
         console.error(
+            "AdsGram initialization failed:",
             error
         );
 
@@ -1687,134 +2017,196 @@ function setupAds(
 
 
 /* =========================================================
-   WATCH AD
+   WATCH ADS
 ========================================================= */
+
+async function watchAd() {
+
+    if (adBusy) {
+        return;
+    }
+
+
+    if (
+        !currentUser ||
+        !currentUser.is_verified
+    ) {
+
+        showMessage(
+            "Join all required channels first."
+        );
+
+        return;
+
+    }
+
+
+    if (!adController) {
+
+        showMessage(
+            "Ads are not ready yet."
+        );
+
+        return;
+
+    }
+
+
+    adBusy = true;
+
+    $("watchAd")
+        .disabled = true;
+
+
+    let rewarded =
+        false;
+
+
+    const rewardKey =
+        createRewardKey();
+
+
+    const rewardHandler =
+        () => {
+
+            rewarded = true;
+
+        };
+
+
+    try {
+
+        /*
+         * AdsGram reward event.
+         */
+
+        adController.addEventListener(
+            "onReward",
+            rewardHandler
+        );
+
+
+        /*
+         * Show rewarded ad.
+         */
+
+        await adController.show();
+
+
+        /*
+         * Remove event listener.
+         */
+
+        adController.removeEventListener(
+            "onReward",
+            rewardHandler
+        );
+
+
+        /*
+         * Do not credit if AdsGram
+         * didn't confirm reward.
+         */
+
+        if (!rewarded) {
+
+            showMessage(
+                "The ad was not completed for a reward."
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * Backend verifies Telegram
+         * identity and processes reward.
+         */
+
+        const result =
+            await api(
+                "/api/ad-reward",
+                {
+                    method: "POST",
+
+                    body:
+                        JSON.stringify({
+                            rewardKey
+                        })
+                }
+            );
+
+
+        if (
+            result.ok
+        ) {
+
+            currentUser.points =
+                result.user.points;
+
+
+            currentUser.total_ads =
+                result.user.total_ads;
+
+
+            currentUser.ads_count =
+                result.user.ads_count;
+
+
+            renderUser();
+
+
+            showMessage(
+                `🎉 +${result.reward} points`
+            );
+
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        showMessage(
+            error.message ||
+            "Ad was not completed."
+        );
+
+    } finally {
+
+        try {
+
+            adController.removeEventListener(
+                "onReward",
+                rewardHandler
+            );
+
+        } catch {}
+
+
+        adBusy = false;
+
+        $("watchAd")
+            .disabled = false;
+
+    }
+
+}
+
 
 $("watchAd")
     .addEventListener(
         "click",
-        async () => {
-
-            if (adInProgress) {
-                return;
-            }
-
-            if (!currentUser?.is_verified) {
-
-                showMessage(
-                    "Join all required channels first."
-                );
-
-                return;
-
-            }
-
-            if (!AdController) {
-
-                showMessage(
-                    "Ads are not ready yet."
-                );
-
-                return;
-
-            }
-
-            adInProgress = true;
-
-            $("watchAd")
-                .disabled = true;
-
-            try {
-
-                const rewardKey =
-                    `${currentUser.telegram_id}-${Date.now()}-${cryptoRandom()}`;
-
-                let rewarded = false;
-
-                const rewardHandler =
-                    () => {
-
-                        rewarded = true;
-
-                    };
-
-                AdController.addEventListener(
-                    "onReward",
-                    rewardHandler
-                );
-
-                await AdController.show();
-
-                AdController.removeEventListener(
-                    "onReward",
-                    rewardHandler
-                );
-
-                /*
-                 * Reward only after the
-                 * rewarded event fires.
-                 */
-
-                if (!rewarded) {
-
-                    showMessage(
-                        "Ad finished without a reward confirmation."
-                    );
-
-                    return;
-
-                }
-
-                const result =
-                    await api(
-                        "/api/ad-reward",
-                        {
-                            method: "POST",
-
-                            body:
-                                JSON.stringify({
-                                    rewardKey
-                                })
-                        }
-                    );
-
-                currentUser.points =
-                    result.user.points;
-
-                currentUser.ads_count =
-                    result.user.ads_count;
-
-                currentUser.total_ads =
-                    result.user.total_ads;
-
-                renderUser();
-
-                showMessage(
-                    `🎉 +${result.reward} points earned!`
-                );
-
-            } catch (error) {
-
-                showMessage(
-                    "No reward was added: " +
-                    error.message
-                );
-
-            } finally {
-
-                adInProgress = false;
-
-                $("watchAd")
-                    .disabled = false;
-
-            }
-
-        }
+        watchAd
     );
 
 
 /* =========================================================
-   REWARDS
+   LOAD REWARDS
 ========================================================= */
 
 async function loadRewards() {
@@ -1826,57 +2218,75 @@ async function loadRewards() {
                 "/api/rewards"
             );
 
-        $("rewardList")
-            .innerHTML = "";
+
+        const container =
+            $("rewardList");
+
+
+        container.innerHTML =
+            "";
+
 
         data.rewards.forEach(
             reward => {
 
-                const item =
+                const card =
                     document.createElement(
                         "div"
                     );
 
-                item.className =
+
+                card.className =
                     "card";
 
-                item.style.marginBottom =
+
+                card.style.marginBottom =
                     "8px";
 
-                item.innerHTML = `
-                    <strong>
+
+                card.innerHTML = `
+
+                    <div
+                        style="
+                            font-weight:800;
+                        "
+                    >
                         #${escapeHtml(
-                            String(
-                                reward.position
-                            )
+                            reward.position
                         )}
                         ${escapeHtml(
                             reward.title
                         )}
-                    </strong>
+                    </div>
 
                     <div
                         style="
+                            margin-top:4px;
                             color:#7f8999;
                             font-size:12px;
-                            margin-top:4px
                         "
                     >
                         ${escapeHtml(
                             reward.description || ""
                         )}
                     </div>
+
                 `;
 
-                $("rewardList")
-                    .appendChild(item);
+
+                container.appendChild(
+                    card
+                );
 
             }
         );
 
+
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
 
     }
 
@@ -1896,8 +2306,29 @@ async function loadLeaderboard() {
                 "/api/leaderboard"
             );
 
-        $("leaderboard")
-            .innerHTML = "";
+
+        const container =
+            $("leaderboard");
+
+
+        container.innerHTML =
+            "";
+
+
+        if (
+            !data.leaderboard.length
+        ) {
+
+            container.innerHTML = `
+                <div class="card">
+                    No leaderboard users yet.
+                </div>
+            `;
+
+            return;
+
+        }
+
 
         data.leaderboard.forEach(
             user => {
@@ -1907,39 +2338,64 @@ async function loadLeaderboard() {
                         "div"
                     );
 
+
                 row.className =
                     "leader";
 
-                const img =
+
+                const avatar =
                     user.photo_url ||
                     "https://via.placeholder.com/50";
+
 
                 const name =
                     user.first_name ||
                     user.username ||
                     "User";
 
+
                 row.innerHTML = `
+
                     <div class="rank">
-                        ${user.rank}
+                        ${escapeHtml(
+                            user.rank
+                        )}
                     </div>
 
                     <img
                         class="leader-avatar"
-                        src="${escapeAttr(img)}"
+                        src="${escapeHtml(
+                            avatar
+                        )}"
                         alt=""
                     >
 
-                    <div class="leader-info">
+                    <div
+                        class="leader-info"
+                    >
 
-                        <div class="leader-name">
-                            ${escapeHtml(name)}
+                        <div
+                            class="leader-name"
+                        >
+                            ${escapeHtml(
+                                name
+                            )}
                         </div>
 
-                        <div class="leader-stats">
-                            📺 ${user.ads}
+                        <div
+                            class="leader-stats"
+                        >
+                            📺
+                            ${escapeHtml(
+                                user.ads
+                            )}
+
                             &nbsp; • &nbsp;
-                            👥 ${user.invites}
+
+                            👥
+                            ${escapeHtml(
+                                user.invites
+                            )}
                         </div>
 
                     </div>
@@ -1949,13 +2405,17 @@ async function loadLeaderboard() {
                             user.points
                         )}
                     </div>
+
                 `;
 
-                $("leaderboard")
-                    .appendChild(row);
+
+                container.appendChild(
+                    row
+                );
 
             }
         );
+
 
     } catch (error) {
 
@@ -1986,32 +2446,45 @@ document
                     const page =
                         button.dataset.page;
 
+
                     document
                         .querySelectorAll(
                             ".page"
                         )
                         .forEach(
-                            x =>
-                                x.classList
-                                    .add("hidden")
+                            item => {
+
+                                item.classList
+                                    .add("hidden");
+
+                            }
                         );
+
 
                     $(page)
                         .classList
                         .remove("hidden");
+
 
                     document
                         .querySelectorAll(
                             ".nav button"
                         )
                         .forEach(
-                            x =>
-                                x.classList
-                                    .remove("active")
+                            item => {
+
+                                item.classList
+                                    .remove(
+                                        "active"
+                                    );
+
+                            }
                         );
+
 
                     button.classList
                         .add("active");
+
 
                     if (
                         page ===
@@ -2042,20 +2515,34 @@ $("shareInvite")
                 $("refLink")
                     .textContent;
 
+
             const text =
                 "Join me and earn rewards!";
 
-            const shareUrl =
-                `https://t.me/share/url?url=${encodeURIComponent(
+
+            const url =
+                "https://t.me/share/url" +
+                "?url=" +
+                encodeURIComponent(
                     link
-                )}&text=${encodeURIComponent(
+                ) +
+                "&text=" +
+                encodeURIComponent(
                     text
-                )}`;
+                );
+
 
             if (tg) {
 
                 tg.openTelegramLink(
-                    shareUrl
+                    url
+                );
+
+            } else {
+
+                window.open(
+                    url,
+                    "_blank"
                 );
 
             }
@@ -2077,18 +2564,24 @@ $("saveAdmin")
 
                 const adReward =
                     Number(
-                        $("adminAdReward").value
+                        $("adminAdReward")
+                            .value
                     );
+
 
                 const inviteReward =
                     Number(
-                        $("adminInviteReward").value
+                        $("adminInviteReward")
+                            .value
                     );
+
 
                 const adLimit =
                     Number(
-                        $("adminAdLimit").value
+                        $("adminAdLimit")
+                            .value
                     );
+
 
                 if (
                     !Number.isFinite(
@@ -2096,10 +2589,13 @@ $("saveAdmin")
                     ) ||
                     adReward < 0
                 ) {
+
                     throw new Error(
-                        "Invalid ad reward"
+                        "Invalid ad reward."
                     );
+
                 }
+
 
                 if (
                     !Number.isFinite(
@@ -2107,10 +2603,13 @@ $("saveAdmin")
                     ) ||
                     inviteReward < 0
                 ) {
+
                     throw new Error(
-                        "Invalid invite reward"
+                        "Invalid invite reward."
                     );
+
                 }
+
 
                 if (
                     !Number.isInteger(
@@ -2118,10 +2617,13 @@ $("saveAdmin")
                     ) ||
                     adLimit < 1
                 ) {
+
                     throw new Error(
-                        "Invalid ad limit"
+                        "Invalid daily ad limit."
                     );
+
                 }
+
 
                 await api(
                     "/api/admin/settings",
@@ -2130,6 +2632,7 @@ $("saveAdmin")
 
                         body:
                             JSON.stringify({
+
                                 ad_reward:
                                     adReward,
 
@@ -2138,13 +2641,16 @@ $("saveAdmin")
 
                                 max_ads_per_day:
                                     adLimit
+
                             })
                     }
                 );
 
+
                 showMessage(
                     "✅ Settings saved."
                 );
+
 
             } catch (error) {
 
@@ -2175,15 +2681,18 @@ $("saveReward")
                             .value
                     );
 
+
                 const title =
                     $("rewardTitle")
                         .value
                         .trim();
 
+
                 const description =
                     $("rewardDescription")
                         .value
                         .trim();
+
 
                 if (
                     !Number.isInteger(
@@ -2194,18 +2703,20 @@ $("saveReward")
                 ) {
 
                     throw new Error(
-                        "Position must be 1-30"
+                        "Position must be between 1 and 30."
                     );
 
                 }
+
 
                 if (!title) {
 
                     throw new Error(
-                        "Reward title required"
+                        "Reward title is required."
                     );
 
                 }
+
 
                 await api(
                     "/api/admin/reward",
@@ -2214,19 +2725,27 @@ $("saveReward")
 
                         body:
                             JSON.stringify({
+
                                 position,
+
                                 title,
+
                                 description,
+
                                 enabled: true
+
                             })
                     }
                 );
 
+
                 showMessage(
-                    "✅ Reward saved."
+                    "✅ Reward updated."
                 );
 
-                loadRewards();
+
+                await loadRewards();
+
 
             } catch (error) {
 
@@ -2241,70 +2760,169 @@ $("saveReward")
 
 
 /* =========================================================
-   HELPERS
+   INITIALIZATION
 ========================================================= */
 
-function formatNumber(
-    value
-) {
+async function initializeApp() {
 
-    const n =
-        Number(value);
+    try {
 
-    if (!Number.isFinite(n)) {
-        return "0";
-    }
+        /*
+         * The Mini App MUST be opened
+         * from Telegram.
+         */
 
-    return n.toLocaleString();
-}
+        if (
+            !tg ||
+            !tg.initData
+        ) {
+
+            throw new Error(
+                "Please open this Mini App from Telegram."
+            );
+
+        }
 
 
-function cryptoRandom() {
+        /*
+         * Referral parameter:
+         *
+         * ?ref=referralCode
+         */
 
-    if (
-        window.crypto &&
-        window.crypto.getRandomValues
-    ) {
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
 
-        const array =
-            new Uint32Array(2);
 
-        window.crypto
-            .getRandomValues(array);
+        const ref =
+            params.get(
+                "ref"
+            );
 
-        return (
-            array[0].toString(36) +
-            array[1].toString(36)
+
+        let endpoint =
+            "/api/me";
+
+
+        if (ref) {
+
+            endpoint +=
+                "?ref=" +
+                encodeURIComponent(
+                    ref
+                );
+
+        }
+
+
+        /*
+         * Connect to Vercel backend.
+         */
+
+        const data =
+            await api(
+                endpoint
+            );
+
+
+        if (!data.ok) {
+
+            throw new Error(
+                data.error ||
+                "Unable to load account."
+            );
+
+        }
+
+
+        currentUser =
+            data.user;
+
+
+        renderUser();
+
+
+        /*
+         * AdsGram block 52614.
+         */
+
+        initializeAds();
+
+
+        /*
+         * Check required channels.
+         */
+
+        if (
+            data.allJoined
+        ) {
+
+            showMain();
+
+            await loadRewards();
+
+        } else {
+
+            showVerification(
+                data.channels
+            );
+
+        }
+
+
+        /*
+         * Finish loading.
+         */
+
+        $("loading")
+            .classList
+            .add("hidden");
+
+
+        $("app")
+            .classList
+            .remove("hidden");
+
+
+    } catch (error) {
+
+        console.error(
+            error
         );
 
+
+        $("loading")
+            .innerHTML = `
+
+                <div
+                    style="
+                        padding:25px;
+                    "
+                >
+
+                    <h3>
+                        Unable to open Mini App
+                    </h3>
+
+                    <p
+                        style="
+                            color:#6f7a8c;
+                            line-height:1.5;
+                        "
+                    >
+                        ${escapeHtml(
+                            error.message
+                        )}
+                    </p>
+
+                </div>
+
+            `;
+
     }
 
-    return Math.random()
-        .toString(36)
-        .slice(2);
-
-}
-
-
-function escapeHtml(
-    value
-) {
-
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-
-function escapeAttr(
-    value
-) {
-
-    return escapeHtml(value)
-        .replaceAll("`", "&#096;");
 }
 
 
@@ -2312,7 +2930,7 @@ function escapeAttr(
    START
 ========================================================= */
 
-init();
+initializeApp();
 
 </script>
 
