@@ -112,8 +112,21 @@ async function ensureDatabase() {
                 );
             `);
             await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_withdrawals (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    amount NUMERIC NOT NULL,
+                    method TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    admin_note TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    processed_at TIMESTAMPTZ
+                );
+            `);
+            await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
-                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100')
+                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100')
                 ON CONFLICT(key) DO NOTHING;
             `);
             await pool.query(`
@@ -423,8 +436,29 @@ app.get("/api/me", authenticate, async (req, res) => {
             [user.points]
         );
 
+        const sRes = await pool.query(`SELECT key, value FROM mr_app_settings`);
+        const settings = {};
+        for (const r of sRes.rows) settings[r.key] = Number(r.value);
+
+        const todayRes = await pool.query(
+            `SELECT COUNT(*)::int AS c FROM mr_ad_rewards
+             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW())`,
+            [telegramId]
+        );
+
+        let pendingWithdrawals = 0;
+        if (telegramId === ADMIN_ID) {
+            const pw = await pool.query(
+                `SELECT COUNT(*)::int AS c FROM mr_withdrawals WHERE status = 'pending'`
+            );
+            pendingWithdrawals = pw.rows[0].c;
+        }
+
         res.json({
             ok: true,
+            settings,
+            today_ads: todayRes.rows[0].c,
+            pending_withdrawals: pendingWithdrawals,
             user: {
                 telegram_id: user.telegram_id,
                 username: user.username,
@@ -635,8 +669,8 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
     try {
         await requireDatabase();
 
-        const { ad_reward, invite_reward, max_ads_per_day } = req.body || {};
-        const settings = { ad_reward, invite_reward, max_ads_per_day };
+        const { ad_reward, invite_reward, max_ads_per_day, min_withdraw } = req.body || {};
+        const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw };
 
         for (const [key, value] of Object.entries(settings)) {
             if (value === undefined || value === null) continue;
@@ -688,6 +722,227 @@ app.post("/api/admin/reward", authenticate, requireAdmin, async (req, res) => {
 
         res.json({ ok: true });
     } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ============================ WITHDRAW ============================ */
+
+const WITHDRAW_METHODS = ["USDT", "TON", "Telebirr", "Other"];
+
+async function notifyUser(telegramId, text) {
+    try {
+        await telegram("sendMessage", { chat_id: Number(telegramId), text });
+    } catch (e) {
+        console.error("notifyUser", e.message); // user may not have started the bot
+    }
+}
+
+app.post("/api/withdraw", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+
+        const telegramId = String(req.telegramUser.id);
+        const amount = Number(req.body?.amount);
+        const method = String(req.body?.method || "").trim();
+        const address = String(req.body?.address || "").trim();
+
+        if (!WITHDRAW_METHODS.includes(method)) {
+            return res.status(400).json({ ok: false, error: "Choose a valid payout method." });
+        }
+        if (address.length < 3 || address.length > 200) {
+            return res.status(400).json({ ok: false, error: "Enter a valid wallet or account." });
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ ok: false, error: "Enter a valid amount." });
+        }
+
+        const minRes = await pool.query(
+            `SELECT value FROM mr_app_settings WHERE key = 'min_withdraw'`
+        );
+        const minWithdraw = Number(minRes.rows[0]?.value || 100);
+        if (amount < minWithdraw) {
+            return res.status(400).json({ ok: false, error: `Minimum withdrawal is ${minWithdraw}.` });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+
+            const u = await client.query(
+                `SELECT points, is_banned FROM mr_users WHERE telegram_id = $1 FOR UPDATE`,
+                [telegramId]
+            );
+            if (!u.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ ok: false, error: "User not found." });
+            }
+            if (u.rows[0].is_banned) {
+                await client.query("ROLLBACK");
+                return res.status(403).json({ ok: false, error: "Your account is banned." });
+            }
+            if (Number(u.rows[0].points) < amount) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ ok: false, error: "Not enough points." });
+            }
+
+            const pending = await client.query(
+                `SELECT 1 FROM mr_withdrawals WHERE telegram_id = $1 AND status = 'pending' LIMIT 1`,
+                [telegramId]
+            );
+            if (pending.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ ok: false, error: "You already have a pending request." });
+            }
+
+            await client.query(
+                `UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1`,
+                [telegramId, amount]
+            );
+            await client.query(
+                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address) VALUES($1,$2,$3,$4)`,
+                [telegramId, amount, method, address]
+            );
+
+            await client.query("COMMIT");
+        } catch (e) {
+            await client.query("ROLLBACK").catch(() => {});
+            throw e;
+        } finally {
+            client.release();
+        }
+
+        const after = await pool.query(
+            `SELECT points FROM mr_users WHERE telegram_id = $1`,
+            [telegramId]
+        );
+        res.json({ ok: true, points: Number(after.rows[0].points) });
+    } catch (error) {
+        console.error("/api/withdraw", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.get("/api/withdrawals", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        const r = await pool.query(
+            `SELECT id, amount, method, address, status, admin_note, created_at, processed_at
+             FROM mr_withdrawals WHERE telegram_id = $1 ORDER BY id DESC LIMIT 30`,
+            [String(req.telegramUser.id)]
+        );
+        res.json({
+            ok: true,
+            withdrawals: r.rows.map(w => ({ ...w, amount: Number(w.amount) }))
+        });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const status = String(req.query.status || "pending");
+        const params = [];
+        let where = "";
+        if (["pending", "approved", "rejected"].includes(status)) {
+            where = "WHERE w.status = $1";
+            params.push(status);
+        }
+        const r = await pool.query(
+            `SELECT w.id, w.telegram_id, w.amount, w.method, w.address, w.status,
+                    w.admin_note, w.created_at, w.processed_at,
+                    u.username, u.first_name, u.last_name
+             FROM mr_withdrawals w
+             LEFT JOIN mr_users u ON u.telegram_id = w.telegram_id
+             ${where}
+             ORDER BY w.id DESC LIMIT 100`,
+            params
+        );
+        res.json({
+            ok: true,
+            withdrawals: r.rows.map(w => ({ ...w, amount: Number(w.amount) }))
+        });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/withdrawals/:id", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+
+        const id = String(req.params.id);
+        if (!/^\d+$/.test(id)) {
+            return res.status(400).json({ ok: false, error: "Invalid id." });
+        }
+        const action = String(req.body?.action || "");
+        if (!["approve", "reject"].includes(action)) {
+            return res.status(400).json({ ok: false, error: "Action must be approve or reject." });
+        }
+        const note = String(req.body?.note || "").slice(0, 300);
+
+        const client = await pool.connect();
+        let w;
+        try {
+            await client.query("BEGIN");
+
+            const found = await client.query(
+                `SELECT * FROM mr_withdrawals WHERE id = $1 FOR UPDATE`,
+                [id]
+            );
+            if (!found.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ ok: false, error: "Request not found." });
+            }
+            w = found.rows[0];
+            if (w.status !== "pending") {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ ok: false, error: "Already processed." });
+            }
+
+            const newStatus = action === "approve" ? "approved" : "rejected";
+
+            await client.query(
+                `UPDATE mr_withdrawals SET status = $2, admin_note = $3, processed_at = NOW() WHERE id = $1`,
+                [id, newStatus, note || null]
+            );
+
+            if (action === "reject") {
+                // give the held points back
+                await client.query(
+                    `UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`,
+                    [w.telegram_id, w.amount]
+                );
+            }
+
+            await client.query(
+                `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+                [ADMIN_ID, `withdraw_${newStatus}`, JSON.stringify({ id, amount: w.amount, user: w.telegram_id })]
+            );
+
+            await client.query("COMMIT");
+        } catch (e) {
+            await client.query("ROLLBACK").catch(() => {});
+            throw e;
+        } finally {
+            client.release();
+        }
+
+        const amt = Number(w.amount);
+        if (action === "approve") {
+            await notifyUser(w.telegram_id, `Your withdrawal of ${amt} has been approved.`);
+        } else {
+            await notifyUser(
+                w.telegram_id,
+                `Your withdrawal of ${amt} was rejected and the points were returned.` + (note ? `\nReason: ${note}` : "")
+            );
+        }
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error("/api/admin/withdrawals", error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
