@@ -7,15 +7,13 @@
 
 <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
 >
 
 <title>Reward Mini App</title>
 
-<!-- Telegram Mini App -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-<!-- AdsGram -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
 <style>
@@ -46,8 +44,12 @@ body {
     color: #172033;
 }
 
-button {
+button,
+input {
     font-family: inherit;
+}
+
+button {
     cursor: pointer;
 }
 
@@ -60,24 +62,12 @@ button:disabled {
     display: none !important;
 }
 
-
-/* =========================================================
-   APP
-========================================================= */
-
 .app {
     width: 100%;
     max-width: 520px;
     margin: 0 auto;
-
-    padding: 16px;
-    padding-bottom: 110px;
+    padding: 16px 16px 105px;
 }
-
-
-/* =========================================================
-   LOADING
-========================================================= */
 
 .loading {
     min-height: 100vh;
@@ -93,27 +83,21 @@ button:disabled {
     width: 44px;
     height: 44px;
 
+    margin: auto;
+
     border: 4px solid #dce4ef;
     border-top-color: #1877f2;
 
     border-radius: 50%;
 
-    animation:
-        spin .8s linear infinite;
+    animation: spin .8s linear infinite;
 }
 
 @keyframes spin {
-
     to {
         transform: rotate(360deg);
     }
-
 }
-
-
-/* =========================================================
-   MESSAGE
-========================================================= */
 
 .message {
     margin-bottom: 14px;
@@ -129,11 +113,6 @@ button:disabled {
     line-height: 1.4;
 }
 
-
-/* =========================================================
-   HEADER
-========================================================= */
-
 .header {
     display: flex;
     align-items: center;
@@ -145,7 +124,6 @@ button:disabled {
 .user {
     display: flex;
     align-items: center;
-
     gap: 11px;
 }
 
@@ -173,11 +151,6 @@ button:disabled {
     font-size: 11px;
 }
 
-
-/* =========================================================
-   BALANCE
-========================================================= */
-
 .balance {
     padding: 22px;
 
@@ -196,7 +169,7 @@ button:disabled {
 
     box-shadow:
         0 12px 30px
-        rgba(24, 105, 224, .18);
+        rgba(24,105,224,.18);
 }
 
 .balance-label {
@@ -211,16 +184,11 @@ button:disabled {
     font-weight: 900;
 }
 
-
-/* =========================================================
-   GRID
-========================================================= */
-
 .grid {
     display: grid;
 
     grid-template-columns:
-        repeat(2, minmax(0, 1fr));
+        repeat(2,minmax(0,1fr));
 
     gap: 11px;
 
@@ -236,7 +204,7 @@ button:disabled {
 
     box-shadow:
         0 5px 18px
-        rgba(22, 34, 55, .055);
+        rgba(22,34,55,.055);
 }
 
 .card-icon {
@@ -257,11 +225,6 @@ button:disabled {
 
     font-size: 12px;
 }
-
-
-/* =========================================================
-   ACTION BUTTON
-========================================================= */
 
 .action {
     width: 100%;
@@ -284,11 +247,6 @@ button:disabled {
     transform: scale(.98);
 }
 
-
-/* =========================================================
-   SECTION
-========================================================= */
-
 .section {
     margin-top: 20px;
 }
@@ -299,11 +257,6 @@ button:disabled {
     font-size: 18px;
     font-weight: 900;
 }
-
-
-/* =========================================================
-   CHANNEL
-========================================================= */
 
 .channel {
     display: flex;
@@ -351,11 +304,6 @@ button:disabled {
     font-size: 12px;
     font-weight: 800;
 }
-
-
-/* =========================================================
-   LEADERBOARD
-========================================================= */
 
 .leader {
     display: flex;
@@ -419,11 +367,6 @@ button:disabled {
     font-weight: 900;
 }
 
-
-/* =========================================================
-   PROFILE
-========================================================= */
-
 .profile-head {
     padding: 25px;
 
@@ -460,11 +403,6 @@ button:disabled {
     font-size: 11px;
 }
 
-
-/* =========================================================
-   REFERRAL
-========================================================= */
-
 .referral-link {
     margin-top: 12px;
 
@@ -478,11 +416,6 @@ button:disabled {
 
     overflow-wrap: anywhere;
 }
-
-
-/* =========================================================
-   NAVIGATION
-========================================================= */
 
 .nav {
     position: fixed;
@@ -501,7 +434,7 @@ button:disabled {
     display: grid;
 
     grid-template-columns:
-        repeat(4, minmax(0, 1fr));
+        repeat(5,minmax(0,1fr));
 
     gap: 4px;
 
@@ -542,11 +475,6 @@ button:disabled {
     color: #1877f2;
 }
 
-
-/* =========================================================
-   ADMIN
-========================================================= */
-
 .admin-input {
     width: 100%;
 
@@ -569,16 +497,10 @@ button:disabled {
     border-color: #1877f2;
 }
 
-
-/* =========================================================
-   RESPONSIVE
-========================================================= */
-
-@media (max-width: 360px) {
+@media(max-width:360px) {
 
     .app {
-        padding: 12px;
-        padding-bottom: 105px;
+        padding: 12px 12px 105px;
     }
 
     .card {
@@ -599,51 +521,26 @@ button:disabled {
 
 </head>
 
-
 <body>
 
-
-<!-- ======================================================
-     LOADING
-======================================================= -->
-
-<div
-    id="loading"
-    class="loading"
->
+<div id="loading" class="loading">
 
     <div>
 
         <div class="spinner"></div>
 
-        <p>
-            Connecting...
-        </p>
+        <p>Connecting...</p>
 
     </div>
 
 </div>
 
-
-<!-- ======================================================
-     APP
-======================================================= -->
-
-<div
-    id="app"
-    class="app hidden"
->
-
-
-    <!-- MESSAGE -->
+<div id="app" class="app hidden">
 
     <div
         id="message"
         class="message hidden"
     ></div>
-
-
-    <!-- HEADER -->
 
     <div class="header">
 
@@ -677,11 +574,6 @@ button:disabled {
 
     </div>
 
-
-    <!-- ==================================================
-         VERIFICATION
-    =================================================== -->
-
     <section
         id="verification"
         class="hidden"
@@ -711,17 +603,7 @@ button:disabled {
 
     </section>
 
-
-    <!-- ==================================================
-         MAIN CONTENT
-    =================================================== -->
-
-    <main
-        id="mainContent"
-    >
-
-
-        <!-- HOME -->
+    <main id="mainContent">
 
         <section
             id="homePage"
@@ -743,9 +625,7 @@ button:disabled {
 
             </div>
 
-
             <div class="grid">
-
 
                 <div class="card">
 
@@ -766,7 +646,6 @@ button:disabled {
 
                 </div>
 
-
                 <div class="card">
 
                     <div class="card-icon">
@@ -785,7 +664,6 @@ button:disabled {
                     </div>
 
                 </div>
-
 
                 <div class="card">
 
@@ -806,7 +684,6 @@ button:disabled {
 
                 </div>
 
-
                 <div class="card">
 
                     <div class="card-icon">
@@ -817,17 +694,13 @@ button:disabled {
                         Rewards
                     </div>
 
-                    <div
-                        class="card-value"
-                    >
+                    <div class="card-value">
                         Top 30
                     </div>
 
                 </div>
 
-
             </div>
-
 
             <button
                 id="watchAd"
@@ -836,23 +709,17 @@ button:disabled {
                 📺 Watch Ad & Earn
             </button>
 
-
             <div class="section">
 
                 <div class="section-title">
                     🎁 Leaderboard Rewards
                 </div>
 
-                <div
-                    id="rewardList"
-                ></div>
+                <div id="rewardList"></div>
 
             </div>
 
         </section>
-
-
-        <!-- INVITE -->
 
         <section
             id="invitePage"
@@ -885,7 +752,6 @@ button:disabled {
 
             </div>
 
-
             <div
                 class="grid"
                 style="margin-top:12px"
@@ -907,7 +773,6 @@ button:disabled {
 
                 </div>
 
-
                 <div class="card">
 
                     <div class="card-title">
@@ -928,9 +793,6 @@ button:disabled {
 
         </section>
 
-
-        <!-- LEADERBOARD -->
-
         <section
             id="leaderPage"
             class="page hidden"
@@ -940,14 +802,9 @@ button:disabled {
                 🏆 Top 30
             </div>
 
-            <div
-                id="leaderboard"
-            ></div>
+            <div id="leaderboard"></div>
 
         </section>
-
-
-        <!-- PROFILE -->
 
         <section
             id="profilePage"
@@ -976,7 +833,6 @@ button:disabled {
 
             </div>
 
-
             <div
                 class="grid"
                 style="margin-top:12px"
@@ -997,7 +853,6 @@ button:disabled {
 
                 </div>
 
-
                 <div class="card">
 
                     <div class="card-title">
@@ -1013,7 +868,6 @@ button:disabled {
 
                 </div>
 
-
                 <div class="card">
 
                     <div class="card-title">
@@ -1028,7 +882,6 @@ button:disabled {
                     </div>
 
                 </div>
-
 
                 <div class="card">
 
@@ -1049,9 +902,6 @@ button:disabled {
 
         </section>
 
-
-        <!-- ADMIN -->
-
         <section
             id="adminPage"
             class="page hidden"
@@ -1060,7 +910,6 @@ button:disabled {
             <div class="section-title">
                 👑 Admin Panel
             </div>
-
 
             <div class="card">
 
@@ -1078,7 +927,6 @@ button:disabled {
                 >
 
             </div>
-
 
             <div
                 class="card"
@@ -1100,7 +948,6 @@ button:disabled {
 
             </div>
 
-
             <div
                 class="card"
                 style="margin-top:10px"
@@ -1120,7 +967,6 @@ button:disabled {
 
             </div>
 
-
             <button
                 id="saveAdmin"
                 class="action"
@@ -1129,14 +975,12 @@ button:disabled {
                 💾 Save Settings
             </button>
 
-
             <div
                 class="section-title"
                 style="margin-top:25px"
             >
                 🎁 Edit Leaderboard Reward
             </div>
-
 
             <div class="card">
 
@@ -1175,16 +1019,9 @@ button:disabled {
 
         </section>
 
-
     </main>
 
-
 </div>
-
-
-<!-- ======================================================
-     NAVIGATION
-======================================================= -->
 
 <nav
     id="nav"
@@ -1231,42 +1068,22 @@ button:disabled {
 
 </nav>
 
-
 <script>
 
 /* =========================================================
-   CONFIGURATION
+   CONFIG
 ========================================================= */
 
 /*
- * IMPORTANT:
- * GitHub Pages frontend talks to Vercel backend.
+ * Because index.html and server.js are deployed
+ * together on Vercel, use the same origin.
  */
 
 const API_BASE =
-    "https://mini-reward-bot.vercel.app";
-
-
-/*
- * Put your bot username here.
- *
- * Example:
- * const BOT_USERNAME = "my_reward_bot";
- *
- * Do NOT put @.
- */
-
-const BOT_USERNAME =
-    "YOUR_BOT_USERNAME";
-
-
-/*
- * Your AdsGram block.
- */
+    window.location.origin;
 
 const ADSGRAM_BLOCK_ID =
     "52614";
-
 
 /* =========================================================
    TELEGRAM
@@ -1278,37 +1095,28 @@ const tg =
         ? window.Telegram.WebApp
         : null;
 
-
 if (tg) {
 
     tg.ready();
-
     tg.expand();
 
 }
-
 
 /* =========================================================
    STATE
 ========================================================= */
 
 let currentUser = null;
-
 let adController = null;
-
 let adBusy = false;
 
-
 /* =========================================================
-   SHORT SELECTOR
+   SELECTOR
 ========================================================= */
 
 function $(id) {
-
     return document.getElementById(id);
-
 }
-
 
 /* =========================================================
    MESSAGE
@@ -1316,30 +1124,23 @@ function $(id) {
 
 function showMessage(text) {
 
-    const element =
-        $("message");
-
-    element.textContent =
+    $("message").textContent =
         String(text);
 
-    element.classList.remove(
-        "hidden"
-    );
-
+    $("message")
+        .classList
+        .remove("hidden");
 }
-
 
 function hideMessage() {
 
     $("message")
         .classList
         .add("hidden");
-
 }
 
-
 /* =========================================================
-   API REQUEST
+   API
 ========================================================= */
 
 async function api(
@@ -1347,10 +1148,13 @@ async function api(
     options = {}
 ) {
 
-    const initData =
-        tg
-            ? tg.initData
-            : "";
+    if (!tg || !tg.initData) {
+
+        throw new Error(
+            "Please open this Mini App from Telegram."
+        );
+
+    }
 
     const headers = {
 
@@ -1358,10 +1162,9 @@ async function api(
             "application/json",
 
         "X-Telegram-Init-Data":
-            initData
+            tg.initData
 
     };
-
 
     const response =
         await fetch(
@@ -1375,7 +1178,6 @@ async function api(
                 }
             }
         );
-
 
     let data;
 
@@ -1392,7 +1194,6 @@ async function api(
 
     }
 
-
     if (!response.ok) {
 
         throw new Error(
@@ -1402,11 +1203,38 @@ async function api(
 
     }
 
-
     return data;
-
 }
 
+/* =========================================================
+   NUMBER
+========================================================= */
+
+function formatNumber(value) {
+
+    const number =
+        Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "0";
+    }
+
+    return number.toLocaleString();
+}
+
+/* =========================================================
+   HTML ESCAPE
+========================================================= */
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+}
 
 /* =========================================================
    IMAGE
@@ -1417,13 +1245,16 @@ function setImage(
     url
 ) {
 
-    if (
-        url &&
-        typeof url === "string"
-    ) {
+    if (url) {
 
-        element.src =
-            url;
+        element.src = url;
+
+        element.onerror = () => {
+
+            element.src =
+                "https://via.placeholder.com/100";
+
+        };
 
     } else {
 
@@ -1431,72 +1262,10 @@ function setImage(
             "https://via.placeholder.com/100";
 
     }
-
 }
 
-
 /* =========================================================
-   ESCAPE HTML
-========================================================= */
-
-function escapeHtml(
-    value
-) {
-
-    return String(value)
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
-
-}
-
-
-/* =========================================================
-   NUMBER
-========================================================= */
-
-function formatNumber(
-    value
-) {
-
-    const number =
-        Number(value);
-
-    if (
-        !Number.isFinite(
-            number
-        )
-    ) {
-
-        return "0";
-
-    }
-
-
-    return number.toLocaleString();
-
-}
-
-
-/* =========================================================
-   RANDOM KEY
+   REWARD KEY
 ========================================================= */
 
 function createRewardKey() {
@@ -1510,21 +1279,15 @@ function createRewardKey() {
             new Uint32Array(4);
 
         window.crypto
-            .getRandomValues(
-                array
-            );
+            .getRandomValues(array);
 
-        return Array.from(
-            array
-        )
-        .map(
-            x =>
-                x.toString(36)
-        )
-        .join("-");
+        return Array.from(array)
+            .map(
+                x => x.toString(36)
+            )
+            .join("-");
 
     }
-
 
     return (
         Date.now() +
@@ -1533,9 +1296,7 @@ function createRewardKey() {
             .toString(36)
             .slice(2)
     );
-
 }
-
 
 /* =========================================================
    RENDER USER
@@ -1543,119 +1304,99 @@ function createRewardKey() {
 
 function renderUser() {
 
-    if (!currentUser) {
-        return;
-    }
-
+    if (!currentUser) return;
 
     const user =
         currentUser;
-
 
     const name =
         user.first_name ||
         user.username ||
         "User";
 
-
     $("headerName")
-        .textContent =
-        name;
-
+        .textContent = name;
 
     $("headerId")
         .textContent =
         `ID: ${user.telegram_id}`;
 
-
     $("points")
         .textContent =
-        formatNumber(
-            user.points
-        );
-
+        formatNumber(user.points);
 
     $("adsCount")
         .textContent =
         `${user.total_ads} watched`;
 
-
     $("inviteCount")
         .textContent =
         `${user.total_invites} invited`;
-
 
     $("rank")
         .textContent =
         `#${user.rank}`;
 
-
     $("inviteTotal")
         .textContent =
         user.total_invites;
 
-
     $("invitePoints")
         .textContent =
-        formatNumber(
-            user.points
-        );
-
+        formatNumber(user.points);
 
     $("profileName")
-        .textContent =
-        name;
-
+        .textContent = name;
 
     $("profileId")
         .textContent =
         `Telegram ID: ${user.telegram_id}`;
 
-
     $("profileAds")
         .textContent =
         user.total_ads;
-
 
     $("profileInvites")
         .textContent =
         user.total_invites;
 
-
     $("profileRank")
         .textContent =
         `#${user.rank}`;
 
-
     $("profilePoints")
         .textContent =
-        formatNumber(
-            user.points
-        );
-
+        formatNumber(user.points);
 
     setImage(
         $("headerAvatar"),
         user.photo_url
     );
 
-
     setImage(
         $("profileAvatar"),
         user.photo_url
     );
 
+    const username =
+        currentUser.botUsername ||
+        "";
 
-    const referralLink =
-        `https://t.me/${BOT_USERNAME}?start=ref_${encodeURIComponent(
-            user.referral_code
-        )}`;
+    if (username) {
 
+        $("refLink")
+            .textContent =
+            `https://t.me/${username}?startapp=ref_${encodeURIComponent(
+                user.referral_code
+            )}`;
 
-    $("refLink")
-        .textContent =
-        referralLink;
+    } else {
 
+        $("refLink")
+            .textContent =
+            "BOT_USERNAME is not configured.";
+
+    }
 
     if (user.is_admin) {
 
@@ -1670,55 +1411,18 @@ function renderUser() {
             .add("hidden");
 
     }
-
 }
 
-
 /* =========================================================
-   SHOW VERIFICATION
+   CHANNELS
 ========================================================= */
 
-function showVerification(
-    channels
-) {
-
-    $("verification")
-        .classList
-        .remove("hidden");
-
-
-    $("mainContent")
-        .classList
-        .add("hidden");
-
-
-    $("nav")
-        .classList
-        .add("hidden");
-
-
-    renderChannels(
-        channels
-    );
-
-}
-
-
-/* =========================================================
-   RENDER CHANNELS
-========================================================= */
-
-function renderChannels(
-    channels
-) {
+function renderChannels(channels) {
 
     const container =
         $("channels");
 
-
-    container.innerHTML =
-        "";
-
+    container.innerHTML = "";
 
     if (
         !channels ||
@@ -1732,144 +1436,99 @@ function renderChannels(
         `;
 
         return;
-
     }
 
+    channels.forEach(channel => {
 
-    channels.forEach(
-        channel => {
+        const row =
+            document.createElement("div");
 
-            const row =
-                document.createElement(
-                    "div"
-                );
+        row.className =
+            "channel";
 
+        const name =
+            document.createElement("div");
 
-            row.className =
-                "channel";
+        name.className =
+            "channel-name";
 
+        name.textContent =
+            channel.channel;
 
-            const name =
-                document.createElement(
-                    "div"
-                );
+        const right =
+            document.createElement("div");
 
+        if (channel.joined) {
 
-            name.className =
-                "channel-name";
+            const status =
+                document.createElement("span");
 
+            status.className =
+                "channel-status";
 
-            name.textContent =
-                channel.channel;
+            status.textContent =
+                "✅ Joined";
 
+            right.appendChild(status);
 
-            const right =
-                document.createElement(
-                    "div"
-                );
+        } else {
 
+            const button =
+                document.createElement("button");
 
-            if (
-                channel.joined
-            ) {
+            button.className =
+                "join-btn";
 
-                const status =
-                    document.createElement(
-                        "span"
+            button.textContent =
+                "JOIN";
+
+            button.onclick = () => {
+
+                const username =
+                    String(channel.channel)
+                        .replace(/^@/,"");
+
+                if (tg) {
+
+                    tg.openTelegramLink(
+                        `https://t.me/${username}`
                     );
 
+                }
 
-                status.className =
-                    "channel-status";
+            };
 
-
-                status.textContent =
-                    "✅ Joined";
-
-
-                right.appendChild(
-                    status
-                );
-
-            } else {
-
-                const button =
-                    document.createElement(
-                        "button"
-                    );
-
-
-                button.className =
-                    "join-btn";
-
-
-                button.textContent =
-                    "JOIN";
-
-
-                button.addEventListener(
-                    "click",
-                    () => {
-
-                        const username =
-                            String(
-                                channel.channel
-                            )
-                            .replace(
-                                /^@/,
-                                ""
-                            );
-
-
-                        if (tg) {
-
-                            tg.openTelegramLink(
-                                `https://t.me/${username}`
-                            );
-
-                        } else {
-
-                            window.open(
-                                `https://t.me/${username}`,
-                                "_blank"
-                            );
-
-                        }
-
-                    }
-                );
-
-
-                right.appendChild(
-                    button
-                );
-
-            }
-
-
-            row.appendChild(
-                name
-            );
-
-
-            row.appendChild(
-                right
-            );
-
-
-            container.appendChild(
-                row
-            );
-
+            right.appendChild(button);
         }
-    );
 
+        row.appendChild(name);
+        row.appendChild(right);
+
+        container.appendChild(row);
+
+    });
 }
 
-
 /* =========================================================
-   SHOW MAIN
+   SHOW / HIDE
 ========================================================= */
+
+function showVerification(channels) {
+
+    $("verification")
+        .classList
+        .remove("hidden");
+
+    $("mainContent")
+        .classList
+        .add("hidden");
+
+    $("nav")
+        .classList
+        .add("hidden");
+
+    renderChannels(channels);
+}
 
 function showMain() {
 
@@ -1877,18 +1536,14 @@ function showMain() {
         .classList
         .add("hidden");
 
-
     $("mainContent")
         .classList
         .remove("hidden");
 
-
     $("nav")
         .classList
         .remove("hidden");
-
 }
-
 
 /* =========================================================
    CHECK CHANNELS
@@ -1901,51 +1556,40 @@ async function checkChannels() {
         $("checkChannels")
             .disabled = true;
 
-
         hideMessage();
-
 
         const data =
             await api(
                 "/api/channels"
             );
 
-
         renderChannels(
             data.channels
         );
 
-
-        if (
-            data.allJoined
-        ) {
+        if (data.allJoined) {
 
             const me =
-                await api(
-                    "/api/me"
-                );
-
+                await api("/api/me");
 
             currentUser =
                 me.user;
 
+            currentUser.botUsername =
+                me.bot?.username || "";
 
             renderUser();
 
-
             showMain();
-
 
             await loadRewards();
 
         } else {
 
             showMessage(
-                "You still need to join all required channels."
+                "Join all required channels first."
             );
-
         }
-
 
     } catch (error) {
 
@@ -1959,16 +1603,13 @@ async function checkChannels() {
             .disabled = false;
 
     }
-
 }
-
 
 $("checkChannels")
     .addEventListener(
         "click",
         checkChannels
     );
-
 
 /* =========================================================
    ADSGRAM
@@ -1978,18 +1619,15 @@ function initializeAds() {
 
     try {
 
-        if (
-            !window.Adsgram
-        ) {
+        if (!window.Adsgram) {
 
             console.error(
-                "AdsGram SDK not available."
+                "AdsGram SDK not loaded."
             );
 
             return;
 
         }
-
 
         adController =
             window.Adsgram.init({
@@ -1997,35 +1635,28 @@ function initializeAds() {
                     ADSGRAM_BLOCK_ID
             });
 
-
         console.log(
             "AdsGram initialized:",
             ADSGRAM_BLOCK_ID
         );
 
-
     } catch (error) {
 
         console.error(
-            "AdsGram initialization failed:",
+            "AdsGram error:",
             error
         );
 
     }
-
 }
 
-
 /* =========================================================
-   WATCH ADS
+   WATCH AD
 ========================================================= */
 
 async function watchAd() {
 
-    if (adBusy) {
-        return;
-    }
-
+    if (adBusy) return;
 
     if (
         !currentUser ||
@@ -2037,94 +1668,61 @@ async function watchAd() {
         );
 
         return;
-
     }
-
 
     if (!adController) {
 
-        showMessage(
-            "Ads are not ready yet."
-        );
+        initializeAds();
 
-        return;
+        if (!adController) {
 
+            showMessage(
+                "Ads are not ready yet."
+            );
+
+            return;
+        }
     }
-
 
     adBusy = true;
 
     $("watchAd")
         .disabled = true;
 
-
-    let rewarded =
-        false;
-
-
-    const rewardKey =
-        createRewardKey();
-
-
-    const rewardHandler =
-        () => {
-
-            rewarded = true;
-
-        };
-
-
     try {
 
-        /*
-         * AdsGram reward event.
-         */
-
-        adController.addEventListener(
-            "onReward",
-            rewardHandler
-        );
-
+        const rewardKey =
+            createRewardKey();
 
         /*
-         * Show rewarded ad.
-         */
-
-        await adController.show();
-
-
-        /*
-         * Remove event listener.
-         */
-
-        adController.removeEventListener(
-            "onReward",
-            rewardHandler
-        );
-
-
-        /*
-         * Do not credit if AdsGram
-         * didn't confirm reward.
-         */
-
-        if (!rewarded) {
-
-            showMessage(
-                "The ad was not completed for a reward."
-            );
-
-            return;
-
-        }
-
-
-        /*
-         * Backend verifies Telegram
-         * identity and processes reward.
+         * Show AdsGram rewarded ad.
          */
 
         const result =
+            await adController.show();
+
+        /*
+         * AdsGram must report a
+         * completed reward.
+         */
+
+        if (
+            !result ||
+            result.done !== true
+        ) {
+
+            showMessage(
+                "Ad was not completed."
+            );
+
+            return;
+        }
+
+        /*
+         * Send reward request.
+         */
+
+        const reward =
             await api(
                 "/api/ad-reward",
                 {
@@ -2137,39 +1735,30 @@ async function watchAd() {
                 }
             );
 
-
-        if (
-            result.ok
-        ) {
+        if (reward.ok) {
 
             currentUser.points =
-                result.user.points;
-
+                reward.user.points;
 
             currentUser.total_ads =
-                result.user.total_ads;
-
+                reward.user.total_ads;
 
             currentUser.ads_count =
-                result.user.ads_count;
-
+                reward.user.ads_count;
 
             renderUser();
 
-
             showMessage(
-                `🎉 +${result.reward} points`
+                `🎉 +${reward.reward} points`
             );
-
         }
-
 
     } catch (error) {
 
         console.error(
+            "Ad error:",
             error
         );
-
 
         showMessage(
             error.message ||
@@ -2178,25 +1767,12 @@ async function watchAd() {
 
     } finally {
 
-        try {
-
-            adController.removeEventListener(
-                "onReward",
-                rewardHandler
-            );
-
-        } catch {}
-
-
         adBusy = false;
 
         $("watchAd")
             .disabled = false;
-
     }
-
 }
-
 
 $("watchAd")
     .addEventListener(
@@ -2204,9 +1780,8 @@ $("watchAd")
         watchAd
     );
 
-
 /* =========================================================
-   LOAD REWARDS
+   REWARDS
 ========================================================= */
 
 async function loadRewards() {
@@ -2218,14 +1793,10 @@ async function loadRewards() {
                 "/api/rewards"
             );
 
-
         const container =
             $("rewardList");
 
-
-        container.innerHTML =
-            "";
-
+        container.innerHTML = "";
 
         data.rewards.forEach(
             reward => {
@@ -2235,17 +1806,13 @@ async function loadRewards() {
                         "div"
                     );
 
-
                 card.className =
                     "card";
-
 
                 card.style.marginBottom =
                     "8px";
 
-
                 card.innerHTML = `
-
                     <div
                         style="
                             font-weight:800;
@@ -2270,28 +1837,22 @@ async function loadRewards() {
                             reward.description || ""
                         )}
                     </div>
-
                 `;
 
-
-                container.appendChild(
-                    card
-                );
+                container.appendChild(card);
 
             }
         );
 
-
     } catch (error) {
 
         console.error(
+            "Rewards:",
             error
         );
 
     }
-
 }
-
 
 /* =========================================================
    LEADERBOARD
@@ -2306,14 +1867,10 @@ async function loadLeaderboard() {
                 "/api/leaderboard"
             );
 
-
         const container =
             $("leaderboard");
 
-
-        container.innerHTML =
-            "";
-
+        container.innerHTML = "";
 
         if (
             !data.leaderboard.length
@@ -2326,9 +1883,7 @@ async function loadLeaderboard() {
             `;
 
             return;
-
         }
-
 
         data.leaderboard.forEach(
             user => {
@@ -2338,21 +1893,17 @@ async function loadLeaderboard() {
                         "div"
                     );
 
-
                 row.className =
                     "leader";
-
-
-                const avatar =
-                    user.photo_url ||
-                    "https://via.placeholder.com/50";
-
 
                 const name =
                     user.first_name ||
                     user.username ||
                     "User";
 
+                const avatar =
+                    user.photo_url ||
+                    "https://via.placeholder.com/50";
 
                 row.innerHTML = `
 
@@ -2370,30 +1921,20 @@ async function loadLeaderboard() {
                         alt=""
                     >
 
-                    <div
-                        class="leader-info"
-                    >
+                    <div class="leader-info">
 
-                        <div
-                            class="leader-name"
-                        >
+                        <div class="leader-name">
                             ${escapeHtml(
                                 name
                             )}
                         </div>
 
-                        <div
-                            class="leader-stats"
-                        >
-                            📺
-                            ${escapeHtml(
+                        <div class="leader-stats">
+                            📺 ${escapeHtml(
                                 user.ads
                             )}
-
-                            &nbsp; • &nbsp;
-
-                            👥
-                            ${escapeHtml(
+                            &nbsp;•&nbsp;
+                            👥 ${escapeHtml(
                                 user.invites
                             )}
                         </div>
@@ -2408,14 +1949,10 @@ async function loadLeaderboard() {
 
                 `;
 
-
-                container.appendChild(
-                    row
-                );
+                container.appendChild(row);
 
             }
         );
-
 
     } catch (error) {
 
@@ -2424,9 +1961,7 @@ async function loadLeaderboard() {
         );
 
     }
-
 }
-
 
 /* =========================================================
    NAVIGATION
@@ -2436,71 +1971,58 @@ document
     .querySelectorAll(
         ".nav button[data-page]"
     )
-    .forEach(
-        button => {
+    .forEach(button => {
 
-            button.addEventListener(
-                "click",
-                async () => {
+        button.addEventListener(
+            "click",
+            async () => {
 
-                    const page =
-                        button.dataset.page;
+                const page =
+                    button.dataset.page;
 
+                document
+                    .querySelectorAll(".page")
+                    .forEach(item => {
 
-                    document
-                        .querySelectorAll(
-                            ".page"
-                        )
-                        .forEach(
-                            item => {
-
-                                item.classList
-                                    .add("hidden");
-
-                            }
+                        item.classList.add(
+                            "hidden"
                         );
 
+                    });
 
-                    $(page)
-                        .classList
-                        .remove("hidden");
+                $(page)
+                    .classList
+                    .remove("hidden");
 
+                document
+                    .querySelectorAll(
+                        ".nav button"
+                    )
+                    .forEach(item => {
 
-                    document
-                        .querySelectorAll(
-                            ".nav button"
-                        )
-                        .forEach(
-                            item => {
-
-                                item.classList
-                                    .remove(
-                                        "active"
-                                    );
-
-                            }
+                        item.classList.remove(
+                            "active"
                         );
 
+                    });
 
-                    button.classList
-                        .add("active");
+                button.classList.add(
+                    "active"
+                );
 
+                if (
+                    page ===
+                    "leaderPage"
+                ) {
 
-                    if (
-                        page ===
-                        "leaderPage"
-                    ) {
-
-                        await loadLeaderboard();
-
-                    }
+                    await loadLeaderboard();
 
                 }
-            );
 
-        }
-    );
+            }
+        );
 
+    });
 
 /* =========================================================
    SHARE
@@ -2515,41 +2037,23 @@ $("shareInvite")
                 $("refLink")
                     .textContent;
 
-
-            const text =
-                "Join me and earn rewards!";
-
-
             const url =
                 "https://t.me/share/url" +
                 "?url=" +
-                encodeURIComponent(
-                    link
-                ) +
+                encodeURIComponent(link) +
                 "&text=" +
                 encodeURIComponent(
-                    text
+                    "Join me and earn rewards!"
                 );
-
 
             if (tg) {
 
-                tg.openTelegramLink(
-                    url
-                );
-
-            } else {
-
-                window.open(
-                    url,
-                    "_blank"
-                );
+                tg.openTelegramLink(url);
 
             }
 
         }
     );
-
 
 /* =========================================================
    ADMIN SETTINGS
@@ -2568,20 +2072,17 @@ $("saveAdmin")
                             .value
                     );
 
-
                 const inviteReward =
                     Number(
                         $("adminInviteReward")
                             .value
                     );
 
-
                 const adLimit =
                     Number(
                         $("adminAdLimit")
                             .value
                     );
-
 
                 if (
                     !Number.isFinite(
@@ -2596,7 +2097,6 @@ $("saveAdmin")
 
                 }
 
-
                 if (
                     !Number.isFinite(
                         inviteReward
@@ -2610,7 +2110,6 @@ $("saveAdmin")
 
                 }
 
-
                 if (
                     !Number.isInteger(
                         adLimit
@@ -2623,7 +2122,6 @@ $("saveAdmin")
                     );
 
                 }
-
 
                 await api(
                     "/api/admin/settings",
@@ -2646,11 +2144,9 @@ $("saveAdmin")
                     }
                 );
 
-
                 showMessage(
                     "✅ Settings saved."
                 );
-
 
             } catch (error) {
 
@@ -2662,7 +2158,6 @@ $("saveAdmin")
 
         }
     );
-
 
 /* =========================================================
    ADMIN REWARD
@@ -2681,18 +2176,15 @@ $("saveReward")
                             .value
                     );
 
-
                 const title =
                     $("rewardTitle")
                         .value
                         .trim();
 
-
                 const description =
                     $("rewardDescription")
                         .value
                         .trim();
-
 
                 if (
                     !Number.isInteger(
@@ -2708,7 +2200,6 @@ $("saveReward")
 
                 }
 
-
                 if (!title) {
 
                     throw new Error(
@@ -2716,7 +2207,6 @@ $("saveReward")
                     );
 
                 }
-
 
                 await api(
                     "/api/admin/reward",
@@ -2738,14 +2228,11 @@ $("saveReward")
                     }
                 );
 
-
                 showMessage(
                     "✅ Reward updated."
                 );
 
-
                 await loadRewards();
-
 
             } catch (error) {
 
@@ -2758,19 +2245,13 @@ $("saveReward")
         }
     );
 
-
 /* =========================================================
-   INITIALIZATION
+   INITIALIZE
 ========================================================= */
 
 async function initializeApp() {
 
     try {
-
-        /*
-         * The Mini App MUST be opened
-         * from Telegram.
-         */
 
         if (
             !tg ||
@@ -2783,49 +2264,27 @@ async function initializeApp() {
 
         }
 
-
-        /*
-         * Referral parameter:
-         *
-         * ?ref=referralCode
-         */
-
         const params =
             new URLSearchParams(
                 window.location.search
             );
 
-
         const ref =
-            params.get(
-                "ref"
-            );
-
+            params.get("ref");
 
         let endpoint =
             "/api/me";
-
 
         if (ref) {
 
             endpoint +=
                 "?ref=" +
-                encodeURIComponent(
-                    ref
-                );
+                encodeURIComponent(ref);
 
         }
 
-
-        /*
-         * Connect to Vercel backend.
-         */
-
         const data =
-            await api(
-                endpoint
-            );
-
+            await api(endpoint);
 
         if (!data.ok) {
 
@@ -2836,28 +2295,17 @@ async function initializeApp() {
 
         }
 
-
         currentUser =
             data.user;
 
+        currentUser.botUsername =
+            data.bot?.username || "";
 
         renderUser();
 
-
-        /*
-         * AdsGram block 52614.
-         */
-
         initializeAds();
 
-
-        /*
-         * Check required channels.
-         */
-
-        if (
-            data.allJoined
-        ) {
+        if (data.allJoined) {
 
             showMain();
 
@@ -2871,60 +2319,47 @@ async function initializeApp() {
 
         }
 
-
-        /*
-         * Finish loading.
-         */
-
         $("loading")
             .classList
             .add("hidden");
-
 
         $("app")
             .classList
             .remove("hidden");
 
-
     } catch (error) {
 
-        console.error(
-            error
-        );
+        console.error(error);
 
+        $("loading").innerHTML = `
 
-        $("loading")
-            .innerHTML = `
+            <div
+                style="
+                    padding:25px;
+                "
+            >
 
-                <div
+                <h3>
+                    Unable to open Mini App
+                </h3>
+
+                <p
                     style="
-                        padding:25px;
+                        color:#6f7a8c;
+                        line-height:1.5;
                     "
                 >
+                    ${escapeHtml(
+                        error.message
+                    )}
+                </p>
 
-                    <h3>
-                        Unable to open Mini App
-                    </h3>
+            </div>
 
-                    <p
-                        style="
-                            color:#6f7a8c;
-                            line-height:1.5;
-                        "
-                    >
-                        ${escapeHtml(
-                            error.message
-                        )}
-                    </p>
-
-                </div>
-
-            `;
+        `;
 
     }
-
 }
-
 
 /* =========================================================
    START
@@ -2935,5 +2370,4 @@ initializeApp();
 </script>
 
 </body>
-
-    </html>
+</html>
