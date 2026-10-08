@@ -1,2373 +1,434 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-    name="viewport"
-    content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
->
-
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Reward Mini App</title>
-
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-
 <style>
-
-* {
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-}
-
-html,
-body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    min-height: 100%;
-}
-
-body {
-    font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Roboto,
-        Arial,
-        sans-serif;
-
-    background: #f4f7fb;
-    color: #172033;
-}
-
-button,
-input {
-    font-family: inherit;
-}
-
-button {
-    cursor: pointer;
-}
-
-button:disabled {
-    opacity: .55;
-    cursor: not-allowed;
-}
-
-.hidden {
-    display: none !important;
-}
-
-.app {
-    width: 100%;
-    max-width: 520px;
-    margin: 0 auto;
-    padding: 16px 16px 105px;
-}
-
-.loading {
-    min-height: 100vh;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    text-align: center;
-}
-
-.spinner {
-    width: 44px;
-    height: 44px;
-
-    margin: auto;
-
-    border: 4px solid #dce4ef;
-    border-top-color: #1877f2;
-
-    border-radius: 50%;
-
-    animation: spin .8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.message {
-    margin-bottom: 14px;
-
-    padding: 13px 15px;
-
-    border-radius: 15px;
-
-    background: #fff4d6;
-    color: #715300;
-
-    font-size: 13px;
-    line-height: 1.4;
-}
-
-.header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    margin-bottom: 16px;
-}
-
-.user {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-}
-
-.avatar {
-    width: 48px;
-    height: 48px;
-
-    border-radius: 50%;
-
-    object-fit: cover;
-
-    background: #dfe6f0;
-}
-
-.user-name {
-    font-size: 16px;
-    font-weight: 800;
-}
-
-.user-id {
-    margin-top: 3px;
-
-    color: #7e899b;
-
-    font-size: 11px;
-}
-
-.balance {
-    padding: 22px;
-
-    margin-bottom: 14px;
-
-    border-radius: 23px;
-
-    color: white;
-
-    background:
-        linear-gradient(
-            135deg,
-            #1769e0,
-            #3d91fa
-        );
-
-    box-shadow:
-        0 12px 30px
-        rgba(24,105,224,.18);
-}
-
-.balance-label {
-    font-size: 13px;
-    opacity: .85;
-}
-
-.balance-value {
-    margin-top: 5px;
-
-    font-size: 34px;
-    font-weight: 900;
-}
-
-.grid {
-    display: grid;
-
-    grid-template-columns:
-        repeat(2,minmax(0,1fr));
-
-    gap: 11px;
-
-    margin-bottom: 14px;
-}
-
-.card {
-    padding: 17px;
-
-    border-radius: 19px;
-
-    background: white;
-
-    box-shadow:
-        0 5px 18px
-        rgba(22,34,55,.055);
-}
-
-.card-icon {
-    font-size: 25px;
-}
-
-.card-title {
-    margin-top: 8px;
-
-    font-size: 15px;
-    font-weight: 800;
-}
-
-.card-value {
-    margin-top: 5px;
-
-    color: #7e899b;
-
-    font-size: 12px;
-}
-
-.action {
-    width: 100%;
-
-    border: 0;
-
-    padding: 15px;
-
-    border-radius: 16px;
-
-    background: #1877f2;
-
-    color: white;
-
-    font-size: 15px;
-    font-weight: 800;
-}
-
-.action:active {
-    transform: scale(.98);
-}
-
-.section {
-    margin-top: 20px;
-}
-
-.section-title {
-    margin-bottom: 10px;
-
-    font-size: 18px;
-    font-weight: 900;
-}
-
-.channel {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 10px;
-
-    padding: 13px;
-
-    margin-bottom: 8px;
-
-    border-radius: 15px;
-
-    background: white;
-}
-
-.channel-name {
-    min-width: 0;
-
-    font-size: 14px;
-    font-weight: 700;
-
-    overflow-wrap: anywhere;
-}
-
-.channel-status {
-    color: #1d9b55;
-
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.join-btn {
-    border: 0;
-
-    padding: 9px 13px;
-
-    border-radius: 11px;
-
-    background: #1877f2;
-
-    color: white;
-
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.leader {
-    display: flex;
-    align-items: center;
-
-    gap: 10px;
-
-    padding: 12px;
-
-    margin-bottom: 8px;
-
-    border-radius: 16px;
-
-    background: white;
-}
-
-.rank {
-    width: 28px;
-
-    text-align: center;
-
-    font-weight: 900;
-}
-
-.leader-avatar {
-    width: 40px;
-    height: 40px;
-
-    border-radius: 50%;
-
-    object-fit: cover;
-
-    background: #e3e9f2;
-}
-
-.leader-info {
-    min-width: 0;
-    flex: 1;
-}
-
-.leader-name {
-    overflow: hidden;
-
-    white-space: nowrap;
-    text-overflow: ellipsis;
-
-    font-size: 14px;
-    font-weight: 800;
-}
-
-.leader-stats {
-    margin-top: 3px;
-
-    color: #8993a3;
-
-    font-size: 10px;
-}
-
-.points {
-    font-size: 13px;
-    font-weight: 900;
-}
-
-.profile-head {
-    padding: 25px;
-
-    border-radius: 22px;
-
-    background: white;
-
-    text-align: center;
-}
-
-.profile-avatar {
-    width: 88px;
-    height: 88px;
-
-    border-radius: 50%;
-
-    object-fit: cover;
-
-    background: #e3e9f2;
-}
-
-.profile-name {
-    margin-top: 10px;
-
-    font-size: 21px;
-    font-weight: 900;
-}
-
-.profile-id {
-    margin-top: 4px;
-
-    color: #8791a1;
-
-    font-size: 11px;
-}
-
-.referral-link {
-    margin-top: 12px;
-
-    padding: 13px;
-
-    border-radius: 13px;
-
-    background: #f1f4f8;
-
-    font-size: 12px;
-
-    overflow-wrap: anywhere;
-}
-
-.nav {
-    position: fixed;
-
-    left: 50%;
-    bottom: 10px;
-
-    transform: translateX(-50%);
-
-    width:
-        min(
-            calc(100% - 20px),
-            510px
-        );
-
-    display: grid;
-
-    grid-template-columns:
-        repeat(5,minmax(0,1fr));
-
-    gap: 4px;
-
-    padding: 8px;
-
-    border-radius: 22px;
-
-    background:
-        rgba(255,255,255,.96);
-
-    backdrop-filter:
-        blur(15px);
-
-    box-shadow:
-        0 8px 30px
-        rgba(0,0,0,.13);
-
-    z-index: 100;
-}
-
-.nav button {
-    border: 0;
-
-    padding: 8px 3px;
-
-    border-radius: 14px;
-
-    background: transparent;
-
-    color: #7c8798;
-
-    font-size: 10px;
-    font-weight: 800;
-}
-
-.nav button.active {
-    background: #e8f2ff;
-    color: #1877f2;
-}
-
-.admin-input {
-    width: 100%;
-
-    margin-top: 8px;
-
-    padding: 13px;
-
-    border:
-        1px solid
-        #dce2ea;
-
-    border-radius: 12px;
-
-    outline: none;
-
-    font-size: 14px;
-}
-
-.admin-input:focus {
-    border-color: #1877f2;
-}
-
-@media(max-width:360px) {
-
-    .app {
-        padding: 12px 12px 105px;
-    }
-
-    .card {
-        padding: 14px;
-    }
-
-    .balance {
-        padding: 18px;
-    }
-
-    .balance-value {
-        font-size: 29px;
-    }
-
-}
-
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0b1220;--card:#162033;--card2:#1d2a42;--text:#eef2fb;--muted:#8fa0bd;--blue:#2f7df6;--green:#2ecc71;--red:#ff5d5d;--gold:#f5b942}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:14px 14px 100px}
+.hidden{display:none!important}
+.toast{position:fixed;top:12px;left:12px;right:12px;padding:12px 14px;border-radius:12px;font-size:14px;z-index:50;background:#3a3320;color:#ffd978}
+.toast.ok{background:#173a28;color:#7dffb0}
+.toast.err{background:#401b1b;color:#ff9a9a}
+.user{display:flex;align-items:center;gap:12px;margin:56px 0 14px}
+.avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2f7df6,#38c6d9);object-fit:cover}
+.uname{font-size:17px;font-weight:600}
+.uid{font-size:13px;color:var(--muted)}
+.points{background:linear-gradient(135deg,#1a4fb8,#2f7df6);border-radius:22px;padding:20px;margin-bottom:14px}
+.points small{opacity:.8;font-size:14px}
+.points .big{font-size:40px;font-weight:800;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.stat{background:var(--card);border-radius:18px;padding:14px}
+.stat .ic{font-size:22px}
+.stat .t{color:var(--muted);font-size:13px;margin-top:4px}
+.stat .v{font-size:18px;font-weight:700;margin-top:2px}
+.btn{width:100%;border:0;border-radius:16px;padding:16px;font-size:16px;font-weight:700;color:#fff;background:var(--blue);cursor:pointer}
+.btn:disabled{opacity:.55}
+.btn.sec{background:var(--card2)}
+.btn.green{background:#1f9d57}
+h2{font-size:19px;margin:18px 0 10px}
+.item{background:var(--card);border-radius:16px;padding:14px;margin-bottom:10px}
+.item .h{font-weight:700}
+.item .d{color:var(--muted);font-size:14px;margin-top:3px}
+.row{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:16px;padding:12px;margin-bottom:8px}
+.rank{width:34px;text-align:center;font-weight:800;color:var(--gold)}
+.row .n{flex:1;min-width:0}
+.row .n b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .n span{color:var(--muted);font-size:12px}
+.row .p{font-weight:700}
+.row.me{outline:2px solid var(--blue)}
+input,textarea{width:100%;background:var(--card2);border:1px solid #2b3b5a;border-radius:12px;padding:12px;color:var(--text);font-size:15px;margin:6px 0 12px}
+label{font-size:13px;color:var(--muted)}
+.link{background:var(--card2);border-radius:12px;padding:12px;font-size:13px;word-break:break-all;margin:10px 0}
+.verify{background:var(--card);border:1px solid #2b3b5a;border-radius:18px;padding:16px;margin-bottom:14px}
+.verify a{color:#6cb2ff}
+nav{position:fixed;left:10px;right:10px;bottom:10px;background:#101a2c;border-radius:24px;display:flex;padding:6px;box-shadow:0 6px 24px #0008;z-index:20}
+nav button{flex:1;background:none;border:0;color:var(--muted);padding:8px 2px;border-radius:18px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:20px}
+nav button.active{background:var(--card2);color:#fff}
+.loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;z-index:100}
+.empty{color:var(--muted);text-align:center;padding:20px}
 </style>
-
 </head>
-
 <body>
 
-<div id="loading" class="loading">
+<div id="loading" class="loading">Connecting...</div>
+<div id="toast" class="toast hidden"></div>
 
-    <div>
+<main id="app" class="hidden">
 
-        <div class="spinner"></div>
+  <!-- verification -->
+  <div id="verify" class="verify hidden">
+    <b>🔒 Verification Required</b>
+    <p style="margin:6px 0 10px;color:var(--muted);font-size:14px">Join all required channels to continue.</p>
+    <div id="channelList"></div>
+    <button class="btn sec" id="checkBtn">🔄 Check Membership</button>
+  </div>
 
-        <p>Connecting...</p>
-
+  <!-- ADS -->
+  <section id="tab-ads">
+    <div class="user">
+      <img id="avatar" class="avatar" alt="">
+      <div><div class="uname" id="uname">User</div><div class="uid" id="uid">ID: -</div></div>
     </div>
-
-</div>
-
-<div id="app" class="app hidden">
-
-    <div
-        id="message"
-        class="message hidden"
-    ></div>
-
-    <div class="header">
-
-        <div class="user">
-
-            <img
-                id="headerAvatar"
-                class="avatar"
-                alt="Profile"
-            >
-
-            <div>
-
-                <div
-                    id="headerName"
-                    class="user-name"
-                >
-                    User
-                </div>
-
-                <div
-                    id="headerId"
-                    class="user-id"
-                >
-                    Telegram ID
-                </div>
-
-            </div>
-
-        </div>
-
+    <div class="points"><small>Your Points</small><div class="big" id="points">0</div></div>
+    <div class="grid">
+      <div class="stat"><div class="ic">📺</div><div class="t">Ads</div><div class="v" id="adsCount">0 watched</div></div>
+      <div class="stat"><div class="ic">👥</div><div class="t">Invites</div><div class="v" id="invCount">0 invited</div></div>
+      <div class="stat"><div class="ic">🏆</div><div class="t">Rank</div><div class="v" id="rank">#-</div></div>
+      <div class="stat"><div class="ic">🎁</div><div class="t">Rewards</div><div class="v">Top 30</div></div>
     </div>
-
-    <section
-        id="verification"
-        class="hidden"
-    >
-
-        <div class="card">
-
-            <div class="section-title">
-                🔒 Verification Required
-            </div>
-
-            <p>
-                Join all required channels
-                to continue.
-            </p>
-
-            <div id="channels"></div>
-
-            <button
-                id="checkChannels"
-                class="action"
-            >
-                🔄 Check Membership
-            </button>
-
-        </div>
-
-    </section>
-
-    <main id="mainContent">
-
-        <section
-            id="homePage"
-            class="page"
-        >
-
-            <div class="balance">
-
-                <div class="balance-label">
-                    Your Points
-                </div>
-
-                <div
-                    id="points"
-                    class="balance-value"
-                >
-                    0
-                </div>
-
-            </div>
-
-            <div class="grid">
-
-                <div class="card">
-
-                    <div class="card-icon">
-                        📺
-                    </div>
-
-                    <div class="card-title">
-                        Ads
-                    </div>
-
-                    <div
-                        id="adsCount"
-                        class="card-value"
-                    >
-                        0 watched
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-icon">
-                        👥
-                    </div>
-
-                    <div class="card-title">
-                        Invites
-                    </div>
-
-                    <div
-                        id="inviteCount"
-                        class="card-value"
-                    >
-                        0 invited
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-icon">
-                        🏆
-                    </div>
-
-                    <div class="card-title">
-                        Rank
-                    </div>
-
-                    <div
-                        id="rank"
-                        class="card-value"
-                    >
-                        #-
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-icon">
-                        🎁
-                    </div>
-
-                    <div class="card-title">
-                        Rewards
-                    </div>
-
-                    <div class="card-value">
-                        Top 30
-                    </div>
-
-                </div>
-
-            </div>
-
-            <button
-                id="watchAd"
-                class="action"
-            >
-                📺 Watch Ad & Earn
-            </button>
-
-            <div class="section">
-
-                <div class="section-title">
-                    🎁 Leaderboard Rewards
-                </div>
-
-                <div id="rewardList"></div>
-
-            </div>
-
-        </section>
-
-        <section
-            id="invitePage"
-            class="page hidden"
-        >
-
-            <div class="card">
-
-                <div class="section-title">
-                    👥 Invite Friends
-                </div>
-
-                <p>
-                    Share your referral link
-                    with your friends.
-                </p>
-
-                <div
-                    id="refLink"
-                    class="referral-link"
-                ></div>
-
-                <button
-                    id="shareInvite"
-                    class="action"
-                    style="margin-top:12px"
-                >
-                    📤 Share Invite
-                </button>
-
-            </div>
-
-            <div
-                class="grid"
-                style="margin-top:12px"
-            >
-
-                <div class="card">
-
-                    <div class="card-title">
-                        Invited
-                    </div>
-
-                    <div
-                        id="inviteTotal"
-                        class="balance-value"
-                        style="font-size:26px"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-title">
-                        Points
-                    </div>
-
-                    <div
-                        id="invitePoints"
-                        class="balance-value"
-                        style="font-size:26px"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-        <section
-            id="leaderPage"
-            class="page hidden"
-        >
-
-            <div class="section-title">
-                🏆 Top 30
-            </div>
-
-            <div id="leaderboard"></div>
-
-        </section>
-
-        <section
-            id="profilePage"
-            class="page hidden"
-        >
-
-            <div class="profile-head">
-
-                <img
-                    id="profileAvatar"
-                    class="profile-avatar"
-                    alt="Profile"
-                >
-
-                <div
-                    id="profileName"
-                    class="profile-name"
-                >
-                    User
-                </div>
-
-                <div
-                    id="profileId"
-                    class="profile-id"
-                ></div>
-
-            </div>
-
-            <div
-                class="grid"
-                style="margin-top:12px"
-            >
-
-                <div class="card">
-
-                    <div class="card-title">
-                        📺 Ads
-                    </div>
-
-                    <div
-                        id="profileAds"
-                        class="card-value"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-title">
-                        👥 Invites
-                    </div>
-
-                    <div
-                        id="profileInvites"
-                        class="card-value"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-title">
-                        🏆 Rank
-                    </div>
-
-                    <div
-                        id="profileRank"
-                        class="card-value"
-                    >
-                        #-
-                    </div>
-
-                </div>
-
-                <div class="card">
-
-                    <div class="card-title">
-                        ⭐ Points
-                    </div>
-
-                    <div
-                        id="profilePoints"
-                        class="card-value"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-        <section
-            id="adminPage"
-            class="page hidden"
-        >
-
-            <div class="section-title">
-                👑 Admin Panel
-            </div>
-
-            <div class="card">
-
-                <div class="card-title">
-                    Ad Reward
-                </div>
-
-                <input
-                    id="adminAdReward"
-                    class="admin-input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value="1"
-                >
-
-            </div>
-
-            <div
-                class="card"
-                style="margin-top:10px"
-            >
-
-                <div class="card-title">
-                    Invite Reward
-                </div>
-
-                <input
-                    id="adminInviteReward"
-                    class="admin-input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value="1"
-                >
-
-            </div>
-
-            <div
-                class="card"
-                style="margin-top:10px"
-            >
-
-                <div class="card-title">
-                    Daily Ads Limit
-                </div>
-
-                <input
-                    id="adminAdLimit"
-                    class="admin-input"
-                    type="number"
-                    min="1"
-                    value="100"
-                >
-
-            </div>
-
-            <button
-                id="saveAdmin"
-                class="action"
-                style="margin-top:12px"
-            >
-                💾 Save Settings
-            </button>
-
-            <div
-                class="section-title"
-                style="margin-top:25px"
-            >
-                🎁 Edit Leaderboard Reward
-            </div>
-
-            <div class="card">
-
-                <input
-                    id="rewardPosition"
-                    class="admin-input"
-                    type="number"
-                    min="1"
-                    max="30"
-                    placeholder="Position 1-30"
-                >
-
-                <input
-                    id="rewardTitle"
-                    class="admin-input"
-                    type="text"
-                    placeholder="Reward title"
-                >
-
-                <input
-                    id="rewardDescription"
-                    class="admin-input"
-                    type="text"
-                    placeholder="Reward description"
-                >
-
-                <button
-                    id="saveReward"
-                    class="action"
-                    style="margin-top:10px"
-                >
-                    💾 Save Reward
-                </button>
-
-            </div>
-
-        </section>
-
-    </main>
-
-</div>
-
-<nav
-    id="nav"
-    class="nav hidden"
->
-
-    <button
-        data-page="homePage"
-        class="active"
-    >
-        📺<br>
-        Ads
-    </button>
-
-    <button
-        data-page="invitePage"
-    >
-        👥<br>
-        Invite
-    </button>
-
-    <button
-        data-page="leaderPage"
-    >
-        🏆<br>
-        Leaderboard
-    </button>
-
-    <button
-        data-page="profilePage"
-    >
-        👤<br>
-        Profile
-    </button>
-
-    <button
-        id="adminNav"
-        data-page="adminPage"
-        class="hidden"
-    >
-        👑<br>
-        Admin
-    </button>
-
+    <button class="btn" id="watchBtn">📺 Watch Ad &amp; Earn</button>
+    <h2>🎁 Leaderboard Rewards</h2>
+    <div id="rewardsList"></div>
+  </section>
+
+  <!-- INVITE -->
+  <section id="tab-invite" class="hidden">
+    <h2 style="margin-top:56px">👥 Invite Friends</h2>
+    <p style="color:var(--muted);font-size:14px">Share your referral link with your friends.</p>
+    <div class="link" id="refLink">-</div>
+    <button class="btn" id="shareBtn">📤 Share Invite</button>
+    <button class="btn sec" id="copyBtn" style="margin-top:10px">📋 Copy Link</button>
+    <div class="grid" style="margin-top:16px">
+      <div class="stat"><div class="t">Invited</div><div class="v" id="invited2">0</div></div>
+      <div class="stat"><div class="t">Points</div><div class="v" id="points2">0</div></div>
+    </div>
+  </section>
+
+  <!-- LEADERBOARD -->
+  <section id="tab-board" class="hidden">
+    <h2 style="margin-top:56px">🏆 Top 30</h2>
+    <div id="boardList"></div>
+  </section>
+
+  <!-- PROFILE -->
+  <section id="tab-profile" class="hidden">
+    <div class="user">
+      <img id="avatar2" class="avatar" alt="">
+      <div><div class="uname" id="uname2">User</div><div class="uid" id="uid2">ID: -</div></div>
+    </div>
+    <div class="grid">
+      <div class="stat"><div class="t">📺 Ads</div><div class="v" id="p_ads">0</div></div>
+      <div class="stat"><div class="t">👥 Invites</div><div class="v" id="p_inv">0</div></div>
+      <div class="stat"><div class="t">🏆 Rank</div><div class="v" id="p_rank">#-</div></div>
+      <div class="stat"><div class="t">⭐ Points</div><div class="v" id="p_pts">0</div></div>
+    </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="tab-admin" class="hidden">
+    <h2 style="margin-top:56px">👑 Admin Panel</h2>
+    <label>Ad Reward</label><input id="a_ad" type="number" step="any" min="0">
+    <label>Invite Reward</label><input id="a_inv" type="number" step="any" min="0">
+    <label>Daily Ads Limit</label><input id="a_max" type="number" min="0">
+    <button class="btn green" id="saveSettings">💾 Save Settings</button>
+
+    <h2>🎁 Edit Leaderboard Reward</h2>
+    <label>Position (1-30)</label><input id="r_pos" type="number" min="1" max="30" value="1">
+    <label>Title</label><input id="r_title" type="text">
+    <label>Description</label><textarea id="r_desc" rows="2"></textarea>
+    <button class="btn green" id="saveReward">💾 Save Reward</button>
+  </section>
+
+</main>
+
+<nav id="nav">
+  <button data-tab="ads" class="active"><span>📺</span>Ads</button>
+  <button data-tab="invite"><span>👥</span>Invite</button>
+  <button data-tab="board"><span>🏆</span>Leaderboard</button>
+  <button data-tab="profile"><span>👤</span>Profile</button>
+  <button data-tab="admin" id="adminTabBtn" class="hidden"><span>👑</span>Admin</button>
 </nav>
 
 <script>
+/* =====================================================
+   CONFIG — ye Adsgram Block ID be-yih file wust new.
+   Lemeqeyer yihin bicha beqeyr, Vercel env ayasfelgim.
+===================================================== */
+const ADSGRAM_BLOCK_ID = "52630";
 
-/* =========================================================
-   CONFIG
-========================================================= */
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
 
-/*
- * Because index.html and server.js are deployed
- * together on Vercel, use the same origin.
- */
-
-const API_BASE =
-    window.location.origin;
-
-const ADSGRAM_BLOCK_ID =
-    "52614";
-
-/* =========================================================
-   TELEGRAM
-========================================================= */
-
-const tg =
-    window.Telegram &&
-    window.Telegram.WebApp
-        ? window.Telegram.WebApp
-        : null;
-
-if (tg) {
-
-    tg.ready();
-    tg.expand();
-
-}
-
-/* =========================================================
-   STATE
-========================================================= */
-
-let currentUser = null;
+const INIT_DATA = tg ? tg.initData : "";
+let ME = null;
+let BOT_USERNAME = "";
 let adController = null;
-let adBusy = false;
+let watching = false;
 
-/* =========================================================
-   SELECTOR
-========================================================= */
+const $ = id => document.getElementById(id);
 
-function $(id) {
-    return document.getElementById(id);
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 }
 
-/* =========================================================
-   MESSAGE
-========================================================= */
-
-function showMessage(text) {
-
-    $("message").textContent =
-        String(text);
-
-    $("message")
-        .classList
-        .remove("hidden");
+let toastTimer = null;
+function toast(msg, type) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast " + (type || "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), 3500);
 }
 
-function hideMessage() {
-
-    $("message")
-        .classList
-        .add("hidden");
+async function api(path, method, body) {
+  const res = await fetch(path, {
+    method: method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "x-telegram-init-data": INIT_DATA
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.error || ("Request failed (" + res.status + ")"));
+  }
+  return data;
 }
 
-/* =========================================================
-   API
-========================================================= */
-
-async function api(
-    endpoint,
-    options = {}
-) {
-
-    if (!tg || !tg.initData) {
-
-        throw new Error(
-            "Please open this Mini App from Telegram."
-        );
-
-    }
-
-    const headers = {
-
-        "Content-Type":
-            "application/json",
-
-        "X-Telegram-Init-Data":
-            tg.initData
-
-    };
-
-    const response =
-        await fetch(
-            API_BASE + endpoint,
-            {
-                ...options,
-
-                headers: {
-                    ...headers,
-                    ...(options.headers || {})
-                }
-            }
-        );
-
-    let data;
-
-    try {
-
-        data =
-            await response.json();
-
-    } catch {
-
-        throw new Error(
-            "Server returned invalid response."
-        );
-
-    }
-
-    if (!response.ok) {
-
-        throw new Error(
-            data.error ||
-            `Server error ${response.status}`
-        );
-
-    }
-
-    return data;
+function fmt(n) {
+  const x = Number(n || 0);
+  return Number.isInteger(x) ? String(x) : x.toFixed(2);
 }
 
-/* =========================================================
-   NUMBER
-========================================================= */
+/* ---------------- render ---------------- */
 
-function formatNumber(value) {
-
-    const number =
-        Number(value);
-
-    if (!Number.isFinite(number)) {
-        return "0";
-    }
-
-    return number.toLocaleString();
+function displayName(u) {
+  const full = [u.first_name, u.last_name].filter(Boolean).join(" ");
+  return full || (u.username ? "@" + u.username : "User");
 }
-
-/* =========================================================
-   HTML ESCAPE
-========================================================= */
-
-function escapeHtml(value) {
-
-    return String(value)
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-}
-
-/* =========================================================
-   IMAGE
-========================================================= */
-
-function setImage(
-    element,
-    url
-) {
-
-    if (url) {
-
-        element.src = url;
-
-        element.onerror = () => {
-
-            element.src =
-                "https://via.placeholder.com/100";
-
-        };
-
-    } else {
-
-        element.src =
-            "https://via.placeholder.com/100";
-
-    }
-}
-
-/* =========================================================
-   REWARD KEY
-========================================================= */
-
-function createRewardKey() {
-
-    if (
-        window.crypto &&
-        window.crypto.getRandomValues
-    ) {
-
-        const array =
-            new Uint32Array(4);
-
-        window.crypto
-            .getRandomValues(array);
-
-        return Array.from(array)
-            .map(
-                x => x.toString(36)
-            )
-            .join("-");
-
-    }
-
-    return (
-        Date.now() +
-        "-" +
-        Math.random()
-            .toString(36)
-            .slice(2)
-    );
-}
-
-/* =========================================================
-   RENDER USER
-========================================================= */
 
 function renderUser() {
+  const u = ME.user;
+  const name = displayName(u);
+  ["uname", "uname2"].forEach(id => $(id).textContent = name);
+  ["uid", "uid2"].forEach(id => $(id).textContent = "ID: " + u.telegram_id);
+  ["avatar", "avatar2"].forEach(id => {
+    if (u.photo_url) $(id).src = u.photo_url; else $(id).removeAttribute("src");
+  });
+  $("points").textContent = fmt(u.points);
+  $("points2").textContent = fmt(u.points);
+  $("p_pts").textContent = fmt(u.points);
+  $("adsCount").textContent = u.total_ads + " watched";
+  $("invCount").textContent = u.total_invites + " invited";
+  $("invited2").textContent = u.total_invites;
+  $("rank").textContent = "#" + u.rank;
+  $("p_ads").textContent = u.total_ads;
+  $("p_inv").textContent = u.total_invites;
+  $("p_rank").textContent = "#" + u.rank;
 
-    if (!currentUser) return;
+  const link = BOT_USERNAME
+    ? "https://t.me/" + BOT_USERNAME + "?startapp=ref_" + u.referral_code
+    : "Bot username is not configured";
+  $("refLink").textContent = link;
 
-    const user =
-        currentUser;
-
-    const name =
-        user.first_name ||
-        user.username ||
-        "User";
-
-    $("headerName")
-        .textContent = name;
-
-    $("headerId")
-        .textContent =
-        `ID: ${user.telegram_id}`;
-
-    $("points")
-        .textContent =
-        formatNumber(user.points);
-
-    $("adsCount")
-        .textContent =
-        `${user.total_ads} watched`;
-
-    $("inviteCount")
-        .textContent =
-        `${user.total_invites} invited`;
-
-    $("rank")
-        .textContent =
-        `#${user.rank}`;
-
-    $("inviteTotal")
-        .textContent =
-        user.total_invites;
-
-    $("invitePoints")
-        .textContent =
-        formatNumber(user.points);
-
-    $("profileName")
-        .textContent = name;
-
-    $("profileId")
-        .textContent =
-        `Telegram ID: ${user.telegram_id}`;
-
-    $("profileAds")
-        .textContent =
-        user.total_ads;
-
-    $("profileInvites")
-        .textContent =
-        user.total_invites;
-
-    $("profileRank")
-        .textContent =
-        `#${user.rank}`;
-
-    $("profilePoints")
-        .textContent =
-        formatNumber(user.points);
-
-    setImage(
-        $("headerAvatar"),
-        user.photo_url
-    );
-
-    setImage(
-        $("profileAvatar"),
-        user.photo_url
-    );
-
-    const username =
-        currentUser.botUsername ||
-        "";
-
-    if (username) {
-
-        $("refLink")
-            .textContent =
-            `https://t.me/${username}?startapp=ref_${encodeURIComponent(
-                user.referral_code
-            )}`;
-
-    } else {
-
-        $("refLink")
-            .textContent =
-            "BOT_USERNAME is not configured.";
-
-    }
-
-    if (user.is_admin) {
-
-        $("adminNav")
-            .classList
-            .remove("hidden");
-
-    } else {
-
-        $("adminNav")
-            .classList
-            .add("hidden");
-
-    }
+  $("adminTabBtn").classList.toggle("hidden", !u.is_admin);
 }
 
-/* =========================================================
-   CHANNELS
-========================================================= */
-
-function renderChannels(channels) {
-
-    const container =
-        $("channels");
-
-    container.innerHTML = "";
-
-    if (
-        !channels ||
-        channels.length === 0
-    ) {
-
-        container.innerHTML = `
-            <div class="message">
-                No required channels configured.
-            </div>
-        `;
-
-        return;
-    }
-
-    channels.forEach(channel => {
-
-        const row =
-            document.createElement("div");
-
-        row.className =
-            "channel";
-
-        const name =
-            document.createElement("div");
-
-        name.className =
-            "channel-name";
-
-        name.textContent =
-            channel.channel;
-
-        const right =
-            document.createElement("div");
-
-        if (channel.joined) {
-
-            const status =
-                document.createElement("span");
-
-            status.className =
-                "channel-status";
-
-            status.textContent =
-                "✅ Joined";
-
-            right.appendChild(status);
-
-        } else {
-
-            const button =
-                document.createElement("button");
-
-            button.className =
-                "join-btn";
-
-            button.textContent =
-                "JOIN";
-
-            button.onclick = () => {
-
-                const username =
-                    String(channel.channel)
-                        .replace(/^@/,"");
-
-                if (tg) {
-
-                    tg.openTelegramLink(
-                        `https://t.me/${username}`
-                    );
-
-                }
-
-            };
-
-            right.appendChild(button);
-        }
-
-        row.appendChild(name);
-        row.appendChild(right);
-
-        container.appendChild(row);
-
-    });
+function renderChannels() {
+  const box = $("verify");
+  const list = $("channelList");
+  if (ME.allJoined) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  list.innerHTML = (ME.channels || []).map(c => {
+    const handle = String(c.channel).replace(/^@/, "");
+    const mark = c.joined ? "✅" : "❌";
+    const href = handle.startsWith("-") ? "#" : "https://t.me/" + esc(handle);
+    return `<div style="margin-bottom:8px">${mark} <a href="${href}" target="_blank" rel="noopener">${esc(c.channel)}</a></div>`;
+  }).join("");
 }
-
-/* =========================================================
-   SHOW / HIDE
-========================================================= */
-
-function showVerification(channels) {
-
-    $("verification")
-        .classList
-        .remove("hidden");
-
-    $("mainContent")
-        .classList
-        .add("hidden");
-
-    $("nav")
-        .classList
-        .add("hidden");
-
-    renderChannels(channels);
-}
-
-function showMain() {
-
-    $("verification")
-        .classList
-        .add("hidden");
-
-    $("mainContent")
-        .classList
-        .remove("hidden");
-
-    $("nav")
-        .classList
-        .remove("hidden");
-}
-
-/* =========================================================
-   CHECK CHANNELS
-========================================================= */
-
-async function checkChannels() {
-
-    try {
-
-        $("checkChannels")
-            .disabled = true;
-
-        hideMessage();
-
-        const data =
-            await api(
-                "/api/channels"
-            );
-
-        renderChannels(
-            data.channels
-        );
-
-        if (data.allJoined) {
-
-            const me =
-                await api("/api/me");
-
-            currentUser =
-                me.user;
-
-            currentUser.botUsername =
-                me.bot?.username || "";
-
-            renderUser();
-
-            showMain();
-
-            await loadRewards();
-
-        } else {
-
-            showMessage(
-                "Join all required channels first."
-            );
-        }
-
-    } catch (error) {
-
-        showMessage(
-            error.message
-        );
-
-    } finally {
-
-        $("checkChannels")
-            .disabled = false;
-
-    }
-}
-
-$("checkChannels")
-    .addEventListener(
-        "click",
-        checkChannels
-    );
-
-/* =========================================================
-   ADSGRAM
-========================================================= */
-
-function initializeAds() {
-
-    try {
-
-        if (!window.Adsgram) {
-
-            console.error(
-                "AdsGram SDK not loaded."
-            );
-
-            return;
-
-        }
-
-        adController =
-            window.Adsgram.init({
-                blockId:
-                    ADSGRAM_BLOCK_ID
-            });
-
-        console.log(
-            "AdsGram initialized:",
-            ADSGRAM_BLOCK_ID
-        );
-
-    } catch (error) {
-
-        console.error(
-            "AdsGram error:",
-            error
-        );
-
-    }
-}
-
-/* =========================================================
-   WATCH AD
-========================================================= */
-
-async function watchAd() {
-
-    if (adBusy) return;
-
-    if (
-        !currentUser ||
-        !currentUser.is_verified
-    ) {
-
-        showMessage(
-            "Join all required channels first."
-        );
-
-        return;
-    }
-
-    if (!adController) {
-
-        initializeAds();
-
-        if (!adController) {
-
-            showMessage(
-                "Ads are not ready yet."
-            );
-
-            return;
-        }
-    }
-
-    adBusy = true;
-
-    $("watchAd")
-        .disabled = true;
-
-    try {
-
-        const rewardKey =
-            createRewardKey();
-
-        /*
-         * Show AdsGram rewarded ad.
-         */
-
-        const result =
-            await adController.show();
-
-        /*
-         * AdsGram must report a
-         * completed reward.
-         */
-
-        if (
-            !result ||
-            result.done !== true
-        ) {
-
-            showMessage(
-                "Ad was not completed."
-            );
-
-            return;
-        }
-
-        /*
-         * Send reward request.
-         */
-
-        const reward =
-            await api(
-                "/api/ad-reward",
-                {
-                    method: "POST",
-
-                    body:
-                        JSON.stringify({
-                            rewardKey
-                        })
-                }
-            );
-
-        if (reward.ok) {
-
-            currentUser.points =
-                reward.user.points;
-
-            currentUser.total_ads =
-                reward.user.total_ads;
-
-            currentUser.ads_count =
-                reward.user.ads_count;
-
-            renderUser();
-
-            showMessage(
-                `🎉 +${reward.reward} points`
-            );
-        }
-
-    } catch (error) {
-
-        console.error(
-            "Ad error:",
-            error
-        );
-
-        showMessage(
-            error.message ||
-            "Ad was not completed."
-        );
-
-    } finally {
-
-        adBusy = false;
-
-        $("watchAd")
-            .disabled = false;
-    }
-}
-
-$("watchAd")
-    .addEventListener(
-        "click",
-        watchAd
-    );
-
-/* =========================================================
-   REWARDS
-========================================================= */
 
 async function loadRewards() {
-
-    try {
-
-        const data =
-            await api(
-                "/api/rewards"
-            );
-
-        const container =
-            $("rewardList");
-
-        container.innerHTML = "";
-
-        data.rewards.forEach(
-            reward => {
-
-                const card =
-                    document.createElement(
-                        "div"
-                    );
-
-                card.className =
-                    "card";
-
-                card.style.marginBottom =
-                    "8px";
-
-                card.innerHTML = `
-                    <div
-                        style="
-                            font-weight:800;
-                        "
-                    >
-                        #${escapeHtml(
-                            reward.position
-                        )}
-                        ${escapeHtml(
-                            reward.title
-                        )}
-                    </div>
-
-                    <div
-                        style="
-                            margin-top:4px;
-                            color:#7f8999;
-                            font-size:12px;
-                        "
-                    >
-                        ${escapeHtml(
-                            reward.description || ""
-                        )}
-                    </div>
-                `;
-
-                container.appendChild(card);
-
-            }
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Rewards:",
-            error
-        );
-
-    }
+  try {
+    const d = await api("/api/rewards");
+    $("rewardsList").innerHTML = d.rewards.length
+      ? d.rewards.map(r =>
+          `<div class="item"><div class="h">#${r.position} ${esc(r.title)}</div><div class="d">${esc(r.description)}</div></div>`
+        ).join("")
+      : `<div class="empty">No rewards yet.</div>`;
+  } catch (e) {
+    $("rewardsList").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
 }
 
-/* =========================================================
-   LEADERBOARD
-========================================================= */
-
-async function loadLeaderboard() {
-
-    try {
-
-        const data =
-            await api(
-                "/api/leaderboard"
-            );
-
-        const container =
-            $("leaderboard");
-
-        container.innerHTML = "";
-
-        if (
-            !data.leaderboard.length
-        ) {
-
-            container.innerHTML = `
-                <div class="card">
-                    No leaderboard users yet.
-                </div>
-            `;
-
-            return;
-        }
-
-        data.leaderboard.forEach(
-            user => {
-
-                const row =
-                    document.createElement(
-                        "div"
-                    );
-
-                row.className =
-                    "leader";
-
-                const name =
-                    user.first_name ||
-                    user.username ||
-                    "User";
-
-                const avatar =
-                    user.photo_url ||
-                    "https://via.placeholder.com/50";
-
-                row.innerHTML = `
-
-                    <div class="rank">
-                        ${escapeHtml(
-                            user.rank
-                        )}
-                    </div>
-
-                    <img
-                        class="leader-avatar"
-                        src="${escapeHtml(
-                            avatar
-                        )}"
-                        alt=""
-                    >
-
-                    <div class="leader-info">
-
-                        <div class="leader-name">
-                            ${escapeHtml(
-                                name
-                            )}
-                        </div>
-
-                        <div class="leader-stats">
-                            📺 ${escapeHtml(
-                                user.ads
-                            )}
-                            &nbsp;•&nbsp;
-                            👥 ${escapeHtml(
-                                user.invites
-                            )}
-                        </div>
-
-                    </div>
-
-                    <div class="points">
-                        ${formatNumber(
-                            user.points
-                        )}
-                    </div>
-
-                `;
-
-                container.appendChild(row);
-
-            }
-        );
-
-    } catch (error) {
-
-        showMessage(
-            error.message
-        );
-
-    }
+async function loadBoard() {
+  $("boardList").innerHTML = `<div class="empty">Loading...</div>`;
+  try {
+    const d = await api("/api/leaderboard");
+    const myId = String(ME.user.telegram_id);
+    $("boardList").innerHTML = d.leaderboard.length
+      ? d.leaderboard.map(u => {
+          const sub = u.username ? "@" + u.username : "ID " + u.telegram_id;
+          return `<div class="row ${String(u.telegram_id) === myId ? "me" : ""}">
+            <div class="rank">${u.rank}</div>
+            <div class="n"><b>${esc(displayName(u))}</b><span>${esc(sub)} · 📺 ${u.ads} · 👥 ${u.invites}</span></div>
+            <div class="p">${fmt(u.points)}</div></div>`;
+        }).join("")
+      : `<div class="empty">No users yet.</div>`;
+  } catch (e) {
+    $("boardList").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
 }
 
-/* =========================================================
-   NAVIGATION
-========================================================= */
+/* ---------------- ads ---------------- */
 
-document
-    .querySelectorAll(
-        ".nav button[data-page]"
-    )
-    .forEach(button => {
+function newKey() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now() + "-" + Math.random().toString(36).slice(2);
+}
 
-        button.addEventListener(
-            "click",
-            async () => {
+function getAdController() {
+  if (adController) return adController;
+  if (!window.Adsgram) throw new Error("Adsgram SDK failed to load. Check your internet.");
+  adController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+  return adController;
+}
 
-                const page =
-                    button.dataset.page;
+async function watchAd() {
+  if (watching) return;
+  if (ME && !ME.allJoined) { toast("Join all required channels first.", "err"); return; }
 
-                document
-                    .querySelectorAll(".page")
-                    .forEach(item => {
+  const btn = $("watchBtn");
+  watching = true;
+  btn.disabled = true;
 
-                        item.classList.add(
-                            "hidden"
-                        );
+  try {
+    const ctrl = getAdController();
+    const result = await ctrl.show();
 
-                    });
+    if (!result || !result.done) {
+      toast("Ad was not completed.");
+      return;
+    }
 
-                $(page)
-                    .classList
-                    .remove("hidden");
+    const d = await api("/api/ad-reward", "POST", { rewardKey: newKey() });
+    ME.user.points = d.user.points;
+    ME.user.ads_count = d.user.ads_count;
+    ME.user.total_ads = d.user.total_ads;
+    renderUser();
+    toast("+" + fmt(d.reward) + " points!", "ok");
+    refreshMe(true);
+  } catch (e) {
+    const msg = (e && (e.description || e.message)) || "Ad error";
+    toast(msg, "err");
+  } finally {
+    watching = false;
+    btn.disabled = false;
+  }
+}
 
-                document
-                    .querySelectorAll(
-                        ".nav button"
-                    )
-                    .forEach(item => {
+/* ---------------- invite ---------------- */
 
-                        item.classList.remove(
-                            "active"
-                        );
+function inviteLink() {
+  return $("refLink").textContent;
+}
 
-                    });
+$("shareBtn").onclick = () => {
+  const link = inviteLink();
+  if (!link.startsWith("http")) return toast("Bot username is not configured.", "err");
+  const text = "Join and earn rewards! 🎁";
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(text);
+  if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
+};
 
-                button.classList.add(
-                    "active"
-                );
+$("copyBtn").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(inviteLink());
+    toast("Link copied!", "ok");
+  } catch (e) {
+    toast("Copy failed. Select and copy manually.", "err");
+  }
+};
 
-                if (
-                    page ===
-                    "leaderPage"
-                ) {
+/* ---------------- admin ---------------- */
 
-                    await loadLeaderboard();
-
-                }
-
-            }
-        );
-
+$("saveSettings").onclick = async () => {
+  try {
+    await api("/api/admin/settings", "POST", {
+      ad_reward: $("a_ad").value,
+      invite_reward: $("a_inv").value,
+      max_ads_per_day: $("a_max").value
     });
-
-/* =========================================================
-   SHARE
-========================================================= */
-
-$("shareInvite")
-    .addEventListener(
-        "click",
-        () => {
-
-            const link =
-                $("refLink")
-                    .textContent;
-
-            const url =
-                "https://t.me/share/url" +
-                "?url=" +
-                encodeURIComponent(link) +
-                "&text=" +
-                encodeURIComponent(
-                    "Join me and earn rewards!"
-                );
-
-            if (tg) {
-
-                tg.openTelegramLink(url);
-
-            }
-
-        }
-    );
-
-/* =========================================================
-   ADMIN SETTINGS
-========================================================= */
-
-$("saveAdmin")
-    .addEventListener(
-        "click",
-        async () => {
-
-            try {
-
-                const adReward =
-                    Number(
-                        $("adminAdReward")
-                            .value
-                    );
-
-                const inviteReward =
-                    Number(
-                        $("adminInviteReward")
-                            .value
-                    );
-
-                const adLimit =
-                    Number(
-                        $("adminAdLimit")
-                            .value
-                    );
-
-                if (
-                    !Number.isFinite(
-                        adReward
-                    ) ||
-                    adReward < 0
-                ) {
-
-                    throw new Error(
-                        "Invalid ad reward."
-                    );
-
-                }
-
-                if (
-                    !Number.isFinite(
-                        inviteReward
-                    ) ||
-                    inviteReward < 0
-                ) {
-
-                    throw new Error(
-                        "Invalid invite reward."
-                    );
-
-                }
-
-                if (
-                    !Number.isInteger(
-                        adLimit
-                    ) ||
-                    adLimit < 1
-                ) {
-
-                    throw new Error(
-                        "Invalid daily ad limit."
-                    );
-
-                }
-
-                await api(
-                    "/api/admin/settings",
-                    {
-                        method: "POST",
-
-                        body:
-                            JSON.stringify({
-
-                                ad_reward:
-                                    adReward,
-
-                                invite_reward:
-                                    inviteReward,
-
-                                max_ads_per_day:
-                                    adLimit
-
-                            })
-                    }
-                );
-
-                showMessage(
-                    "✅ Settings saved."
-                );
-
-            } catch (error) {
-
-                showMessage(
-                    error.message
-                );
-
-            }
-
-        }
-    );
-
-/* =========================================================
-   ADMIN REWARD
-========================================================= */
-
-$("saveReward")
-    .addEventListener(
-        "click",
-        async () => {
-
-            try {
-
-                const position =
-                    Number(
-                        $("rewardPosition")
-                            .value
-                    );
-
-                const title =
-                    $("rewardTitle")
-                        .value
-                        .trim();
-
-                const description =
-                    $("rewardDescription")
-                        .value
-                        .trim();
-
-                if (
-                    !Number.isInteger(
-                        position
-                    ) ||
-                    position < 1 ||
-                    position > 30
-                ) {
-
-                    throw new Error(
-                        "Position must be between 1 and 30."
-                    );
-
-                }
-
-                if (!title) {
-
-                    throw new Error(
-                        "Reward title is required."
-                    );
-
-                }
-
-                await api(
-                    "/api/admin/reward",
-                    {
-                        method: "POST",
-
-                        body:
-                            JSON.stringify({
-
-                                position,
-
-                                title,
-
-                                description,
-
-                                enabled: true
-
-                            })
-                    }
-                );
-
-                showMessage(
-                    "✅ Reward updated."
-                );
-
-                await loadRewards();
-
-            } catch (error) {
-
-                showMessage(
-                    error.message
-                );
-
-            }
-
-        }
-    );
-
-/* =========================================================
-   INITIALIZE
-========================================================= */
-
-async function initializeApp() {
-
-    try {
-
-        if (
-            !tg ||
-            !tg.initData
-        ) {
-
-            throw new Error(
-                "Please open this Mini App from Telegram."
-            );
-
-        }
-
-        const params =
-            new URLSearchParams(
-                window.location.search
-            );
-
-        const ref =
-            params.get("ref");
-
-        let endpoint =
-            "/api/me";
-
-        if (ref) {
-
-            endpoint +=
-                "?ref=" +
-                encodeURIComponent(ref);
-
-        }
-
-        const data =
-            await api(endpoint);
-
-        if (!data.ok) {
-
-            throw new Error(
-                data.error ||
-                "Unable to load account."
-            );
-
-        }
-
-        currentUser =
-            data.user;
-
-        currentUser.botUsername =
-            data.bot?.username || "";
-
-        renderUser();
-
-        initializeAds();
-
-        if (data.allJoined) {
-
-            showMain();
-
-            await loadRewards();
-
-        } else {
-
-            showVerification(
-                data.channels
-            );
-
-        }
-
-        $("loading")
-            .classList
-            .add("hidden");
-
-        $("app")
-            .classList
-            .remove("hidden");
-
-    } catch (error) {
-
-        console.error(error);
-
-        $("loading").innerHTML = `
-
-            <div
-                style="
-                    padding:25px;
-                "
-            >
-
-                <h3>
-                    Unable to open Mini App
-                </h3>
-
-                <p
-                    style="
-                        color:#6f7a8c;
-                        line-height:1.5;
-                    "
-                >
-                    ${escapeHtml(
-                        error.message
-                    )}
-                </p>
-
-            </div>
-
-        `;
-
-    }
+    toast("Settings saved.", "ok");
+  } catch (e) { toast(e.message, "err"); }
+};
+
+$("saveReward").onclick = async () => {
+  try {
+    await api("/api/admin/reward", "POST", {
+      position: Number($("r_pos").value),
+      title: $("r_title").value,
+      description: $("r_desc").value,
+      enabled: true
+    });
+    toast("Reward saved.", "ok");
+    loadRewards();
+  } catch (e) { toast(e.message, "err"); }
+};
+
+/* ---------------- tabs ---------------- */
+
+function showTab(name) {
+  ["ads", "invite", "board", "profile", "admin"].forEach(t =>
+    $("tab-" + t).classList.toggle("hidden", t !== name));
+  document.querySelectorAll("nav button").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === name));
+  if (name === "board") loadBoard();
+  if (name === "ads") loadRewards();
 }
 
-/* =========================================================
-   START
-========================================================= */
+document.querySelectorAll("nav button").forEach(b =>
+  b.onclick = () => showTab(b.dataset.tab));
 
-initializeApp();
+$("watchBtn").onclick = watchAd;
 
+$("checkBtn").onclick = async () => {
+  const btn = $("checkBtn");
+  btn.disabled = true;
+  try {
+    await refreshMe(false);
+    toast(ME.allJoined ? "Verified!" : "You have not joined all channels yet.", ME.allJoined ? "ok" : "");
+  } catch (e) { toast(e.message, "err"); }
+  btn.disabled = false;
+};
+
+/* ---------------- init ---------------- */
+
+async function refreshMe(silent) {
+  const d = await api("/api/me");
+  ME = d;
+  BOT_USERNAME = (d.bot && d.bot.username) || "";
+  renderUser();
+  renderChannels();
+}
+
+async function init() {
+  try {
+    if (!INIT_DATA) {
+      $("loading").textContent = "Please open this app from inside Telegram.";
+      return;
+    }
+    await refreshMe();
+    $("loading").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    loadRewards();
+
+    if (ME.user.is_admin) {
+      api("/api/rewards").catch(() => {});
+    }
+  } catch (e) {
+    $("loading").textContent = "Error: " + e.message;
+  }
+}
+
+init();
 </script>
-
 </body>
 </html>
