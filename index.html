@@ -120,6 +120,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .notice{background:var(--red);color:#fff;border-radius:20px;font-size:11px;font-weight:800;padding:2px 7px;margin-left:6px}
 
+.av{position:relative;width:46px;height:46px;border-radius:50%;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;
+  font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.12)}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.mini span{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--card2);color:var(--muted)}
+.mini span.ok{background:rgba(34,197,94,.16);color:#4ade80}
 /* gate */
 .gate{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto;
   background:radial-gradient(520px 380px at 50% 10%,rgba(99,102,241,.35),transparent 70%),var(--bg)}
@@ -231,17 +237,21 @@ nav button.active svg{stroke:#8ec5ff}
   <section id="v-invite" class="view hidden">
     <h2 style="margin-top:6px"><span class="ib sm green" id="iIc"></span>Invite friends</h2>
     <div class="card">
-      <div class="muted">Share your personal link. You earn <b id="iReward" style="color:#fff">0</b> points for each friend who joins.</div>
+      <div class="muted">Share your personal link. You earn <b id="iReward" style="color:#fff">0</b> points for each friend who joins the required channels and watches <b id="iNeed" style="color:#fff">1</b> ad(s).</div>
       <div class="linkbox" id="refLink">-</div>
       <div class="row2">
         <button class="btn" id="shareBtn"></button>
         <button class="btn dark" id="copyBtn"></button>
       </div>
     </div>
-    <div class="stats" style="grid-template-columns:1fr 1fr">
-      <div class="stat"><span class="ib green" id="i1"></span><div class="v" id="iInv">0</div><div class="l">Friends invited</div></div>
+    <div class="stats">
+      <div class="stat"><span class="ib blue" id="i1"></span><div class="v" id="iInv">0</div><div class="l">Friends invited</div></div>
+      <div class="stat"><span class="ib green" id="i3"></span><div class="v" id="iVer">0</div><div class="l">Verified</div></div>
       <div class="stat"><span class="ib orange" id="i2"></span><div class="v" id="iPts">0</div><div class="l">Your points</div></div>
     </div>
+
+    <h2><span class="ib sm purple" id="frIc"></span>Your friends</h2>
+    <div id="friendList"></div>
   </section>
 
   <!-- PROFILE -->
@@ -327,6 +337,7 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Invite reward (points)</label><input id="a_inv" type="number" step="any" min="0">
         <label>Daily ads limit</label><input id="a_max" type="number" min="0">
         <label>Minimum withdrawal</label><input id="a_min" type="number" step="any" min="0">
+        <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
         <button class="btn green" id="saveSettings" style="margin-top:16px"></button>
       </div>
     </div>
@@ -383,7 +394,7 @@ function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text 
 
 /* static icon setup */
 [["gIc","shield"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
- ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i2","coin"],
+ ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i3","shield"],["frIc","users"],["i2","coin"],
  ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
 setBtn("checkBtn","refresh","Check membership");
 setBtn("hWithdraw","wallet","Withdraw");
@@ -454,7 +465,7 @@ function render() {
   $("hAds").textContent = u.total_ads; $("pAds").textContent = u.total_ads;
   $("hInv").textContent = u.total_invites; $("pInv").textContent = u.total_invites;
   $("hToday").textContent = ME.today_ads;
-  $("iInv").textContent = u.total_invites;
+  $("iNeed").textContent = (ME.settings || {}).verify_ads ?? 1;
   $("iPts").textContent = fmt(u.points);
   $("wBal").textContent = fmt(u.points);
 
@@ -610,7 +621,7 @@ function admSeg(name) {
   if (name === "task") loadAdminTasks();
   if (name === "set") {
     const s = ME.settings || {};
-    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100; $("a_min").value = s.min_withdraw ?? 100;
+    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100; $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
   }
 }
 $("segReq").onclick = () => admSeg("req");
@@ -679,11 +690,34 @@ $("saveSettings").onclick = async () => {
   try {
     await api("/api/admin/settings", "POST", {
       ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
-      max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value
+      max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value, verify_ads: $("a_vads").value
     });
     toast("Settings saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
 };
+
+/* ---------------- my friends ---------------- */
+async function loadFriends() {
+  try {
+    const d = await api("/api/referrals");
+    const need = (ME.settings || {}).verify_ads ?? 1;
+    const list = d.friends;
+    $("iInv").textContent = list.length;
+    $("iVer").textContent = list.filter(f => f.verified).length;
+    $("friendList").innerHTML = list.length ? list.map(f => {
+      const name = nameOf(f);
+      const letter = esc((name.replace("@", "")[0] || "U").toUpperCase());
+      const img = f.photo_url ? `<img src="${esc(f.photo_url)}" alt="" onerror="this.remove()">` : "";
+      const ads = Number(f.total_ads || 0);
+      return `<div class="card" style="padding:13px"><div class="line">
+        <div class="av"><span>${letter}</span>${img}</div>
+        <div class="x"><b class="ellip">${esc(name)}</b><span>ID ${esc(f.telegram_id)}</span>
+          <div class="mini"><span class="${f.joined ? "ok" : ""}">Channels: ${f.joined ? "joined" : "not joined"}</span><span class="${ads >= need ? "ok" : ""}">Ads: ${Math.min(ads, need)}/${need}</span></div></div>
+        <span class="badge ${f.verified ? "approved" : "pending"}">${f.verified ? "Verified" : "Unverified"}</span>
+      </div></div>`;
+    }).join("") : '<div class="empty">No friends yet. Share your link to invite friends.</div>';
+  } catch (e) { $("friendList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
 
 /* ---------------- tasks ---------------- */
 const taskState = {};   // id -> "started"
@@ -763,6 +797,7 @@ function showTab(name) {
   if (name === "home") loadTop();
   if (name === "profile") loadHistory();
   if (name === "earn") loadTasks();
+  if (name === "invite") loadFriends();
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $("checkBtn").onclick = async () => {
