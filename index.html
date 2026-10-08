@@ -2,432 +2,674 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Reward Mini App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--bg:#0b1220;--card:#162033;--card2:#1d2a42;--text:#eef2fb;--muted:#8fa0bd;--blue:#2f7df6;--green:#2ecc71;--red:#ff5d5d;--gold:#f5b942}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:14px 14px 100px}
+:root{
+  --bg:#070b16;--card:#0f1730;--card2:#16213f;--line:#22305a;
+  --text:#f1f5ff;--muted:#8b9bc2;
+  --blue:#3b82f6;--cyan:#06b6d4;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--purple:#8b5cf6;--pink:#ec4899;
+}
+html,body{background:var(--bg)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);min-height:100vh;
+  padding:16px 16px calc(104px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(520px 320px at 90% -5%,rgba(59,130,246,.22),transparent 70%),
+    radial-gradient(480px 300px at -10% 20%,rgba(139,92,246,.18),transparent 70%),var(--bg);
+  background-attachment:fixed}
 .hidden{display:none!important}
-.toast{position:fixed;top:12px;left:12px;right:12px;padding:12px 14px;border-radius:12px;font-size:14px;z-index:50;background:#3a3320;color:#ffd978}
-.toast.ok{background:#173a28;color:#7dffb0}
-.toast.err{background:#401b1b;color:#ff9a9a}
-.user{display:flex;align-items:center;gap:12px;margin:56px 0 14px}
-.avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2f7df6,#38c6d9);object-fit:cover}
-.uname{font-size:17px;font-weight:600}
-.uid{font-size:13px;color:var(--muted)}
-.points{background:linear-gradient(135deg,#1a4fb8,#2f7df6);border-radius:22px;padding:20px;margin-bottom:14px}
-.points small{opacity:.8;font-size:14px}
-.points .big{font-size:40px;font-weight:800;margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-.stat{background:var(--card);border-radius:18px;padding:14px}
-.stat .ic{font-size:22px}
-.stat .t{color:var(--muted);font-size:13px;margin-top:4px}
-.stat .v{font-size:18px;font-weight:700;margin-top:2px}
-.btn{width:100%;border:0;border-radius:16px;padding:16px;font-size:16px;font-weight:700;color:#fff;background:var(--blue);cursor:pointer}
-.btn:disabled{opacity:.55}
-.btn.sec{background:var(--card2)}
-.btn.green{background:#1f9d57}
-h2{font-size:19px;margin:18px 0 10px}
-.item{background:var(--card);border-radius:16px;padding:14px;margin-bottom:10px}
-.item .h{font-weight:700}
-.item .d{color:var(--muted);font-size:14px;margin-top:3px}
-.row{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:16px;padding:12px;margin-bottom:8px}
-.rank{width:34px;text-align:center;font-weight:800;color:var(--gold)}
-.row .n{flex:1;min-width:0}
-.row .n b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row .n span{color:var(--muted);font-size:12px}
-.row .p{font-weight:700}
-.row.me{outline:2px solid var(--blue)}
-input,textarea{width:100%;background:var(--card2);border:1px solid #2b3b5a;border-radius:12px;padding:12px;color:var(--text);font-size:15px;margin:6px 0 12px}
-label{font-size:13px;color:var(--muted)}
-.link{background:var(--card2);border-radius:12px;padding:12px;font-size:13px;word-break:break-all;margin:10px 0}
-.verify{background:var(--card);border:1px solid #2b3b5a;border-radius:18px;padding:16px;margin-bottom:14px}
-.verify a{color:#6cb2ff}
-nav{position:fixed;left:10px;right:10px;bottom:10px;background:#101a2c;border-radius:24px;display:flex;padding:6px;box-shadow:0 6px 24px #0008;z-index:20}
-nav button{flex:1;background:none;border:0;color:var(--muted);padding:8px 2px;border-radius:18px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
-nav button span{font-size:20px}
-nav button.active{background:var(--card2);color:#fff}
-.loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;z-index:100}
-.empty{color:var(--muted);text-align:center;padding:20px}
+svg{display:block}
+
+/* icons */
+.ib{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ib.sm{width:32px;height:32px;border-radius:10px}.ib.sm svg{width:18px;height:18px}
+.blue{background:linear-gradient(135deg,#3b82f6,#06b6d4)}
+.green{background:linear-gradient(135deg,#22c55e,#10b981)}
+.orange{background:linear-gradient(135deg,#f59e0b,#f97316)}
+.purple{background:linear-gradient(135deg,#8b5cf6,#6366f1)}
+.pink{background:linear-gradient(135deg,#ec4899,#f43f5e)}
+.teal{background:linear-gradient(135deg,#14b8a6,#0ea5e9)}
+.redg{background:linear-gradient(135deg,#ef4444,#f97316)}
+
+/* splash */
+#splash{position:fixed;inset:0;z-index:200;background:radial-gradient(600px 400px at 50% 40%,#16275a,#070b16 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .6s,transform .6s}
+#splash.out{opacity:0;transform:scale(1.06);pointer-events:none}
+.logo{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+.logo .ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#3b82f6;border-right-color:#8b5cf6;animation:spin 1.4s linear infinite}
+.logo .ring.r2{inset:12px;border-top-color:#06b6d4;border-right-color:#ec4899;animation-duration:2s;animation-direction:reverse}
+.logo .core{width:68px;height:68px;border-radius:22px;display:flex;align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(135deg,#3b82f6,#8b5cf6);box-shadow:0 0 40px rgba(99,102,241,.7);animation:pulse 1.6s ease-in-out infinite}
+.logo .core svg{width:36px;height:36px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sp-t1{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;animation:fadeUp .8s .2s both}
+.sp-t2{font-size:28px;font-weight:800;text-align:center;padding:0 24px;animation:fadeUp .8s .5s both;
+  background:linear-gradient(90deg,#fff,#9db8ff);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{width:160px;height:5px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;animation:fadeUp .8s .8s both}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899);animation:load 1.8s .6s ease-out forwards}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes load{to{width:100%}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes shine{0%{transform:translateX(-120%)}100%{transform:translateX(220%)}}
+
+/* toast */
+.toast{position:fixed;top:calc(12px + env(safe-area-inset-top));left:14px;right:14px;z-index:150;padding:13px 16px;border-radius:14px;
+  font-size:14px;font-weight:600;background:#2a2a40;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:fadeIn .25s both}
+.toast.ok{background:#0f3d28;color:#7dffb0;border:1px solid #1f7a4d}
+.toast.err{background:#451a1a;color:#ffb0b0;border:1px solid #8a2d2d}
+
+/* layout */
+.view{animation:fadeIn .35s both}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.15)}
+.head .t{font-size:13px;color:var(--muted)}
+.head .n{font-size:18px;font-weight:700;max-width:52vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);padding:7px 12px;border-radius:30px;font-size:13px;font-weight:700}
+h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:12px}
+.balance{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:14px;
+  background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 60%,#be185d 120%);box-shadow:0 16px 40px rgba(76,29,149,.45)}
+.balance::after{content:"";position:absolute;top:0;bottom:0;width:60px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);animation:shine 4s infinite}
+.balance small{opacity:.85;font-size:13px;letter-spacing:.5px}
+.balance .big{font-size:44px;font-weight:800;margin:4px 0 16px;letter-spacing:-1px}
+.row2{display:flex;gap:10px}
+.row2>*{flex:1}
+.btn{border:0;border-radius:16px;padding:15px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
+  background:linear-gradient(135deg,#3b82f6,#6366f1);box-shadow:0 8px 20px rgba(59,130,246,.35);transition:transform .12s,opacity .2s;width:100%}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5}
+.btn svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.glass{background:rgba(255,255,255,.16);box-shadow:none;backdrop-filter:blur(6px)}
+.btn.green{background:linear-gradient(135deg,#22c55e,#10b981);box-shadow:0 8px 20px rgba(34,197,94,.3)}
+.btn.red{background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 8px 20px rgba(239,68,68,.3)}
+.btn.dark{background:var(--card2);box-shadow:none;border:1px solid var(--line)}
+.btn.sm{padding:11px;font-size:14px;border-radius:13px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:13px 10px;text-align:center}
+.stat .ib{margin:0 auto 8px}
+.stat .v{font-size:18px;font-weight:800}
+.stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+.line{display:flex;align-items:center;gap:12px}
+.line .x{flex:1;min-width:0}
+.line .x b{display:block;font-size:15px}
+.line .x span{font-size:13px;color:var(--muted)}
+.rankn{width:30px;text-align:center;font-weight:800;color:var(--amber)}
+.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress{height:10px;background:var(--card2);border-radius:10px;overflow:hidden;margin:10px 0 6px}
+.progress i{display:block;height:100%;border-radius:10px;background:linear-gradient(90deg,#22c55e,#06b6d4);transition:width .6s}
+.muted{color:var(--muted);font-size:13px}
+.linkbox{background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:13px;font-size:13px;word-break:break-all;margin:12px 0;color:#bcd0ff}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+input,select,textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px;color:var(--text);font-size:15px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.chip{padding:8px 14px;border-radius:30px;background:var(--card2);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
+.chip.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent}
+.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.badge.pending{background:rgba(245,158,11,.18);color:#fbbf24}
+.badge.approved{background:rgba(34,197,94,.18);color:#4ade80}
+.badge.rejected{background:rgba(239,68,68,.18);color:#f87171}
+.verify{background:linear-gradient(135deg,#2a1f4d,#1b2650);border:1px solid #4a3a8a;border-radius:20px;padding:16px;margin-bottom:14px}
+.verify a{color:#7dc4ff;font-weight:600}
+.empty{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.notice{background:var(--red);color:#fff;border-radius:20px;font-size:11px;font-weight:800;padding:2px 7px;margin-left:6px}
+
+/* nav */
+nav{position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:flex;padding:7px;border-radius:26px;
+  background:rgba(15,23,48,.88);backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 12px 36px rgba(0,0,0,.55)}
+nav button{flex:1;background:none;border:0;color:var(--muted);padding:6px 2px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:20px;transition:all .2s}
+nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav button.active{color:#fff;background:linear-gradient(135deg,rgba(59,130,246,.35),rgba(139,92,246,.35))}
+nav button.active svg{stroke:#8ec5ff}
+
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:120;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s both}
+#modal .sheet{width:100%;max-width:520px;background:var(--card);border-radius:26px 26px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));border:1px solid var(--line)}
+.seg{display:flex;background:var(--card2);border-radius:16px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;border:0;background:none;color:var(--muted);padding:10px;border-radius:12px;font-weight:700;font-size:14px}
+.seg button.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff}
 </style>
 </head>
 <body>
 
-<div id="loading" class="loading">Connecting...</div>
+<!-- Welcome splash -->
+<div id="splash">
+  <div class="logo">
+    <div class="ring"></div><div class="ring r2"></div>
+    <div class="core"><svg viewBox="0 0 24 24"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg></div>
+  </div>
+  <div class="sp-t1" id="spT1">Welcome</div>
+  <div class="sp-t2" id="spName">Reward Hub</div>
+  <div class="bar"><i></i></div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
+<div id="modal" class="hidden"></div>
 
 <main id="app" class="hidden">
 
-  <!-- verification -->
   <div id="verify" class="verify hidden">
-    <b>🔒 Verification Required</b>
-    <p style="margin:6px 0 10px;color:var(--muted);font-size:14px">Join all required channels to continue.</p>
+    <div class="line" style="margin-bottom:10px">
+      <span class="ib purple" id="vIcon"></span>
+      <div class="x"><b>Verification required</b><span>Join all required channels to continue.</span></div>
+    </div>
     <div id="channelList"></div>
-    <button class="btn sec" id="checkBtn">🔄 Check Membership</button>
+    <button class="btn dark sm" id="checkBtn" style="margin-top:6px"></button>
   </div>
 
-  <!-- ADS -->
-  <section id="tab-ads">
-    <div class="user">
-      <img id="avatar" class="avatar" alt="">
-      <div><div class="uname" id="uname">User</div><div class="uid" id="uid">ID: -</div></div>
+  <!-- HOME -->
+  <section id="v-home" class="view">
+    <div class="head">
+      <img id="hAvatar" class="avatar" alt="">
+      <div><div class="t">Welcome back</div><div class="n" id="hName">User</div></div>
+      <div class="pill"><span class="ib sm orange" id="hRankIc"></span><span id="hRank">#-</span></div>
     </div>
-    <div class="points"><small>Your Points</small><div class="big" id="points">0</div></div>
-    <div class="grid">
-      <div class="stat"><div class="ic">📺</div><div class="t">Ads</div><div class="v" id="adsCount">0 watched</div></div>
-      <div class="stat"><div class="ic">👥</div><div class="t">Invites</div><div class="v" id="invCount">0 invited</div></div>
-      <div class="stat"><div class="ic">🏆</div><div class="t">Rank</div><div class="v" id="rank">#-</div></div>
-      <div class="stat"><div class="ic">🎁</div><div class="t">Rewards</div><div class="v">Top 30</div></div>
+
+    <div class="balance">
+      <small>TOTAL BALANCE</small>
+      <div class="big" id="hPoints">0</div>
+      <div class="row2">
+        <button class="btn glass" id="hWithdraw"></button>
+        <button class="btn glass" id="hInvite"></button>
+      </div>
     </div>
-    <button class="btn" id="watchBtn">📺 Watch Ad &amp; Earn</button>
-    <h2>🎁 Leaderboard Rewards</h2>
-    <div id="rewardsList"></div>
+
+    <div class="stats">
+      <div class="stat"><span class="ib blue" id="s1"></span><div class="v" id="hAds">0</div><div class="l">Ads watched</div></div>
+      <div class="stat"><span class="ib green" id="s2"></span><div class="v" id="hInv">0</div><div class="l">Invites</div></div>
+      <div class="stat"><span class="ib orange" id="s3"></span><div class="v" id="hToday">0</div><div class="l">Today</div></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="line">
+        <span class="ib pink" id="hAdIc"></span>
+        <div class="x"><b>Watch an ad</b><span id="hAdSub">Earn points instantly</span></div>
+      </div>
+      <button class="btn" id="hWatch" style="margin-top:14px"></button>
+    </div>
+
+    <h2><span class="ib sm purple" id="topIc"></span>Top earners</h2>
+    <div id="topList"></div>
+  </section>
+
+  <!-- EARN -->
+  <section id="v-earn" class="view hidden">
+    <h2 style="margin-top:6px"><span class="ib sm green" id="eIc"></span>Earn points</h2>
+
+    <div class="card">
+      <div class="line">
+        <span class="ib blue" id="eAdIc"></span>
+        <div class="x"><b>Watch ads</b><span id="eAdSub">-</span></div>
+      </div>
+      <div class="progress"><i id="eBar" style="width:0"></i></div>
+      <div class="muted" id="eProg">0 / 0 today</div>
+      <button class="btn" id="eWatch" style="margin-top:14px"></button>
+    </div>
+
+    <div class="card">
+      <div class="line">
+        <span class="ib green" id="eInvIc"></span>
+        <div class="x"><b>Invite friends</b><span id="eInvSub">-</span></div>
+      </div>
+      <button class="btn green" id="eGoInvite" style="margin-top:14px"></button>
+    </div>
   </section>
 
   <!-- INVITE -->
-  <section id="tab-invite" class="hidden">
-    <h2 style="margin-top:56px">👥 Invite Friends</h2>
-    <p style="color:var(--muted);font-size:14px">Share your referral link with your friends.</p>
-    <div class="link" id="refLink">-</div>
-    <button class="btn" id="shareBtn">📤 Share Invite</button>
-    <button class="btn sec" id="copyBtn" style="margin-top:10px">📋 Copy Link</button>
-    <div class="grid" style="margin-top:16px">
-      <div class="stat"><div class="t">Invited</div><div class="v" id="invited2">0</div></div>
-      <div class="stat"><div class="t">Points</div><div class="v" id="points2">0</div></div>
+  <section id="v-invite" class="view hidden">
+    <h2 style="margin-top:6px"><span class="ib sm green" id="iIc"></span>Invite friends</h2>
+    <div class="card">
+      <div class="muted">Share your personal link. You earn <b id="iReward" style="color:#fff">0</b> points for each friend who joins.</div>
+      <div class="linkbox" id="refLink">-</div>
+      <div class="row2">
+        <button class="btn" id="shareBtn"></button>
+        <button class="btn dark" id="copyBtn"></button>
+      </div>
     </div>
-  </section>
-
-  <!-- LEADERBOARD -->
-  <section id="tab-board" class="hidden">
-    <h2 style="margin-top:56px">🏆 Top 30</h2>
-    <div id="boardList"></div>
+    <div class="stats" style="grid-template-columns:1fr 1fr">
+      <div class="stat"><span class="ib green" id="i1"></span><div class="v" id="iInv">0</div><div class="l">Friends invited</div></div>
+      <div class="stat"><span class="ib orange" id="i2"></span><div class="v" id="iPts">0</div><div class="l">Your points</div></div>
+    </div>
   </section>
 
   <!-- PROFILE -->
-  <section id="tab-profile" class="hidden">
-    <div class="user">
-      <img id="avatar2" class="avatar" alt="">
-      <div><div class="uname" id="uname2">User</div><div class="uid" id="uid2">ID: -</div></div>
+  <section id="v-profile" class="view hidden">
+    <div class="head">
+      <img id="pAvatar" class="avatar" alt="">
+      <div><div class="n" id="pName">User</div><div class="t" id="pId">ID</div></div>
     </div>
-    <div class="grid">
-      <div class="stat"><div class="t">📺 Ads</div><div class="v" id="p_ads">0</div></div>
-      <div class="stat"><div class="t">👥 Invites</div><div class="v" id="p_inv">0</div></div>
-      <div class="stat"><div class="t">🏆 Rank</div><div class="v" id="p_rank">#-</div></div>
-      <div class="stat"><div class="t">⭐ Points</div><div class="v" id="p_pts">0</div></div>
+
+    <div class="stats">
+      <div class="stat"><span class="ib blue" id="p1"></span><div class="v" id="pAds">0</div><div class="l">Ads</div></div>
+      <div class="stat"><span class="ib green" id="p2"></span><div class="v" id="pInv">0</div><div class="l">Invites</div></div>
+      <div class="stat"><span class="ib orange" id="p3"></span><div class="v" id="pRank">#-</div><div class="l">Rank</div></div>
     </div>
+
+    <h2><span class="ib sm teal" id="wIc"></span>Withdraw</h2>
+    <div class="card" id="wCard">
+      <div class="line" style="margin-bottom:6px">
+        <div class="x"><span>Available balance</span><b style="font-size:24px" id="wBal">0</b></div>
+        <div class="muted" id="wMin">Min -</div>
+      </div>
+      <label>Payout method</label>
+      <div class="chips" id="wMethods"></div>
+      <label>Wallet / account</label>
+      <input id="wAddr" type="text" placeholder="Enter your wallet address or account" autocomplete="off">
+      <label>Amount</label>
+      <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+      <button class="btn green" id="wBtn" style="margin-top:14px"></button>
+    </div>
+
+    <h2><span class="ib sm purple" id="hisIc"></span>Withdrawal history</h2>
+    <div id="wHist"></div>
+
+    <button class="btn dark hidden" id="adminBtn" style="margin-top:16px"></button>
   </section>
 
   <!-- ADMIN -->
-  <section id="tab-admin" class="hidden">
-    <h2 style="margin-top:56px">👑 Admin Panel</h2>
-    <label>Ad Reward</label><input id="a_ad" type="number" step="any" min="0">
-    <label>Invite Reward</label><input id="a_inv" type="number" step="any" min="0">
-    <label>Daily Ads Limit</label><input id="a_max" type="number" min="0">
-    <button class="btn green" id="saveSettings">💾 Save Settings</button>
+  <section id="v-admin" class="view hidden">
+    <div class="line" style="margin-bottom:14px">
+      <button class="ib sm purple" id="adminBack" style="border:0"></button>
+      <div class="x"><b style="font-size:18px">Admin panel</b></div>
+    </div>
+    <div class="seg">
+      <button id="segReq" class="on">Requests</button>
+      <button id="segSet">Settings</button>
+    </div>
 
-    <h2>🎁 Edit Leaderboard Reward</h2>
-    <label>Position (1-30)</label><input id="r_pos" type="number" min="1" max="30" value="1">
-    <label>Title</label><input id="r_title" type="text">
-    <label>Description</label><textarea id="r_desc" rows="2"></textarea>
-    <button class="btn green" id="saveReward">💾 Save Reward</button>
+    <div id="admReq">
+      <div class="chips" id="admFilter" style="margin-bottom:12px">
+        <span class="chip on" data-s="pending">Pending</span>
+        <span class="chip" data-s="approved">Approved</span>
+        <span class="chip" data-s="rejected">Rejected</span>
+      </div>
+      <div id="admList"></div>
+    </div>
+
+    <div id="admSet" class="hidden">
+      <div class="card">
+        <label style="margin-top:0">Ad reward (points)</label><input id="a_ad" type="number" step="any" min="0">
+        <label>Invite reward (points)</label><input id="a_inv" type="number" step="any" min="0">
+        <label>Daily ads limit</label><input id="a_max" type="number" min="0">
+        <label>Minimum withdrawal</label><input id="a_min" type="number" step="any" min="0">
+        <button class="btn green" id="saveSettings" style="margin-top:16px"></button>
+      </div>
+    </div>
   </section>
 
 </main>
 
-<nav id="nav">
-  <button data-tab="ads" class="active"><span>📺</span>Ads</button>
-  <button data-tab="invite"><span>👥</span>Invite</button>
-  <button data-tab="board"><span>🏆</span>Leaderboard</button>
-  <button data-tab="profile"><span>👤</span>Profile</button>
-  <button data-tab="admin" id="adminTabBtn" class="hidden"><span>👑</span>Admin</button>
+<nav id="nav" class="hidden">
+  <button data-tab="home" class="active"></button>
+  <button data-tab="earn"></button>
+  <button data-tab="invite"></button>
+  <button data-tab="profile"></button>
 </nav>
 
 <script>
 /* =====================================================
-   CONFIG — ye Adsgram Block ID be-yih file wust new.
-   Lemeqeyer yihin bicha beqeyr, Vercel env ayasfelgim.
+   CONFIG - Adsgram Block ID be-yih file wust new.
 ===================================================== */
 const ADSGRAM_BLOCK_ID = "52630";
 
 const tg = window.Telegram && window.Telegram.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
-
+if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#070b16"); tg.setBackgroundColor && tg.setBackgroundColor("#070b16"); } catch (e) {} }
 const INIT_DATA = tg ? tg.initData : "";
-let ME = null;
-let BOT_USERNAME = "";
-let adController = null;
-let watching = false;
 
 const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
 
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-}
+/* ---------------- icons (colored badges, no emoji) ---------------- */
+const P = {
+  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/>',
+  play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.5 0 4.5 2 4.5 4.5"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+  wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2.5"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  coin:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',
+  trophy:'<path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 6H4c0 3 1.5 4.5 4 5M16 6h4c0 3-1.5 4.5-4 5M12 13v4M8.5 20h7M10 17h4"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
+  share:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  bolt:'<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>',
+  send:'<path d="M4 12l16-8-6 16-3-7z"/>',
+  list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  refresh:'<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>'
+};
+const svg = n => `<svg viewBox="0 0 24 24">${P[n] || ""}</svg>`;
+function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
+function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text + "</span>"; }
 
-let toastTimer = null;
+/* static icon setup */
+[["vIcon","shield"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
+ ["eIc","bolt"],["eAdIc","play"],["eInvIc","users"],["iIc","users"],["i1","users"],["i2","coin"],
+ ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
+setBtn("checkBtn","refresh","Check membership");
+setBtn("hWithdraw","wallet","Withdraw");
+setBtn("hInvite","users","Invite");
+setBtn("hWatch","play","Watch ad &amp; earn");
+setBtn("eWatch","play","Watch ad &amp; earn");
+setBtn("eGoInvite","share","Get my invite link");
+setBtn("shareBtn","share","Share");
+setBtn("copyBtn","copy","Copy");
+setBtn("wBtn","send","Request withdrawal");
+setBtn("adminBtn","shield","Admin panel");
+setBtn("saveSettings","check","Save settings");
+const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invite"], profile:["user","Profile"] };
+document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
+
+/* ---------------- state / helpers ---------------- */
+let ME = null, BOT_USERNAME = "", adController = null, watching = false;
+let wMethod = "USDT", admStatus = "pending", currentTab = "home";
+const METHODS = ["USDT", "TON", "Telebirr", "Other"];
+
+let toastTimer;
 function toast(msg, type) {
   const t = $("toast");
-  t.textContent = msg;
-  t.className = "toast " + (type || "");
+  t.textContent = msg; t.className = "toast " + (type || "");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add("hidden"), 3500);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), 3200);
 }
 
 async function api(path, method, body) {
   const res = await fetch(path, {
     method: method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "x-telegram-init-data": INIT_DATA
-    },
+    headers: { "Content-Type": "application/json", "x-telegram-init-data": INIT_DATA },
     body: body ? JSON.stringify(body) : undefined
   });
   let data = {};
   try { data = await res.json(); } catch (e) {}
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.error || ("Request failed (" + res.status + ")"));
-  }
+  if (!res.ok || data.ok === false) throw new Error(data.error || ("Request failed (" + res.status + ")"));
   return data;
 }
 
-function fmt(n) {
-  const x = Number(n || 0);
-  return Number.isInteger(x) ? String(x) : x.toFixed(2);
+function countUp(el, to) {
+  const from = Number(el.dataset.v || 0);
+  el.dataset.v = to;
+  const start = performance.now(), dur = 700;
+  function step(t) {
+    const k = Math.min(1, (t - start) / dur), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(from + (to - from) * e);
+    if (k < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
+
+const nameOf = u => [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "User");
+const fmtDate = d => d ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
 /* ---------------- render ---------------- */
+function render() {
+  const u = ME.user, st = ME.settings || {};
+  const name = nameOf(u);
 
-function displayName(u) {
-  const full = [u.first_name, u.last_name].filter(Boolean).join(" ");
-  return full || (u.username ? "@" + u.username : "User");
-}
+  ["hAvatar","pAvatar"].forEach(id => { if (u.photo_url) $(id).src = u.photo_url; else $(id).removeAttribute("src"); });
+  $("hName").textContent = name; $("pName").textContent = name;
+  $("pId").textContent = "ID: " + u.telegram_id;
+  $("hRank").textContent = "#" + u.rank; $("pRank").textContent = "#" + u.rank;
+  countUp($("hPoints"), u.points);
+  $("hAds").textContent = u.total_ads; $("pAds").textContent = u.total_ads;
+  $("hInv").textContent = u.total_invites; $("pInv").textContent = u.total_invites;
+  $("hToday").textContent = ME.today_ads;
+  $("iInv").textContent = u.total_invites;
+  $("iPts").textContent = fmt(u.points);
+  $("wBal").textContent = fmt(u.points);
 
-function renderUser() {
-  const u = ME.user;
-  const name = displayName(u);
-  ["uname", "uname2"].forEach(id => $(id).textContent = name);
-  ["uid", "uid2"].forEach(id => $(id).textContent = "ID: " + u.telegram_id);
-  ["avatar", "avatar2"].forEach(id => {
-    if (u.photo_url) $(id).src = u.photo_url; else $(id).removeAttribute("src");
-  });
-  $("points").textContent = fmt(u.points);
-  $("points2").textContent = fmt(u.points);
-  $("p_pts").textContent = fmt(u.points);
-  $("adsCount").textContent = u.total_ads + " watched";
-  $("invCount").textContent = u.total_invites + " invited";
-  $("invited2").textContent = u.total_invites;
-  $("rank").textContent = "#" + u.rank;
-  $("p_ads").textContent = u.total_ads;
-  $("p_inv").textContent = u.total_invites;
-  $("p_rank").textContent = "#" + u.rank;
+  const adR = st.ad_reward ?? 1, invR = st.invite_reward ?? 1, max = st.max_ads_per_day ?? 100, minW = st.min_withdraw ?? 100;
+  $("hAdSub").textContent = "+" + fmt(adR) + " points per ad";
+  $("eAdSub").textContent = "+" + fmt(adR) + " points per ad";
+  $("eInvSub").textContent = "+" + fmt(invR) + " points per friend";
+  $("iReward").textContent = fmt(invR);
+  $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
+  $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
+  $("wMin").textContent = "Min " + fmt(minW);
 
-  const link = BOT_USERNAME
-    ? "https://t.me/" + BOT_USERNAME + "?startapp=ref_" + u.referral_code
-    : "Bot username is not configured";
-  $("refLink").textContent = link;
+  $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?startapp=ref_" + u.referral_code : "Bot username is not configured";
 
-  $("adminTabBtn").classList.toggle("hidden", !u.is_admin);
-}
+  const ab = $("adminBtn");
+  ab.classList.toggle("hidden", !u.is_admin);
+  if (u.is_admin) {
+    setBtn("adminBtn", "shield", "Admin panel" + (ME.pending_withdrawals ? '<span class="notice">' + ME.pending_withdrawals + "</span>" : ""));
+  }
 
-function renderChannels() {
+  // verification
   const box = $("verify");
-  const list = $("channelList");
-  if (ME.allJoined) { box.classList.add("hidden"); return; }
-  box.classList.remove("hidden");
-  list.innerHTML = (ME.channels || []).map(c => {
-    const handle = String(c.channel).replace(/^@/, "");
-    const mark = c.joined ? "✅" : "❌";
-    const href = handle.startsWith("-") ? "#" : "https://t.me/" + esc(handle);
-    return `<div style="margin-bottom:8px">${mark} <a href="${href}" target="_blank" rel="noopener">${esc(c.channel)}</a></div>`;
-  }).join("");
-}
-
-async function loadRewards() {
-  try {
-    const d = await api("/api/rewards");
-    $("rewardsList").innerHTML = d.rewards.length
-      ? d.rewards.map(r =>
-          `<div class="item"><div class="h">#${r.position} ${esc(r.title)}</div><div class="d">${esc(r.description)}</div></div>`
-        ).join("")
-      : `<div class="empty">No rewards yet.</div>`;
-  } catch (e) {
-    $("rewardsList").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  if (ME.allJoined) box.classList.add("hidden");
+  else {
+    box.classList.remove("hidden");
+    $("channelList").innerHTML = (ME.channels || []).map(c => {
+      const h = String(c.channel).replace(/^@/, "");
+      const href = h.startsWith("-") ? "#" : "https://t.me/" + esc(h);
+      return `<div class="line" style="margin-bottom:8px"><span class="dot" style="background:${c.joined ? "#22c55e" : "#ef4444"}"></span><a href="${href}" target="_blank" rel="noopener">${esc(c.channel)}</a></div>`;
+    }).join("");
   }
 }
 
-async function loadBoard() {
-  $("boardList").innerHTML = `<div class="empty">Loading...</div>`;
+async function refreshMe() {
+  const d = await api("/api/me");
+  ME = d; BOT_USERNAME = (d.bot && d.bot.username) || "";
+  render();
+}
+
+async function loadTop() {
   try {
     const d = await api("/api/leaderboard");
-    const myId = String(ME.user.telegram_id);
-    $("boardList").innerHTML = d.leaderboard.length
-      ? d.leaderboard.map(u => {
-          const sub = u.username ? "@" + u.username : "ID " + u.telegram_id;
-          return `<div class="row ${String(u.telegram_id) === myId ? "me" : ""}">
-            <div class="rank">${u.rank}</div>
-            <div class="n"><b>${esc(displayName(u))}</b><span>${esc(sub)} · 📺 ${u.ads} · 👥 ${u.invites}</span></div>
-            <div class="p">${fmt(u.points)}</div></div>`;
-        }).join("")
-      : `<div class="empty">No users yet.</div>`;
-  } catch (e) {
-    $("boardList").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
-  }
+    const my = String(ME.user.telegram_id);
+    const list = d.leaderboard.slice(0, 5);
+    $("topList").innerHTML = list.length ? list.map(u => `
+      <div class="card" style="padding:12px;${String(u.telegram_id) === my ? "border-color:#3b82f6" : ""}">
+        <div class="line"><div class="rankn">${u.rank}</div>
+        <div class="x"><b class="ellip">${esc(nameOf(u))}</b><span>${u.ads} ads · ${u.invites} invites</span></div>
+        <b>${fmt(u.points)}</b></div></div>`).join("") : '<div class="empty">No users yet.</div>';
+  } catch (e) { $("topList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
 }
 
 /* ---------------- ads ---------------- */
-
-function newKey() {
-  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return Date.now() + "-" + Math.random().toString(36).slice(2);
-}
-
-function getAdController() {
+function getCtrl() {
   if (adController) return adController;
-  if (!window.Adsgram) throw new Error("Adsgram SDK failed to load. Check your internet.");
+  if (!window.Adsgram) throw new Error("Adsgram failed to load. Check your internet.");
   adController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
   return adController;
 }
+const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
 
 async function watchAd() {
   if (watching) return;
-  if (ME && !ME.allJoined) { toast("Join all required channels first.", "err"); return; }
-
-  const btn = $("watchBtn");
-  watching = true;
-  btn.disabled = true;
-
+  if (ME && !ME.allJoined) return toast("Join all required channels first.", "err");
+  watching = true; ["hWatch","eWatch"].forEach(i => $(i).disabled = true);
   try {
-    const ctrl = getAdController();
-    const result = await ctrl.show();
-
-    if (!result || !result.done) {
-      toast("Ad was not completed.");
-      return;
-    }
-
+    const r = await getCtrl().show();
+    if (!r || !r.done) return toast("Ad was not completed.");
     const d = await api("/api/ad-reward", "POST", { rewardKey: newKey() });
-    ME.user.points = d.user.points;
-    ME.user.ads_count = d.user.ads_count;
-    ME.user.total_ads = d.user.total_ads;
-    renderUser();
-    toast("+" + fmt(d.reward) + " points!", "ok");
-    refreshMe(true);
+    toast("+" + fmt(d.reward) + " points", "ok");
+    await refreshMe();
   } catch (e) {
-    const msg = (e && (e.description || e.message)) || "Ad error";
-    toast(msg, "err");
+    toast((e && (e.description || e.message)) || "Ad error", "err");
   } finally {
-    watching = false;
-    btn.disabled = false;
+    watching = false; ["hWatch","eWatch"].forEach(i => $(i).disabled = false);
   }
 }
+$("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
 
 /* ---------------- invite ---------------- */
-
-function inviteLink() {
-  return $("refLink").textContent;
-}
-
 $("shareBtn").onclick = () => {
-  const link = inviteLink();
+  const link = $("refLink").textContent;
   if (!link.startsWith("http")) return toast("Bot username is not configured.", "err");
-  const text = "Join and earn rewards! 🎁";
-  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(text);
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent("Join and earn rewards!");
   if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
 };
-
 $("copyBtn").onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(inviteLink());
-    toast("Link copied!", "ok");
-  } catch (e) {
-    toast("Copy failed. Select and copy manually.", "err");
-  }
+  try { await navigator.clipboard.writeText($("refLink").textContent); toast("Link copied", "ok"); }
+  catch (e) { toast("Copy failed.", "err"); }
 };
+$("hInvite").onclick = () => showTab("invite");
+$("eGoInvite").onclick = () => showTab("invite");
+$("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
 
-/* ---------------- admin ---------------- */
-
-$("saveSettings").onclick = async () => {
-  try {
-    await api("/api/admin/settings", "POST", {
-      ad_reward: $("a_ad").value,
-      invite_reward: $("a_inv").value,
-      max_ads_per_day: $("a_max").value
-    });
-    toast("Settings saved.", "ok");
-  } catch (e) { toast(e.message, "err"); }
-};
-
-$("saveReward").onclick = async () => {
-  try {
-    await api("/api/admin/reward", "POST", {
-      position: Number($("r_pos").value),
-      title: $("r_title").value,
-      description: $("r_desc").value,
-      enabled: true
-    });
-    toast("Reward saved.", "ok");
-    loadRewards();
-  } catch (e) { toast(e.message, "err"); }
-};
-
-/* ---------------- tabs ---------------- */
-
-function showTab(name) {
-  ["ads", "invite", "board", "profile", "admin"].forEach(t =>
-    $("tab-" + t).classList.toggle("hidden", t !== name));
-  document.querySelectorAll("nav button").forEach(b =>
-    b.classList.toggle("active", b.dataset.tab === name));
-  if (name === "board") loadBoard();
-  if (name === "ads") loadRewards();
+/* ---------------- withdraw ---------------- */
+function renderMethods() {
+  $("wMethods").innerHTML = METHODS.map(m => `<span class="chip ${m === wMethod ? "on" : ""}" data-m="${m}">${m}</span>`).join("");
+  $("wMethods").querySelectorAll(".chip").forEach(c => c.onclick = () => { wMethod = c.dataset.m; renderMethods(); });
 }
+renderMethods();
 
-document.querySelectorAll("nav button").forEach(b =>
-  b.onclick = () => showTab(b.dataset.tab));
-
-$("watchBtn").onclick = watchAd;
-
-$("checkBtn").onclick = async () => {
-  const btn = $("checkBtn");
-  btn.disabled = true;
+$("wBtn").onclick = async () => {
+  const btn = $("wBtn"); btn.disabled = true;
   try {
-    await refreshMe(false);
-    toast(ME.allJoined ? "Verified!" : "You have not joined all channels yet.", ME.allJoined ? "ok" : "");
+    await api("/api/withdraw", "POST", { amount: Number($("wAmt").value), method: wMethod, address: $("wAddr").value.trim() });
+    $("wAmt").value = "";
+    toast("Withdrawal requested. Waiting for approval.", "ok");
+    await refreshMe(); loadHistory();
   } catch (e) { toast(e.message, "err"); }
   btn.disabled = false;
 };
 
-/* ---------------- init ---------------- */
-
-async function refreshMe(silent) {
-  const d = await api("/api/me");
-  ME = d;
-  BOT_USERNAME = (d.bot && d.bot.username) || "";
-  renderUser();
-  renderChannels();
+function statusBadge(s) {
+  const icon = s === "approved" ? "check" : s === "rejected" ? "x" : "clock";
+  return `<span class="badge ${s}">${s[0].toUpperCase() + s.slice(1)}</span>`;
 }
 
+async function loadHistory() {
+  try {
+    const d = await api("/api/withdrawals");
+    $("wHist").innerHTML = d.withdrawals.length ? d.withdrawals.map(w => {
+      const ic = w.status === "approved" ? ["check","green"] : w.status === "rejected" ? ["x","redg"] : ["clock","orange"];
+      return `<div class="card" style="padding:13px"><div class="line">
+        <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
+        <div class="x"><b>${fmt(w.amount)} · ${esc(w.method)}</b><span>${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</span></div>
+        ${statusBadge(w.status)}</div></div>`;
+    }).join("") : '<div class="empty">No withdrawals yet.</div>';
+  } catch (e) { $("wHist").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
+
+/* ---------------- admin ---------------- */
+$("adminBtn").onclick = () => { openAdmin(); };
+$("adminBack").onclick = () => showTab("profile");
+$("segReq").onclick = () => { $("segReq").classList.add("on"); $("segSet").classList.remove("on"); $("admReq").classList.remove("hidden"); $("admSet").classList.add("hidden"); loadAdmin(); };
+$("segSet").onclick = () => {
+  $("segSet").classList.add("on"); $("segReq").classList.remove("on"); $("admSet").classList.remove("hidden"); $("admReq").classList.add("hidden");
+  const s = ME.settings || {};
+  $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100; $("a_min").value = s.min_withdraw ?? 100;
+};
+document.querySelectorAll("#admFilter .chip").forEach(c => c.onclick = () => {
+  admStatus = c.dataset.s;
+  document.querySelectorAll("#admFilter .chip").forEach(x => x.classList.toggle("on", x === c));
+  loadAdmin();
+});
+
+function openAdmin() {
+  ["home","earn","invite","profile"].forEach(t => $("v-" + t).classList.add("hidden"));
+  $("v-admin").classList.remove("hidden"); window.scrollTo(0, 0);
+  $("segReq").click();
+}
+
+async function loadAdmin() {
+  $("admList").innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const d = await api("/api/admin/withdrawals?status=" + admStatus);
+    $("admList").innerHTML = d.withdrawals.length ? d.withdrawals.map(w => {
+      const who = [w.first_name, w.last_name].filter(Boolean).join(" ") || (w.username ? "@" + w.username : "User");
+      return `<div class="card">
+        <div class="line"><span class="ib sm blue">${svg("user")}</span>
+          <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · ${fmtDate(w.created_at)}</span></div>
+          ${statusBadge(w.status)}</div>
+        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.amount)} <span class="muted">${esc(w.method)}</span></div>
+        <div class="linkbox" style="margin:8px 0">${esc(w.address)}</div>
+        ${w.admin_note ? `<div class="muted" style="margin-bottom:8px">Note: ${esc(w.admin_note)}</div>` : ""}
+        ${w.status === "pending" ? `<div class="row2" style="margin-top:8px">
+          <button class="btn green sm" data-a="approve" data-id="${esc(w.id)}">${svg("check")}<span>Accept</span></button>
+          <button class="btn red sm" data-a="reject" data-id="${esc(w.id)}">${svg("x")}<span>Reject</span></button></div>` : ""}
+      </div>`;
+    }).join("") : '<div class="empty">Nothing here.</div>';
+
+    $("admList").querySelectorAll("button[data-a]").forEach(b => b.onclick = () => handleAction(b.dataset.id, b.dataset.a));
+  } catch (e) { $("admList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
+
+function handleAction(id, action) {
+  const modal = $("modal");
+  const isRej = action === "reject";
+  modal.innerHTML = `<div class="sheet">
+    <div class="line" style="margin-bottom:12px"><span class="ib ${isRej ? "redg" : "green"}">${svg(isRej ? "x" : "check")}</span>
+    <div class="x"><b style="font-size:17px">${isRej ? "Reject request" : "Accept request"}</b><span>${isRej ? "Points will be returned to the user." : "Confirm you have sent the payment."}</span></div></div>
+    <input id="mNote" type="text" placeholder="Note (optional)" maxlength="200">
+    <div class="row2" style="margin-top:14px">
+      <button class="btn dark" id="mCancel">Cancel</button>
+      <button class="btn ${isRej ? "red" : "green"}" id="mOk">Confirm</button></div></div>`;
+  modal.classList.remove("hidden");
+  $("mCancel").onclick = () => modal.classList.add("hidden");
+  modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
+  $("mOk").onclick = async () => {
+    $("mOk").disabled = true;
+    try {
+      await api("/api/admin/withdrawals/" + encodeURIComponent(id), "POST", { action, note: $("mNote").value.trim() });
+      modal.classList.add("hidden");
+      toast(isRej ? "Request rejected." : "Request accepted.", "ok");
+      await refreshMe(); loadAdmin();
+    } catch (e) { toast(e.message, "err"); $("mOk").disabled = false; }
+  };
+}
+
+$("saveSettings").onclick = async () => {
+  try {
+    await api("/api/admin/settings", "POST", {
+      ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
+      max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value
+    });
+    toast("Settings saved.", "ok"); await refreshMe();
+  } catch (e) { toast(e.message, "err"); }
+};
+
+/* ---------------- tabs ---------------- */
+function showTab(name) {
+  currentTab = name;
+  ["home","earn","invite","profile","admin"].forEach(t => $("v-" + t).classList.toggle("hidden", t !== name));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name || (name === "admin" && b.dataset.tab === "profile")));
+  window.scrollTo(0, 0);
+  if (name === "home") loadTop();
+  if (name === "profile") loadHistory();
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+$("checkBtn").onclick = async () => {
+  $("checkBtn").disabled = true;
+  try { await refreshMe(); toast(ME.allJoined ? "Verified!" : "You have not joined all channels yet.", ME.allJoined ? "ok" : ""); }
+  catch (e) { toast(e.message, "err"); }
+  $("checkBtn").disabled = false;
+};
+
+/* ---------------- init ---------------- */
 async function init() {
+  const t0 = performance.now();
   try {
     if (!INIT_DATA) {
-      $("loading").textContent = "Please open this app from inside Telegram.";
+      $("spT1").textContent = "Open in Telegram";
+      $("spName").textContent = "Please open this app from the Telegram bot.";
       return;
     }
     await refreshMe();
-    $("loading").classList.add("hidden");
+    $("spName").textContent = nameOf(ME.user);
     $("app").classList.remove("hidden");
-    loadRewards();
-
-    if (ME.user.is_admin) {
-      api("/api/rewards").catch(() => {});
-    }
+    $("nav").classList.remove("hidden");
+    loadTop();
+    const wait = Math.max(0, 2300 - (performance.now() - t0));
+    setTimeout(() => { $("splash").classList.add("out"); setTimeout(() => $("splash").remove(), 700); }, wait);
   } catch (e) {
-    $("loading").textContent = "Error: " + e.message;
+    $("spT1").textContent = "Error";
+    $("spName").textContent = e.message;
   }
 }
-
 init();
 </script>
 </body>
