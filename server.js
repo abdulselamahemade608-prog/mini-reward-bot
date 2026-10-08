@@ -125,6 +125,10 @@ async function ensureDatabase() {
                 );
             `);
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS account_name TEXT;`);
+            // existing referral rows were already paid under the old rule -> they become verified=TRUE
+            await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT TRUE;`);
+            await pool.query(`ALTER TABLE mr_referrals ALTER COLUMN verified SET DEFAULT FALSE;`);
+            await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;`);
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS mr_tasks (
                     id BIGSERIAL PRIMARY KEY,
@@ -149,7 +153,7 @@ async function ensureDatabase() {
             `);
             await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
-                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100')
+                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100'),('verify_ads','1')
                 ON CONFLICT(key) DO NOTHING;
             `);
             await pool.query(`
@@ -365,33 +369,56 @@ async function createOrUpdateUser(tgUser, referralCode) {
 /* ============================ REFERRAL ============================ */
 
 async function processReferral(userId) {
+    // register the invite as PENDING. No points are paid here.
     const u = await pool.query(
         `SELECT referred_by FROM mr_users WHERE telegram_id = $1`,
         [userId]
     );
     if (!u.rows.length || !u.rows[0].referred_by) return;
 
-    const referredBy = u.rows[0].referred_by;
-
-    const setting = await pool.query(
-        `SELECT value FROM mr_app_settings WHERE key = 'invite_reward'`
+    await pool.query(
+        `INSERT INTO mr_referrals(inviter_id, invited_id, reward, verified)
+         VALUES($1,$2,0,FALSE)
+         ON CONFLICT(invited_id) DO NOTHING`,
+        [u.rows[0].referred_by, userId]
     );
-    const reward = Number(setting.rows[0]?.value || 1);
+}
+
+// A friend is "verified" when he joined all required channels AND watched enough ads.
+// Only then the inviter gets the invite reward (once).
+async function tryVerifyReferral(userId, joined) {
+    if (!joined) return;
+
+    const r = await pool.query(
+        `SELECT r.inviter_id, u.total_ads
+         FROM mr_referrals r JOIN mr_users u ON u.telegram_id = r.invited_id
+         WHERE r.invited_id = $1 AND r.verified = FALSE`,
+        [userId]
+    );
+    if (!r.rows.length) return;
+
+    const sRes = await pool.query(
+        `SELECT key, value FROM mr_app_settings WHERE key IN ('verify_ads','invite_reward')`
+    );
+    const set = {};
+    for (const x of sRes.rows) set[x.key] = Number(x.value);
+    const needAds = Number.isFinite(set.verify_ads) ? set.verify_ads : 1;
+    const reward = Number.isFinite(set.invite_reward) ? set.invite_reward : 1;
+
+    if (Number(r.rows[0].total_ads) < needAds) return;
+
+    const inviterId = r.rows[0].inviter_id;
+    let paid = false;
 
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
-
-        // FIX: ON CONFLICT so a double request can't crash or double-pay
-        const ins = await client.query(
-            `INSERT INTO mr_referrals(inviter_id, invited_id, reward)
-             VALUES($1,$2,$3)
-             ON CONFLICT(invited_id) DO NOTHING
-             RETURNING id`,
-            [referredBy, userId, reward]
+        const upd = await client.query(
+            `UPDATE mr_referrals SET verified = TRUE, verified_at = NOW(), reward = $2
+             WHERE invited_id = $1 AND verified = FALSE RETURNING id`,
+            [userId, reward]
         );
-
-        if (ins.rows.length) {
+        if (upd.rows.length) {
             await client.query(
                 `UPDATE mr_users
                  SET invite_count = invite_count + 1,
@@ -399,16 +426,20 @@ async function processReferral(userId) {
                      points = points + $2,
                      updated_at = NOW()
                  WHERE telegram_id = $1`,
-                [referredBy, reward]
+                [inviterId, reward]
             );
+            paid = true;
         }
-
         await client.query("COMMIT");
     } catch (error) {
-        await client.query("ROLLBACK");
+        await client.query("ROLLBACK").catch(() => {});
         throw error;
     } finally {
         client.release();
+    }
+
+    if (paid) {
+        notifyUser(inviterId, `Your friend is verified. You earned ${reward} points!`);
     }
 }
 
@@ -438,6 +469,12 @@ app.get("/api/me", authenticate, async (req, res) => {
 
         const channels = await checkAllChannels(telegramId);
         const allJoined = allJoinedOf(channels);
+
+        try {
+            await tryVerifyReferral(telegramId, allJoined);
+        } catch (e) {
+            console.error("tryVerifyReferral", e.message);
+        }
 
         await pool.query(
             `UPDATE mr_users SET is_verified=$2, updated_at=NOW() WHERE telegram_id=$1`,
@@ -614,6 +651,12 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
             client.release();
         }
 
+        try {
+            await tryVerifyReferral(telegramId, true); // channels were already checked above
+        } catch (e) {
+            console.error("tryVerifyReferral", e.message);
+        }
+
         const updated = await pool.query(
             `SELECT points, ads_count, total_ads FROM mr_users WHERE telegram_id = $1`,
             [telegramId]
@@ -692,8 +735,8 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
     try {
         await requireDatabase();
 
-        const { ad_reward, invite_reward, max_ads_per_day, min_withdraw } = req.body || {};
-        const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw };
+        const { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads } = req.body || {};
+        const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads };
 
         for (const [key, value] of Object.entries(settings)) {
             if (value === undefined || value === null) continue;
@@ -973,6 +1016,28 @@ app.post("/api/admin/withdrawals/:id", authenticate, requireAdmin, async (req, r
         res.json({ ok: true });
     } catch (error) {
         console.error("/api/admin/withdrawals", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ============================ MY FRIENDS ============================ */
+
+app.get("/api/referrals", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        const r = await pool.query(
+            `SELECT r.invited_id AS telegram_id, r.verified, r.created_at,
+                    u.username, u.first_name, u.last_name, u.photo_url,
+                    u.total_ads, u.is_verified AS joined
+             FROM mr_referrals r
+             JOIN mr_users u ON u.telegram_id = r.invited_id
+             WHERE r.inviter_id = $1
+             ORDER BY r.created_at DESC
+             LIMIT 100`,
+            [String(req.telegramUser.id)]
+        );
+        res.json({ ok: true, friends: r.rows });
+    } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
 });
