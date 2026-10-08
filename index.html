@@ -297,6 +297,7 @@ nav button.active svg{stroke:#8ec5ff}
       <input id="wAddr" type="text" placeholder="Account number or phone number" autocomplete="off" maxlength="100">
       <label>Amount</label>
       <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+      <div class="muted" id="wFee" style="margin-top:8px"></div>
       <button class="btn green" id="wBtn" style="margin-top:14px"></button>
     </div>
 
@@ -390,6 +391,7 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Minimum withdrawal</label><input id="a_min" type="number" step="any" min="0">
         <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
         <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
+        <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
         <label>Bonus: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
         <label>Bonus: 10 verified friends</label><input id="a_m10" type="number" step="any" min="0">
         <label>Bonus: 25 verified friends</label><input id="a_m25" type="number" step="any" min="0">
@@ -539,9 +541,10 @@ function render() {
   $("iReward").textContent = fmt(invR);
   $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
   $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
+  updateFee();
   $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
 
-  $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?startapp=ref_" + u.referral_code : "Bot username is not configured";
+  $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?start=" + u.telegram_id : "Bot username is not configured";
 
   const ab = $("adminBtn");
   ab.classList.toggle("hidden", !u.is_admin);
@@ -638,6 +641,14 @@ $("hInvite").onclick = () => showTab("invite");
 $("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
 
 /* ---------------- withdraw ---------------- */
+function updateFee() {
+  const pct = ((ME && ME.settings) || {}).withdraw_fee_percent ?? 25;
+  const amt = Number($("wAmt").value) || 0;
+  const fee = Math.round(amt * pct) / 100;
+  $("wFee").textContent = "Service fee " + pct + "%" + (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + (amt - fee).toFixed(2) : "");
+}
+$("wAmt").addEventListener("input", updateFee);
+
 function renderMethods() {
   $("wMethods").innerHTML = METHODS.map(m => `<span class="chip ${m === wMethod ? "on" : ""}" data-m="${m}">${m}</span>`).join("");
   $("wMethods").querySelectorAll(".chip").forEach(c => c.onclick = () => { wMethod = c.dataset.m; renderMethods(); });
@@ -667,7 +678,7 @@ async function loadHistory() {
       const ic = w.status === "approved" ? ["check","green"] : w.status === "rejected" ? ["x","redg"] : ["clock","orange"];
       return `<div class="card" style="padding:13px"><div class="line">
         <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
-        <div class="x"><b>${fmt(w.amount)} · ${esc(w.method)}</b><span>${esc(w.account_name || "")} · ${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</span></div>
+        <div class="x"><b>${fmt(w.amount)} · ${esc(w.method)}</b><span>${esc(w.account_name || "")} · Receive ${fmt(w.final_amount ?? w.amount)} · ${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</span></div>
         ${statusBadge(w.status)}</div></div>`;
     }).join("") : '<div class="empty">No withdrawals yet.</div>';
   } catch (e) { $("wHist").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
@@ -691,7 +702,7 @@ function admSeg(name) {
     const s = ME.settings || {};
     $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100;
     $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
-    $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50;
+    $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
   }
 }
 $("segStats").onclick = () => admSeg("stats");
@@ -723,7 +734,7 @@ async function loadAdmin() {
         <div class="line"><span class="ib sm blue">${svg("user")}</span>
           <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · ${fmtDate(w.created_at)}</span></div>
           ${statusBadge(w.status)}</div>
-        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.amount)} <span class="muted">${esc(w.method)}</span></div>
+        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.final_amount)} <span class="muted">to send · ${esc(w.method)}</span></div><div class="muted">Requested ${fmt(w.amount)} · Fee ${fmt(w.fee)}</div>
         <div class="linkbox" style="margin:8px 0"><span class="muted">Owner</span><br><b>${esc(w.account_name || "-")}</b><br><span class="muted" style="display:block;margin-top:8px">Account</span><b>${esc(w.address)}</b></div>
         ${w.admin_note ? `<div class="muted" style="margin-bottom:8px">Note: ${esc(w.admin_note)}</div>` : ""}
         ${w.status === "pending" ? `<div class="row2" style="margin-top:8px">
@@ -765,7 +776,7 @@ $("saveSettings").onclick = async () => {
     await api("/api/admin/settings", "POST", {
       ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
       max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value, verify_ads: $("a_vads").value,
-      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value
+      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value
     });
     toast("Settings saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
