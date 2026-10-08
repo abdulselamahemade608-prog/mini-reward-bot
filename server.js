@@ -1,62 +1,37 @@
 import express from "express";
 import crypto from "crypto";
 import pg from "pg";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const {
-    Pool
-} = pg;
+const { Pool } = pg;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const app =
-    express();
+const app = express();
 
-
-app.use(
-    express.json()
-);
-
+app.use(express.json({ limit: "1mb" }));
 
 /* =========================================================
-   ENVIRONMENT
+   ENV
 ========================================================= */
 
-const BOT_TOKEN =
-    process.env.BOT_TOKEN || "";
+const BOT_TOKEN = process.env.BOT_TOKEN || "";
+const BOT_USERNAME = process.env.BOT_USERNAME || "";
+const ADMIN_ID = String(process.env.ADMIN_ID || "");
+const DATABASE_URL = process.env.DATABASE_URL || "";
 
+const ADSGRAM_BLOCK_ID = String(
+    process.env.ADSGRAM_BLOCK_ID || "52614"
+);
 
-const BOT_USERNAME =
-    process.env.BOT_USERNAME || "";
-
-
-const ADMIN_ID =
-    String(
-        process.env.ADMIN_ID || ""
-    );
-
-
-const DATABASE_URL =
-    process.env.DATABASE_URL || "";
-
-
-const ADSGRAM_BLOCK_ID =
-    String(
-        process.env.ADSGRAM_BLOCK_ID ||
-        "52614"
-    );
-
-
-const REQUIRED_CHANNELS =
-    String(
-        process.env.REQUIRED_CHANNELS ||
-        ""
-    )
+const REQUIRED_CHANNELS = String(
+    process.env.REQUIRED_CHANNELS || ""
+)
     .split(",")
-    .map(
-        item =>
-            item.trim()
-    )
+    .map(x => x.trim())
     .filter(Boolean);
-
 
 /* =========================================================
    DATABASE
@@ -64,446 +39,344 @@ const REQUIRED_CHANNELS =
 
 let pool = null;
 
-
 if (DATABASE_URL) {
-
-    pool =
-        new Pool({
-            connectionString:
-                DATABASE_URL,
-
-            ssl: {
-                rejectUnauthorized:
-                    false
-            }
-        });
-
+    pool = new Pool({
+        connectionString: DATABASE_URL,
+        ssl: {
+            rejectUnauthorized: false
+        }
+    });
 }
 
+/* =========================================================
+   DATABASE SCHEMA
+========================================================= */
+
+let schemaPromise = null;
+
+async function ensureDatabase() {
+    if (!pool) {
+        throw new Error("DATABASE_URL is not configured.");
+    }
+
+    if (!schemaPromise) {
+        schemaPromise = (async () => {
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS users (
+                    telegram_id BIGINT PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    photo_url TEXT,
+
+                    ads_count INTEGER NOT NULL DEFAULT 0,
+                    total_ads INTEGER NOT NULL DEFAULT 0,
+
+                    invite_count INTEGER NOT NULL DEFAULT 0,
+                    total_invites INTEGER NOT NULL DEFAULT 0,
+
+                    points NUMERIC NOT NULL DEFAULT 0,
+
+                    referral_code TEXT UNIQUE,
+                    referred_by BIGINT,
+
+                    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+                    is_banned BOOLEAN NOT NULL DEFAULT FALSE,
+
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS referrals (
+                    id BIGSERIAL PRIMARY KEY,
+                    inviter_id BIGINT NOT NULL,
+                    invited_id BIGINT NOT NULL UNIQUE,
+                    reward NUMERIC NOT NULL DEFAULT 0,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS ad_rewards (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    reward NUMERIC NOT NULL DEFAULT 0,
+                    reward_key TEXT NOT NULL UNIQUE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS rewards (
+                    id BIGSERIAL PRIMARY KEY,
+                    position INTEGER NOT NULL UNIQUE,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS admin_logs (
+                    id BIGSERIAL PRIMARY KEY,
+                    admin_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+
+            /* Default settings */
+
+            await pool.query(`
+                INSERT INTO app_settings(key, value)
+                VALUES
+                    ('ad_reward', '1'),
+                    ('invite_reward', '1'),
+                    ('max_ads_per_day', '100')
+                ON CONFLICT(key) DO NOTHING;
+            `);
+
+            /* Default leaderboard rewards */
+
+            await pool.query(`
+                INSERT INTO rewards(position, title, description)
+                VALUES
+                    (1, '1st Place Reward', 'Top leaderboard reward'),
+                    (2, '2nd Place Reward', 'Second leaderboard reward'),
+                    (3, '3rd Place Reward', 'Third leaderboard reward')
+                ON CONFLICT(position) DO NOTHING;
+            `);
+
+        })();
+    }
+
+    return schemaPromise;
+}
 
 /* =========================================================
    HEALTH
 ========================================================= */
 
-app.get(
-    "/api/health",
-    async (req, res) => {
+app.get("/api/health", async (req, res) => {
 
-        let database =
-            false;
+    try {
 
-
-        try {
-
-            if (!pool) {
-
-                return res.json({
-
-                    ok: true,
-
-                    app:
-                        "Telegram Reward Mini App",
-
-                    database:
-                        false,
-
-                    error:
-                        "DATABASE_URL is not configured",
-
-                    adsgramBlock:
-                        ADSGRAM_BLOCK_ID
-
-                });
-
-            }
-
-
-            await pool.query(
-                "SELECT 1"
-            );
-
-
-            database =
-                true;
-
-
+        if (!pool) {
             return res.json({
-
                 ok: true,
-
-                app:
-                    "Telegram Reward Mini App",
-
-                database,
-
-                adsgramBlock:
-                    ADSGRAM_BLOCK_ID
-
+                app: "Telegram Reward Mini App",
+                database: false,
+                adsgramBlock: ADSGRAM_BLOCK_ID,
+                error: "DATABASE_URL is not configured"
             });
-
-
-        } catch (error) {
-
-            return res.status(500)
-                .json({
-
-                    ok: false,
-
-                    app:
-                        "Telegram Reward Mini App",
-
-                    database: false,
-
-                    error:
-                        error.message,
-
-                    adsgramBlock:
-                        ADSGRAM_BLOCK_ID
-
-                });
-
         }
 
-    }
-);
+        await ensureDatabase();
+        await pool.query("SELECT 1");
 
+        return res.json({
+            ok: true,
+            app: "Telegram Reward Mini App",
+            database: true,
+            adsgramBlock: ADSGRAM_BLOCK_ID
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            ok: false,
+            app: "Telegram Reward Mini App",
+            database: false,
+            adsgramBlock: ADSGRAM_BLOCK_ID,
+            error: error.message
+        });
+
+    }
+});
 
 /* =========================================================
    TELEGRAM INIT DATA VALIDATION
 ========================================================= */
 
-function validateTelegramInitData(
-    initData
-) {
+function validateTelegramInitData(initData) {
 
     if (!initData) {
-
-        throw new Error(
-            "Telegram initData is missing."
-        );
-
+        throw new Error("Telegram initData is missing.");
     }
-
 
     if (!BOT_TOKEN) {
-
-        throw new Error(
-            "BOT_TOKEN is not configured."
-        );
-
+        throw new Error("BOT_TOKEN is not configured.");
     }
 
+    const params = new URLSearchParams(initData);
 
-    const params =
-        new URLSearchParams(
-            initData
-        );
-
-
-    const receivedHash =
-        params.get(
-            "hash"
-        );
-
+    const receivedHash = params.get("hash");
 
     if (!receivedHash) {
-
-        throw new Error(
-            "Telegram hash is missing."
-        );
-
+        throw new Error("Telegram hash is missing.");
     }
 
+    params.delete("hash");
 
-    params.delete(
-        "hash"
-    );
+    const dataCheckString = [...params.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join("\n");
 
+    const secretKey = crypto
+        .createHmac("sha256", "WebAppData")
+        .update(BOT_TOKEN)
+        .digest();
 
-    const dataCheckString =
-        [...params.entries()]
-            .sort(
-                ([a], [b]) =>
-                    a.localeCompare(b)
-            )
-            .map(
-                ([key, value]) =>
-                    `${key}=${value}`
-            )
-            .join("\n");
-
-
-    /*
-     * Telegram Web Apps validation.
-     */
-
-    const secretKey =
-        crypto
-            .createHmac(
-                "sha256",
-                "WebAppData"
-            )
-            .update(
-                BOT_TOKEN
-            )
-            .digest();
-
-
-    const calculatedHash =
-        crypto
-            .createHmac(
-                "sha256",
-                secretKey
-            )
-            .update(
-                dataCheckString
-            )
-            .digest("hex");
-
+    const calculatedHash = crypto
+        .createHmac("sha256", secretKey)
+        .update(dataCheckString)
+        .digest("hex");
 
     if (
         calculatedHash.length !==
         receivedHash.length
     ) {
-
-        throw new Error(
-            "Invalid Telegram initData."
-        );
-
+        throw new Error("Invalid Telegram initData.");
     }
 
-
-    const valid =
-        crypto.timingSafeEqual(
-            Buffer.from(
-                calculatedHash,
-                "utf8"
-            ),
-
-            Buffer.from(
-                receivedHash,
-                "utf8"
-            )
-        );
-
+    const valid = crypto.timingSafeEqual(
+        Buffer.from(calculatedHash, "utf8"),
+        Buffer.from(receivedHash, "utf8")
+    );
 
     if (!valid) {
-
-        throw new Error(
-            "Invalid Telegram initData."
-        );
-
+        throw new Error("Invalid Telegram initData.");
     }
 
-
-    /*
-     * Check auth_date.
-     */
-
-    const authDate =
-        Number(
-            params.get(
-                "auth_date"
-            )
-        );
-
+    const authDate = Number(
+        params.get("auth_date")
+    );
 
     if (!authDate) {
-
         throw new Error(
             "Telegram auth_date is missing."
         );
-
     }
 
+    const now = Math.floor(Date.now() / 1000);
+    const age = now - authDate;
 
-    const currentTime =
-        Math.floor(
-            Date.now() / 1000
-        );
-
-
-    const age =
-        currentTime -
-        authDate;
-
-
-    /*
-     * 24-hour maximum age.
-     */
-
-    if (
-        age < 0 ||
-        age > 86400
-    ) {
-
+    if (age < 0 || age > 86400) {
         throw new Error(
             "Telegram initData expired."
         );
-
     }
 
-
-    const userRaw =
-        params.get(
-            "user"
-        );
-
+    const userRaw = params.get("user");
 
     if (!userRaw) {
-
         throw new Error(
             "Telegram user is missing."
         );
-
     }
-
 
     let user;
 
-
     try {
-
-        user =
-            JSON.parse(
-                userRaw
-            );
-
+        user = JSON.parse(userRaw);
     } catch {
-
         throw new Error(
             "Telegram user data is invalid."
         );
-
     }
 
-
     if (!user.id) {
-
         throw new Error(
             "Telegram user ID is missing."
         );
-
     }
 
-
-    return user;
-
+    return {
+        user,
+        startParam: params.get("start_param") || ""
+    };
 }
 
-
 /* =========================================================
-   AUTHENTICATION
+   AUTH
 ========================================================= */
 
-async function authenticate(
-    req,
-    res,
-    next
-) {
+async function authenticate(req, res, next) {
 
     try {
 
         const initData =
-            req.headers[
-                "x-telegram-init-data"
-            ];
+            req.headers["x-telegram-init-data"];
 
+        const result =
+            validateTelegramInitData(initData);
 
-        const user =
-            validateTelegramInitData(
-                initData
-            );
-
-
-        req.telegramUser =
-            user;
-
+        req.telegramUser = result.user;
+        req.startParam = result.startParam;
 
         next();
 
-
     } catch (error) {
 
-        return res.status(401)
-            .json({
-
-                ok: false,
-
-                error:
-                    error.message
-
-            });
+        return res.status(401).json({
+            ok: false,
+            error: error.message
+        });
 
     }
-
 }
-
 
 /* =========================================================
    TELEGRAM API
 ========================================================= */
 
-async function telegram(
-    method,
-    body = {}
-) {
+async function telegram(method, body = {}) {
 
     if (!BOT_TOKEN) {
-
         throw new Error(
             "BOT_TOKEN is not configured."
         );
-
     }
 
+    const response = await fetch(
+        `https://api.telegram.org/bot${BOT_TOKEN}/${method}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(body)
+        }
+    );
 
-    const response =
-        await fetch(
-            `https://api.telegram.org/bot${BOT_TOKEN}/${method}`,
-
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json"
-
-                },
-
-                body:
-                    JSON.stringify(
-                        body
-                    )
-
-            }
-        );
-
-
-    const data =
-        await response.json();
-
+    const data = await response.json();
 
     if (!data.ok) {
-
         throw new Error(
             data.description ||
             "Telegram API error."
         );
-
     }
 
-
     return data.result;
-
 }
 
-
 /* =========================================================
-   CHECK CHANNEL
+   CHANNEL CHECK
 ========================================================= */
 
 async function checkChannel(
@@ -513,122 +386,76 @@ async function checkChannel(
 
     try {
 
-        const member =
-            await telegram(
-                "getChatMember",
-                {
-
-                    chat_id:
-                        channel,
-
-                    user_id:
-                        telegramId
-
-                }
-            );
-
+        const member = await telegram(
+            "getChatMember",
+            {
+                chat_id: channel,
+                user_id: telegramId
+            }
+        );
 
         const validStatuses = [
-
             "creator",
-
             "administrator",
-
             "member"
-
         ];
 
-
         return {
-
             channel,
-
-            joined:
-                validStatuses.includes(
-                    member.status
-                ),
-
-            status:
+            joined: validStatuses.includes(
                 member.status
-
+            ),
+            status: member.status
         };
-
 
     } catch (error) {
 
         return {
-
             channel,
-
             joined: false,
-
-            status:
-                "unknown",
-
-            error:
-                error.message
-
+            status: "unknown",
+            error: error.message
         };
 
     }
-
 }
-
-
-/* =========================================================
-   CHECK ALL CHANNELS
-========================================================= */
 
 async function checkAllChannels(
     telegramId
 ) {
 
-    const results = [];
-
-
-    for (
-        const channel
-        of REQUIRED_CHANNELS
-    ) {
-
-        const result =
-            await checkChannel(
-                telegramId,
-                channel
-            );
-
-
-        results.push(
-            result
-        );
-
+    if (!REQUIRED_CHANNELS.length) {
+        return [];
     }
 
-
-    return results;
-
+    return Promise.all(
+        REQUIRED_CHANNELS.map(
+            channel =>
+                checkChannel(
+                    telegramId,
+                    channel
+                )
+        )
+    );
 }
-
 
 /* =========================================================
    DATABASE REQUIRED
 ========================================================= */
 
-function requireDatabase() {
+async function requireDatabase() {
 
     if (!pool) {
-
         throw new Error(
             "DATABASE_URL is not configured."
         );
-
     }
 
+    await ensureDatabase();
 }
 
-
 /* =========================================================
-   CREATE / UPDATE USER
+   USER
 ========================================================= */
 
 async function createOrUpdateUser(
@@ -636,343 +463,191 @@ async function createOrUpdateUser(
     referralCode
 ) {
 
-    requireDatabase();
-
+    await requireDatabase();
 
     const telegramId =
-        String(
-            telegramUser.id
-        );
-
+        String(telegramUser.id);
 
     const existing =
         await pool.query(
-
             `
             SELECT *
             FROM users
             WHERE telegram_id = $1
             `,
-
-            [
-                telegramId
-            ]
-
+            [telegramId]
         );
 
-
-    /*
-     * Existing user.
-     */
-
-    if (
-        existing.rows.length > 0
-    ) {
+    if (existing.rows.length) {
 
         await pool.query(
-
             `
             UPDATE users
-
             SET
                 username = $2,
                 first_name = $3,
                 last_name = $4,
                 photo_url = $5,
                 updated_at = NOW()
-
             WHERE telegram_id = $1
             `,
-
             [
-
                 telegramId,
-
-                telegramUser.username ||
-                    null,
-
-                telegramUser.first_name ||
-                    null,
-
-                telegramUser.last_name ||
-                    null,
-
-                telegramUser.photo_url ||
-                    null
-
+                telegramUser.username || null,
+                telegramUser.first_name || null,
+                telegramUser.last_name || null,
+                telegramUser.photo_url || null
             ]
-
         );
 
-
-        return existing.rows[0];
-
+        return;
     }
 
+    let referredBy = null;
 
-    /*
-     * New user.
-     */
-
-    const generatedReferralCode =
-        "u" +
-        telegramId;
-
-
-    let referredBy =
-        null;
-
-
-    if (
-        referralCode
-    ) {
+    if (referralCode) {
 
         const inviter =
             await pool.query(
-
                 `
                 SELECT telegram_id
                 FROM users
                 WHERE referral_code = $1
                 `,
-
-                [
-                    referralCode
-                ]
-
+                [referralCode]
             );
 
-
-        if (
-            inviter.rows.length > 0
-        ) {
+        if (inviter.rows.length) {
 
             const inviterId =
                 String(
-                    inviter.rows[0]
-                        .telegram_id
+                    inviter.rows[0].telegram_id
                 );
 
-
-            if (
-                inviterId !==
-                telegramId
-            ) {
-
-                referredBy =
-                    inviterId;
-
+            if (inviterId !== telegramId) {
+                referredBy = inviterId;
             }
-
         }
-
     }
 
+    const generatedReferralCode =
+        crypto
+            .randomBytes(8)
+            .toString("hex");
 
-    const result =
-        await pool.query(
-
-            `
-            INSERT INTO users(
-
-                telegram_id,
-
-                username,
-
-                first_name,
-
-                last_name,
-
-                photo_url,
-
-                referral_code,
-
-                referred_by
-
-            )
-
-            VALUES(
-                $1,
-                $2,
-                $3,
-                $4,
-                $5,
-                $6,
-                $7
-            )
-
-            RETURNING *
-            `,
-
-            [
-
-                telegramId,
-
-                telegramUser.username ||
-                    null,
-
-                telegramUser.first_name ||
-                    null,
-
-                telegramUser.last_name ||
-                    null,
-
-                telegramUser.photo_url ||
-                    null,
-
-                generatedReferralCode,
-
-                referredBy
-
-            ]
-
-        );
-
-
-    return result.rows[0];
-
+    await pool.query(
+        `
+        INSERT INTO users(
+            telegram_id,
+            username,
+            first_name,
+            last_name,
+            photo_url,
+            referral_code,
+            referred_by
+        )
+        VALUES(
+            $1,$2,$3,$4,$5,$6,$7
+        )
+        ON CONFLICT(telegram_id)
+        DO NOTHING
+        `,
+        [
+            telegramId,
+            telegramUser.username || null,
+            telegramUser.first_name || null,
+            telegramUser.last_name || null,
+            telegramUser.photo_url || null,
+            generatedReferralCode,
+            referredBy
+        ]
+    );
 }
-
 
 /* =========================================================
    REFERRAL
 ========================================================= */
 
-async function processReferral(
-    userId
-) {
+async function processReferral(userId) {
 
-    requireDatabase();
-
+    await requireDatabase();
 
     const userResult =
         await pool.query(
-
             `
             SELECT referred_by
             FROM users
             WHERE telegram_id = $1
             `,
-
-            [
-                userId
-            ]
-
+            [userId]
         );
 
-
-    if (
-        userResult.rows.length === 0
-    ) {
-
+    if (!userResult.rows.length) {
         return;
-
     }
-
 
     const referredBy =
-        userResult.rows[0]
-            .referred_by;
-
+        userResult.rows[0].referred_by;
 
     if (!referredBy) {
-
         return;
-
     }
-
 
     const already =
         await pool.query(
-
             `
             SELECT id
             FROM referrals
             WHERE invited_id = $1
             `,
-
-            [
-                userId
-            ]
-
+            [userId]
         );
 
-
-    if (
-        already.rows.length > 0
-    ) {
-
+    if (already.rows.length) {
         return;
-
     }
-
 
     const setting =
         await pool.query(
-
             `
             SELECT value
             FROM app_settings
             WHERE key = 'invite_reward'
             `
-
         );
-
 
     const reward =
         Number(
-            setting.rows[0]?.value ||
-            1
+            setting.rows[0]?.value || 1
         );
 
-
-    await pool.query(
-        "BEGIN"
-    );
-
+    const client =
+        await pool.connect();
 
     try {
 
-        await pool.query(
+        await client.query("BEGIN");
 
+        await client.query(
             `
             INSERT INTO referrals(
-
                 inviter_id,
-
                 invited_id,
-
                 reward
-
             )
-
-            VALUES(
-                $1,
-                $2,
-                $3
-            )
+            VALUES($1,$2,$3)
             `,
-
             [
-
                 referredBy,
-
                 userId,
-
                 reward
-
             ]
-
         );
 
-
-        await pool.query(
-
+        await client.query(
             `
             UPDATE users
-
             SET
-
                 invite_count =
                     invite_count + 1,
 
@@ -982,183 +657,149 @@ async function processReferral(
                 points =
                     points + $2,
 
-                updated_at =
-                    NOW()
+                updated_at = NOW()
 
             WHERE telegram_id = $1
             `,
-
             [
-
                 referredBy,
-
                 reward
-
             ]
-
         );
 
-
-        await pool.query(
-            "COMMIT"
-        );
-
+        await client.query("COMMIT");
 
     } catch (error) {
 
-        await pool.query(
-            "ROLLBACK"
-        );
-
+        await client.query("ROLLBACK");
         throw error;
 
-    }
+    } finally {
 
+        client.release();
+
+    }
 }
 
-
 /* =========================================================
-   /api/me
+   ME
 ========================================================= */
 
 app.get(
     "/api/me",
     authenticate,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            requireDatabase();
+            await requireDatabase();
 
+            let referral = null;
 
-            const telegramUser =
-                req.telegramUser;
-
-
-            const referral =
+            if (
                 typeof req.query.ref ===
                 "string"
-                    ? req.query.ref.trim()
-                    : null;
+            ) {
+                referral =
+                    req.query.ref.trim();
+            }
 
+            /*
+             * Also support Telegram
+             * startapp parameter.
+             */
+            if (
+                !referral &&
+                req.startParam
+            ) {
+
+                if (
+                    req.startParam.startsWith(
+                        "ref_"
+                    )
+                ) {
+
+                    referral =
+                        req.startParam
+                            .slice(4);
+
+                }
+            }
 
             await createOrUpdateUser(
-                telegramUser,
+                req.telegramUser,
                 referral
             );
 
-
             await processReferral(
-                String(
-                    telegramUser.id
-                )
+                String(req.telegramUser.id)
             );
 
+            const telegramId =
+                String(
+                    req.telegramUser.id
+                );
+
+            const channels =
+                await checkAllChannels(
+                    telegramId
+                );
+
+            const allJoined =
+                channels.length === 0 ||
+                channels.every(
+                    x => x.joined
+                );
+
+            await pool.query(
+                `
+                UPDATE users
+                SET
+                    is_verified = $2,
+                    updated_at = NOW()
+                WHERE telegram_id = $1
+                `,
+                [
+                    telegramId,
+                    allJoined
+                ]
+            );
 
             const userResult =
                 await pool.query(
-
                     `
                     SELECT *
                     FROM users
                     WHERE telegram_id = $1
                     `,
-
-                    [
-                        String(
-                            telegramUser.id
-                        )
-                    ]
-
+                    [telegramId]
                 );
-
 
             const user =
                 userResult.rows[0];
 
-
-            const channels =
-                await checkAllChannels(
-                    String(
-                        telegramUser.id
-                    )
-                );
-
-
-            const allJoined =
-                channels.length === 0 ||
-                channels.every(
-                    item =>
-                        item.joined
-                );
-
-
-            await pool.query(
-
-                `
-                UPDATE users
-
-                SET
-
-                    is_verified = $2,
-
-                    updated_at = NOW()
-
-                WHERE telegram_id = $1
-                `,
-
-                [
-
-                    String(
-                        telegramUser.id
-                    ),
-
-                    allJoined
-
-                ]
-
-            );
-
-
-            /*
-             * Rank.
-             */
-
             const rankResult =
                 await pool.query(
-
                     `
                     SELECT
                         COUNT(*) + 1 AS rank
-
                     FROM users
-
-                    WHERE points > $1
+                    WHERE
+                        is_banned = FALSE
+                        AND points > $1
                     `,
-
-                    [
-                        user.points
-                    ]
-
+                    [user.points]
                 );
-
 
             const rank =
                 Number(
-                    rankResult.rows[0]
-                        .rank
+                    rankResult.rows[0].rank
                 );
 
-
             res.json({
-
                 ok: true,
 
                 user: {
-
                     telegram_id:
                         user.telegram_id,
 
@@ -1198,11 +839,8 @@ app.get(
                         allJoined,
 
                     is_admin:
-                        String(
-                            user.telegram_id
-                        ) ===
+                        telegramId ===
                         ADMIN_ID
-
                 },
 
                 channels,
@@ -1210,21 +848,15 @@ app.get(
                 allJoined,
 
                 adsgram: {
-
                     blockId:
                         ADSGRAM_BLOCK_ID
-
                 },
 
                 bot: {
-
                     username:
                         BOT_USERNAME
-
                 }
-
             });
-
 
         } catch (error) {
 
@@ -1233,22 +865,13 @@ app.get(
                 error
             );
 
-
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
-
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
         }
-
     }
 );
-
 
 /* =========================================================
    CHANNELS
@@ -1257,79 +880,55 @@ app.get(
 app.get(
     "/api/channels",
     authenticate,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
             const channels =
                 await checkAllChannels(
-
                     String(
                         req.telegramUser.id
                     )
-
                 );
 
-
             res.json({
-
                 ok: true,
-
                 channels,
-
                 allJoined:
                     channels.length === 0 ||
                     channels.every(
-                        item =>
-                            item.joined
+                        x => x.joined
                     )
-
             });
-
 
         } catch (error) {
 
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
 
         }
-
     }
 );
 
-
 /* =========================================================
-   ADS REWARD
+   AD REWARD
 ========================================================= */
 
 app.post(
     "/api/ad-reward",
     authenticate,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            requireDatabase();
-
+            await requireDatabase();
 
             const telegramId =
                 String(
                     req.telegramUser.id
                 );
-
 
             const rewardKey =
                 typeof req.body?.rewardKey ===
@@ -1337,107 +936,65 @@ app.post(
                     ? req.body.rewardKey.trim()
                     : "";
 
-
             if (!rewardKey) {
 
-                return res.status(400)
-                    .json({
-
-                        ok: false,
-
-                        error:
-                            "rewardKey is required."
-
-                    });
+                return res.status(400).json({
+                    ok: false,
+                    error:
+                        "rewardKey is required."
+                });
 
             }
-
-
-            /*
-             * Check membership again.
-             */
 
             const channels =
                 await checkAllChannels(
                     telegramId
                 );
 
-
             const allJoined =
                 channels.length === 0 ||
                 channels.every(
-                    item =>
-                        item.joined
+                    x => x.joined
                 );
-
 
             if (!allJoined) {
 
-                return res.status(403)
-                    .json({
-
-                        ok: false,
-
-                        error:
-                            "Join all required channels first."
-
-                    });
+                return res.status(403).json({
+                    ok: false,
+                    error:
+                        "Join all required channels first."
+                });
 
             }
 
-
-            /*
-             * Duplicate protection.
-             */
-
             const duplicate =
                 await pool.query(
-
                     `
                     SELECT id
                     FROM ad_rewards
                     WHERE reward_key = $1
                     `,
-
-                    [
-                        rewardKey
-                    ]
-
+                    [rewardKey]
                 );
 
+            if (duplicate.rows.length) {
 
-            if (
-                duplicate.rows.length > 0
-            ) {
-
-                return res.status(409)
-                    .json({
-
-                        ok: false,
-
-                        error:
-                            "This reward was already claimed."
-
-                    });
+                return res.status(409).json({
+                    ok: false,
+                    error:
+                        "This reward was already claimed."
+                });
 
             }
 
-
-            /*
-             * Daily limit.
-             */
-
             const limitResult =
                 await pool.query(
-
                     `
                     SELECT value
                     FROM app_settings
                     WHERE key = 'max_ads_per_day'
                     `
-
                 );
-
 
             const maxAds =
                 Number(
@@ -1445,69 +1002,41 @@ app.post(
                     100
                 );
 
-
             const todayResult =
                 await pool.query(
-
                     `
-                    SELECT
-                        COUNT(*)::int AS count
-
+                    SELECT COUNT(*)::int AS count
                     FROM ad_rewards
-
                     WHERE
                         telegram_id = $1
-
-                        AND created_at >=
-                            CURRENT_DATE
+                        AND created_at >= CURRENT_DATE
                     `,
-
-                    [
-                        telegramId
-                    ]
-
+                    [telegramId]
                 );
-
 
             const todayCount =
                 Number(
-                    todayResult.rows[0]
-                        .count
+                    todayResult.rows[0].count
                 );
 
+            if (todayCount >= maxAds) {
 
-            if (
-                todayCount >= maxAds
-            ) {
-
-                return res.status(429)
-                    .json({
-
-                        ok: false,
-
-                        error:
-                            "Daily ad limit reached."
-
-                    });
+                return res.status(429).json({
+                    ok: false,
+                    error:
+                        "Daily ad limit reached."
+                });
 
             }
 
-
-            /*
-             * Reward amount.
-             */
-
             const rewardResult =
                 await pool.query(
-
                     `
                     SELECT value
                     FROM app_settings
                     WHERE key = 'ad_reward'
                     `
-
                 );
-
 
             const reward =
                 Number(
@@ -1515,72 +1044,42 @@ app.post(
                     1
                 );
 
-
             if (
-                !Number.isFinite(
-                    reward
-                ) ||
+                !Number.isFinite(reward) ||
                 reward < 0
             ) {
-
                 throw new Error(
                     "Invalid ad reward configuration."
                 );
-
             }
 
-
-            /*
-             * Transaction.
-             */
-
-            await pool.query(
-                "BEGIN"
-            );
-
+            const client =
+                await pool.connect();
 
             try {
 
-                await pool.query(
+                await client.query("BEGIN");
 
+                await client.query(
                     `
                     INSERT INTO ad_rewards(
-
                         telegram_id,
-
                         reward,
-
                         reward_key
-
                     )
-
-                    VALUES(
-                        $1,
-                        $2,
-                        $3
-                    )
+                    VALUES($1,$2,$3)
                     `,
-
                     [
-
                         telegramId,
-
                         reward,
-
                         rewardKey
-
                     ]
-
                 );
 
-
-                await pool.query(
-
+                await client.query(
                     `
                     UPDATE users
-
                     SET
-
                         ads_count =
                             ads_count + 1,
 
@@ -1595,73 +1094,44 @@ app.post(
 
                     WHERE telegram_id = $1
                     `,
-
                     [
-
                         telegramId,
-
                         reward
-
                     ]
-
                 );
 
-
-                await pool.query(
-                    "COMMIT"
-                );
-
+                await client.query("COMMIT");
 
             } catch (error) {
 
-                await pool.query(
-                    "ROLLBACK"
-                );
-
+                await client.query("ROLLBACK");
                 throw error;
+
+            } finally {
+
+                client.release();
 
             }
 
-
-            /*
-             * Updated user.
-             */
-
             const updated =
                 await pool.query(
-
                     `
                     SELECT
-
                         points,
-
                         ads_count,
-
                         total_ads
-
                     FROM users
-
                     WHERE telegram_id = $1
                     `,
-
-                    [
-                        telegramId
-                    ]
-
+                    [telegramId]
                 );
 
-
-            res.json({
-
+            return res.json({
                 ok: true,
-
                 reward,
-
                 user:
                     updated.rows[0]
-
             });
-
 
         } catch (error) {
 
@@ -1670,22 +1140,13 @@ app.post(
                 error
             );
 
-
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
-
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
         }
-
     }
 );
-
 
 /* =========================================================
    LEADERBOARD
@@ -1694,60 +1155,38 @@ app.post(
 app.get(
     "/api/leaderboard",
     authenticate,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            requireDatabase();
-
+            await requireDatabase();
 
             const result =
                 await pool.query(
-
                     `
                     SELECT
-
                         telegram_id,
-
                         username,
-
                         first_name,
-
                         last_name,
-
                         photo_url,
-
                         points,
-
                         total_ads,
-
                         total_invites
-
                     FROM users
-
-                    WHERE
-                        is_banned = FALSE
-
+                    WHERE is_banned = FALSE
                     ORDER BY
                         points DESC,
+                        total_ads DESC,
+                        total_invites DESC,
                         created_at ASC
-
                     LIMIT 30
                     `
-
                 );
-
 
             const leaderboard =
                 result.rows.map(
-                    (
-                        user,
-                        index
-                    ) => ({
-
+                    (user, index) => ({
                         rank:
                             index + 1,
 
@@ -1774,37 +1213,24 @@ app.get(
 
                         invites:
                             user.total_invites
-
                     })
                 );
 
-
             res.json({
-
                 ok: true,
-
                 leaderboard
-
             });
-
 
         } catch (error) {
 
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
 
         }
-
     }
 );
-
 
 /* =========================================================
    REWARDS
@@ -1813,86 +1239,54 @@ app.get(
 app.get(
     "/api/rewards",
     authenticate,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            requireDatabase();
-
+            await requireDatabase();
 
             const result =
                 await pool.query(
-
                     `
                     SELECT
-
                         position,
-
                         title,
-
                         description,
-
                         enabled
-
                     FROM rewards
-
                     WHERE enabled = TRUE
-
-                    ORDER BY
-                        position ASC
+                    ORDER BY position ASC
                     `
-
                 );
 
-
             res.json({
-
                 ok: true,
-
                 rewards:
                     result.rows
-
             });
-
 
         } catch (error) {
 
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
 
         }
-
     }
 );
-
 
 /* =========================================================
    ADMIN
 ========================================================= */
 
-function isAdmin(
-    req
-) {
+function isAdmin(req) {
 
     return (
-        String(
-            req.telegramUser.id
-        ) ===
+        String(req.telegramUser.id) ===
         ADMIN_ID
     );
-
 }
-
 
 function requireAdmin(
     req,
@@ -1902,23 +1296,16 @@ function requireAdmin(
 
     if (!isAdmin(req)) {
 
-        return res.status(403)
-            .json({
-
-                ok: false,
-
-                error:
-                    "Admin access required."
-
-            });
+        return res.status(403).json({
+            ok: false,
+            error:
+                "Admin access required."
+        });
 
     }
 
-
     next();
-
 }
-
 
 /* =========================================================
    ADMIN SETTINGS
@@ -1928,166 +1315,88 @@ app.post(
     "/api/admin/settings",
     authenticate,
     requireAdmin,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            requireDatabase();
-
+            await requireDatabase();
 
             const {
                 ad_reward,
                 invite_reward,
                 max_ads_per_day
-            } =
-                req.body || {};
-
+            } = req.body || {};
 
             const settings = {
-
                 ad_reward,
-
                 invite_reward,
-
                 max_ads_per_day
-
             };
 
-
             for (
-                const [
-                    key,
-                    value
-                ]
-                of Object.entries(
-                    settings
-                )
+                const [key, value]
+                of Object.entries(settings)
             ) {
 
                 if (
-                    value ===
-                    undefined ||
-                    value ===
-                    null
+                    value === undefined ||
+                    value === null
                 ) {
-
                     continue;
-
                 }
 
-
                 await pool.query(
-
                     `
                     INSERT INTO app_settings(
-
                         key,
-
                         value,
-
                         updated_at
-
                     )
-
-                    VALUES(
-                        $1,
-                        $2,
-                        NOW()
-                    )
-
+                    VALUES($1,$2,NOW())
                     ON CONFLICT(key)
-
                     DO UPDATE SET
-
                         value =
                             EXCLUDED.value,
-
                         updated_at =
                             NOW()
                     `,
-
                     [
-
                         key,
-
-                        String(
-                            value
-                        )
-
+                        String(value)
                     ]
-
                 );
-
             }
 
-
             await pool.query(
-
                 `
                 INSERT INTO admin_logs(
-
                     admin_id,
-
                     action,
-
                     details
-
                 )
-
-                VALUES(
-                    $1,
-                    $2,
-                    $3
-                )
+                VALUES($1,$2,$3)
                 `,
-
                 [
-
                     ADMIN_ID,
-
                     "update_settings",
-
-                    JSON.stringify(
-                        settings
-                    )
-
+                    JSON.stringify(settings)
                 ]
-
             );
 
-
             res.json({
-
                 ok: true
-
             });
-
 
         } catch (error) {
 
-            console.error(
-                error
-            );
-
-
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
 
         }
-
     }
 );
-
 
 /* =========================================================
    ADMIN REWARD
@@ -2097,30 +1406,21 @@ app.post(
     "/api/admin/reward",
     authenticate,
     requireAdmin,
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            requireDatabase();
-
+            await requireDatabase();
 
             const {
                 position,
                 title,
                 description,
                 enabled
-            } =
-                req.body || {};
-
+            } = req.body || {};
 
             const positionNumber =
-                Number(
-                    position
-                );
-
+                Number(position);
 
             if (
                 !Number.isInteger(
@@ -2130,192 +1430,126 @@ app.post(
                 positionNumber > 30
             ) {
 
-                return res.status(400)
-                    .json({
-
-                        ok: false,
-
-                        error:
-                            "Position must be between 1 and 30."
-
-                    });
+                return res.status(400).json({
+                    ok: false,
+                    error:
+                        "Position must be between 1 and 30."
+                });
 
             }
 
-
             if (
-                typeof title !==
-                "string" ||
+                typeof title !== "string" ||
                 !title.trim()
             ) {
 
-                return res.status(400)
-                    .json({
-
-                        ok: false,
-
-                        error:
-                            "Reward title is required."
-
-                    });
+                return res.status(400).json({
+                    ok: false,
+                    error:
+                        "Reward title is required."
+                });
 
             }
 
-
             await pool.query(
-
                 `
                 INSERT INTO rewards(
-
                     position,
-
                     title,
-
                     description,
-
                     enabled,
-
                     updated_at
-
                 )
-
-                VALUES(
-                    $1,
-                    $2,
-                    $3,
-                    $4,
-                    NOW()
-                )
+                VALUES($1,$2,$3,$4,NOW())
 
                 ON CONFLICT(position)
-
                 DO UPDATE SET
-
                     title =
                         EXCLUDED.title,
-
                     description =
                         EXCLUDED.description,
-
                     enabled =
                         EXCLUDED.enabled,
-
                     updated_at =
                         NOW()
                 `,
-
                 [
-
                     positionNumber,
-
                     title.trim(),
-
-                    String(
-                        description ||
-                        ""
-                    ),
-
+                    String(description || ""),
                     enabled !== false
-
                 ]
-
             );
-
-
-            await pool.query(
-
-                `
-                INSERT INTO admin_logs(
-
-                    admin_id,
-
-                    action,
-
-                    details
-
-                )
-
-                VALUES(
-                    $1,
-                    $2,
-                    $3
-                )
-                `,
-
-                [
-
-                    ADMIN_ID,
-
-                    "update_reward",
-
-                    JSON.stringify(
-                        req.body
-                    )
-
-                ]
-
-            );
-
 
             res.json({
-
                 ok: true
-
             });
-
 
         } catch (error) {
 
-            console.error(
-                error
-            );
-
-
-            res.status(500)
-                .json({
-
-                    ok: false,
-
-                    error:
-                        error.message
-
-                });
+            res.status(500).json({
+                ok: false,
+                error: error.message
+            });
 
         }
-
     }
 );
 
-
 /* =========================================================
-   ROOT
+   FRONTEND
 ========================================================= */
 
-app.get(
-    "/",
-    (req, res) => {
+/*
+ * IMPORTANT:
+ * Vercel must serve index.html from the same
+ * server as the API.
+ */
 
-        res.json({
+app.use(
+    express.static(__dirname, {
+        index: false
+    })
+);
 
-            ok: true,
+app.get("/", (req, res) => {
 
-            app:
-                "Telegram Reward Mini App API",
+    res.sendFile(
+        path.join(
+            __dirname,
+            "index.html"
+        )
+    );
 
-            status:
-                "online",
+});
 
-            adsgramBlock:
-                ADSGRAM_BLOCK_ID
+/* =========================================================
+   404 API
+========================================================= */
 
+app.use((req, res) => {
+
+    if (
+        req.path.startsWith("/api/")
+    ) {
+
+        return res.status(404).json({
+            ok: false,
+            error: "API route not found."
         });
 
     }
-);
 
+    res.sendFile(
+        path.join(
+            __dirname,
+            "index.html"
+        )
+    );
+});
 
 /* =========================================================
-   VERCEL EXPORT
+   VERCEL
 ========================================================= */
 
 export default app;
