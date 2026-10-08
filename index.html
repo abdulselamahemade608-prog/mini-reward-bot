@@ -126,6 +126,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .mini span{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--card2);color:var(--muted)}
 .mini span.ok{background:rgba(34,197,94,.16);color:#4ade80}
+.seg{overflow-x:auto;gap:4px;scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;padding:10px 14px;white-space:nowrap}
+textarea{resize:vertical;min-height:110px;font-family:inherit}
+.ms{display:flex;align-items:center;gap:12px}
 /* gate */
 .gate{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto;
   background:radial-gradient(520px 380px at 50% 10%,rgba(99,102,241,.35),transparent 70%),var(--bg)}
@@ -229,6 +234,14 @@ nav button.active svg{stroke:#8ec5ff}
       <button class="btn" id="eWatch" style="margin-top:14px"></button>
     </div>
 
+    <div class="card">
+      <div class="line"><span class="ib purple" id="prIc"></span><div class="x"><b>Promo code</b><span>Enter a code to get points</span></div></div>
+      <div class="row2" style="margin-top:12px;align-items:stretch">
+        <input id="promoIn" type="text" placeholder="CODE" autocapitalize="characters" autocomplete="off" maxlength="32">
+        <button class="btn green" id="promoBtn" style="flex:none;width:auto;padding:0 20px"></button>
+      </div>
+    </div>
+
     <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
     <div id="taskList"></div>
   </section>
@@ -249,6 +262,9 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="stat"><span class="ib green" id="i3"></span><div class="v" id="iVer">0</div><div class="l">Verified</div></div>
       <div class="stat"><span class="ib orange" id="i2"></span><div class="v" id="iPts">0</div><div class="l">Your points</div></div>
     </div>
+
+    <h2><span class="ib sm orange" id="msIc"></span>Bonus milestones</h2>
+    <div id="mileList"></div>
 
     <h2><span class="ib sm purple" id="frIc"></span>Your friends</h2>
     <div id="friendList"></div>
@@ -305,12 +321,47 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="x"><b style="font-size:18px">Admin panel</b></div>
     </div>
     <div class="seg">
-      <button id="segReq" class="on">Requests</button>
+      <button id="segStats" class="on">Dashboard</button>
+      <button id="segReq">Requests</button>
+      <button id="segUsers">Users</button>
       <button id="segTask">Tasks</button>
+      <button id="segPromo">Promo</button>
+      <button id="segBcast">Broadcast</button>
       <button id="segSet">Settings</button>
     </div>
 
-    <div id="admReq">
+    <div id="admStats" class="hidden">
+      <div class="stats" id="statGrid"></div>
+    </div>
+
+    <div id="admUsers" class="hidden">
+      <div class="row2" style="align-items:stretch;margin-bottom:12px">
+        <input id="uQ" type="text" placeholder="Search: ID, @username or name" autocomplete="off">
+        <button class="btn" id="uSearch" style="flex:none;width:auto;padding:0 18px"></button>
+      </div>
+      <div id="userList"></div>
+    </div>
+
+    <div id="admPromo" class="hidden">
+      <div class="card">
+        <label style="margin-top:0">Code (leave empty to auto-generate)</label><input id="pr_code" type="text" maxlength="32" autocapitalize="characters" placeholder="WELCOME10">
+        <label>Points per person</label><input id="pr_rew" type="number" step="any" min="0" placeholder="10">
+        <label>Number of people who can use it</label><input id="pr_max" type="number" min="1" placeholder="100">
+        <button class="btn green" id="pCreate" style="margin-top:16px"></button>
+      </div>
+      <div id="promoList"></div>
+    </div>
+
+    <div id="admBcast" class="hidden">
+      <div class="card">
+        <label style="margin-top:0">Message to all users (sent by the bot)</label>
+        <textarea id="bText" maxlength="1000" placeholder="Write your message..."></textarea>
+        <button class="btn" id="bSend" style="margin-top:14px"></button>
+        <div class="muted" id="bStatus" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div id="admReq" class="hidden">
       <div class="chips" id="admFilter" style="margin-bottom:12px">
         <span class="chip on" data-s="pending">Pending</span>
         <span class="chip" data-s="approved">Approved</span>
@@ -338,6 +389,10 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Daily ads limit</label><input id="a_max" type="number" min="0">
         <label>Minimum withdrawal</label><input id="a_min" type="number" step="any" min="0">
         <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
+        <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
+        <label>Bonus: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
+        <label>Bonus: 10 verified friends</label><input id="a_m10" type="number" step="any" min="0">
+        <label>Bonus: 25 verified friends</label><input id="a_m25" type="number" step="any" min="0">
         <button class="btn green" id="saveSettings" style="margin-top:16px"></button>
       </div>
     </div>
@@ -357,6 +412,10 @@ nav button.active svg{stroke:#8ec5ff}
    CONFIG - Adsgram Block ID be-yih file wust new.
 ===================================================== */
 const ADSGRAM_BLOCK_ID = "52630";
+
+/* Auto-shown ads (Interstitial). Create an "Interstitial" block in Adsgram
+   (its ID starts with "int-") and paste it here. Empty = auto ads are off. */
+const ADSGRAM_INTERSTITIAL_ID = "";
 
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#070b16"); tg.setBackgroundColor && tg.setBackgroundColor("#070b16"); } catch (e) {} }
@@ -386,6 +445,7 @@ const P = {
   send:'<path d="M4 12l16-8-6 16-3-7z"/>',
   list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   refresh:'<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z"/>',
   star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>'
 };
 const svg = n => `<svg viewBox="0 0 24 24">${P[n] || ""}</svg>`;
@@ -393,7 +453,7 @@ function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
 function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text + "</span>"; }
 
 /* static icon setup */
-[["gIc","shield"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
+[["gIc","shield"],["prIc","gift"],["msIc","gift"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
  ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i3","shield"],["frIc","users"],["i2","coin"],
  ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
 setBtn("checkBtn","refresh","Check membership");
@@ -403,6 +463,10 @@ setBtn("hWatch","play","Watch ad &amp; earn");
 setBtn("eWatch","play","Watch ad &amp; earn");
 setBtn("supportBtn","send","Contact admin");
 setBtn("addTask","check","Add task");
+setBtn("promoBtn","check","Redeem");
+setBtn("uSearch","refresh","Search");
+setBtn("pCreate","check","Create code");
+setBtn("bSend","send","Send to everyone");
 setBtn("shareBtn","share","Share");
 setBtn("copyBtn","copy","Copy");
 setBtn("wBtn","send","Request withdrawal");
@@ -475,7 +539,7 @@ function render() {
   $("iReward").textContent = fmt(invR);
   $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
   $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
-  $("wMin").textContent = "Min " + fmt(minW);
+  $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
 
   $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?startapp=ref_" + u.referral_code : "Bot username is not configured";
 
@@ -613,19 +677,29 @@ async function loadHistory() {
 $("adminBtn").onclick = () => { openAdmin(); };
 $("adminBack").onclick = () => showTab("profile");
 function admSeg(name) {
-  [["segReq","admReq","req"],["segTask","admTask","task"],["segSet","admSet","set"]].forEach(a => {
+  [["segStats","admStats","stats"],["segReq","admReq","req"],["segUsers","admUsers","users"],["segTask","admTask","task"],
+   ["segPromo","admPromo","promo"],["segBcast","admBcast","bcast"],["segSet","admSet","set"]].forEach(a => {
     $(a[0]).classList.toggle("on", a[2] === name);
     $(a[1]).classList.toggle("hidden", a[2] !== name);
   });
+  if (name === "stats") loadStats();
   if (name === "req") loadAdmin();
+  if (name === "users") loadUsers();
   if (name === "task") loadAdminTasks();
+  if (name === "promo") loadPromos();
   if (name === "set") {
     const s = ME.settings || {};
-    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100; $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
+    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100;
+    $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
+    $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50;
   }
 }
+$("segStats").onclick = () => admSeg("stats");
 $("segReq").onclick = () => admSeg("req");
+$("segUsers").onclick = () => admSeg("users");
 $("segTask").onclick = () => admSeg("task");
+$("segPromo").onclick = () => admSeg("promo");
+$("segBcast").onclick = () => admSeg("bcast");
 $("segSet").onclick = () => admSeg("set");
 document.querySelectorAll("#admFilter .chip").forEach(c => c.onclick = () => {
   admStatus = c.dataset.s;
@@ -636,7 +710,7 @@ document.querySelectorAll("#admFilter .chip").forEach(c => c.onclick = () => {
 function openAdmin() {
   ["home","earn","invite","profile"].forEach(t => $("v-" + t).classList.add("hidden"));
   $("v-admin").classList.remove("hidden"); window.scrollTo(0, 0);
-  $("segReq").click();
+  $("segStats").click();
 }
 
 async function loadAdmin() {
@@ -690,10 +764,203 @@ $("saveSettings").onclick = async () => {
   try {
     await api("/api/admin/settings", "POST", {
       ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
-      max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value, verify_ads: $("a_vads").value
+      max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value, verify_ads: $("a_vads").value,
+      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value
     });
     toast("Settings saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
+};
+
+/* ---------------- promo code ---------------- */
+$("promoBtn").onclick = async () => {
+  const code = $("promoIn").value.trim();
+  if (!code) return toast("Enter a promo code.", "err");
+  $("promoBtn").disabled = true;
+  try {
+    const d = await api("/api/promo/redeem", "POST", { code });
+    $("promoIn").value = "";
+    toast("+" + fmt(d.reward) + " points", "ok");
+    await refreshMe();
+  } catch (e) { toast(e.message, "err"); }
+  $("promoBtn").disabled = false;
+};
+
+/* ---------------- milestones ---------------- */
+function renderMilestones(verified, claimed) {
+  const st = ME.settings || {};
+  $("mileList").innerHTML = [5, 10, 25].map(m => {
+    const bonus = st["milestone_" + m] ?? 0;
+    const done = claimed.includes(m) || verified >= m;
+    const pct = Math.min(100, (Math.min(verified, m) / m) * 100);
+    return `<div class="card" style="padding:13px"><div class="ms">
+      <span class="ib sm ${done ? "green" : "orange"}">${svg(done ? "check" : "gift")}</span>
+      <div class="x" style="flex:1;min-width:0"><b>${m} verified friends</b><span class="muted" style="display:block">Bonus +${fmt(bonus)} points</span>
+        <div class="progress" style="margin:8px 0 0"><i style="width:${pct}%"></i></div></div>
+      ${done ? statusBadge("approved").replace("Approved", "Reached") : `<span class="badge pending">${Math.min(verified, m)}/${m}</span>`}
+    </div></div>`;
+  }).join("");
+}
+
+/* ---------------- auto ads (interstitial) ---------------- */
+let interCtrl = null, interBusy = false, lastInter = Date.now(), lastActive = Date.now();
+function getInter() {
+  if (interCtrl) return interCtrl;
+  if (!ADSGRAM_INTERSTITIAL_ID || !window.Adsgram) return null;
+  try { interCtrl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_ID }); } catch (e) { return null; }
+  return interCtrl;
+}
+async function showInterstitial() {
+  if (interBusy || watching || document.hidden) return;
+  if (!ME || !ME.allJoined) return;
+  if (!$("modal").classList.contains("hidden")) return;
+  if (Date.now() - lastInter < 25000) return;
+  const c = getInter();
+  if (!c) return;
+  interBusy = true; lastInter = Date.now();
+  try { await c.show(); } catch (e) { /* no ad available or skipped: ignore */ }
+  interBusy = false; lastInter = Date.now(); lastActive = Date.now();
+}
+["touchstart", "click", "scroll", "keydown"].forEach(ev =>
+  window.addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
+setInterval(() => {
+  if (!ADSGRAM_INTERSTITIAL_ID) return;
+  const now = Date.now(), idle = now - lastActive;
+  if (idle >= 60000) return showInterstitial();                   // idle 60s -> show
+  if (idle < 30000 && now - lastInter >= 30000) showInterstitial(); // using the app -> every 30s
+}, 5000);
+
+/* ---------------- admin: dashboard / users / promo / broadcast ---------------- */
+const tile = (ic, color, v, l) => `<div class="stat"><span class="ib ${color}">${svg(ic)}</span><div class="v">${v}</div><div class="l">${l}</div></div>`;
+
+async function loadStats() {
+  $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">Loading...</div>';
+  try {
+    const d = (await api("/api/admin/stats")).stats;
+    $("statGrid").innerHTML =
+      tile("users", "blue", fmt(d.total_users), "Total users") +
+      tile("star", "green", fmt(d.new_today), "New today") +
+      tile("play", "pink", fmt(d.ads_today), "Ads today") +
+      tile("play", "purple", fmt(d.ads_total), "Ads total") +
+      tile("wallet", "green", fmt(d.paid_total), "Total paid") +
+      tile("wallet", "teal", fmt(d.paid_today), "Paid today") +
+      tile("clock", "orange", fmt(d.pending_count), "Pending (" + fmt(d.pending_amount) + ")") +
+      tile("shield", "redg", fmt(d.banned), "Banned") +
+      tile("users", "blue", fmt(d.verified_refs), "Verified invites");
+  } catch (e) { $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(e.message) + "</div>"; }
+}
+
+let usersCache = [];
+async function loadUsers() {
+  $("userList").innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const d = await api("/api/admin/users?q=" + encodeURIComponent($("uQ").value.trim()));
+    usersCache = d.users;
+    $("userList").innerHTML = d.users.length ? d.users.map(u => {
+      const name = nameOf(u), letter = esc((name.replace("@", "")[0] || "U").toUpperCase());
+      const img = u.photo_url ? `<img src="${esc(u.photo_url)}" alt="" onerror="this.remove()">` : "";
+      return `<div class="card"><div class="line">
+        <div class="av"><span>${letter}</span>${img}</div>
+        <div class="x"><b class="ellip">${esc(name)}</b><span>ID ${esc(u.telegram_id)}</span></div>
+        ${u.is_banned ? '<span class="badge rejected">Banned</span>' : ""}</div>
+        <div class="mini"><span>Points: ${fmt(u.points)}</span><span>Ads: ${u.total_ads}</span><span>Invites: ${u.total_invites}</span></div>
+        <div class="row2" style="margin-top:12px">
+          <button class="btn dark sm" data-pts="${esc(u.telegram_id)}">Points</button>
+          <button class="btn ${u.is_banned ? "green" : "red"} sm" data-ban="${esc(u.telegram_id)}">${u.is_banned ? "Unban" : "Ban"}</button></div></div>`;
+    }).join("") : '<div class="empty">No users found.</div>';
+
+    $("userList").querySelectorAll("button[data-ban]").forEach(b => b.onclick = async () => {
+      const u = usersCache.find(x => String(x.telegram_id) === b.dataset.ban);
+      b.disabled = true;
+      try {
+        await api("/api/admin/users/" + encodeURIComponent(b.dataset.ban) + "/ban", "POST", { banned: !u.is_banned });
+        toast(u.is_banned ? "User unbanned." : "User banned.", "ok"); loadUsers();
+      } catch (e) { toast(e.message, "err"); b.disabled = false; }
+    });
+    $("userList").querySelectorAll("button[data-pts]").forEach(b => b.onclick = () => pointsSheet(usersCache.find(x => String(x.telegram_id) === b.dataset.pts)));
+  } catch (e) { $("userList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
+$("uSearch").onclick = loadUsers;
+$("uQ").addEventListener("keydown", e => { if (e.key === "Enter") loadUsers(); });
+
+function pointsSheet(u) {
+  const modal = $("modal");
+  modal.innerHTML = `<div class="sheet">
+    <div class="line" style="margin-bottom:12px"><span class="ib orange">${svg("coin")}</span>
+    <div class="x"><b style="font-size:17px">${esc(nameOf(u))}</b><span>Balance: ${fmt(u.points)}</span></div></div>
+    <input id="mAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount">
+    <div class="row2" style="margin-top:14px">
+      <button class="btn red" id="mSub">Subtract</button>
+      <button class="btn green" id="mAdd">Add</button></div>
+    <button class="btn dark" id="mClose" style="margin-top:10px">Cancel</button></div>`;
+  modal.classList.remove("hidden");
+  $("mClose").onclick = () => modal.classList.add("hidden");
+  modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
+  const apply = async sign => {
+    const amt = Math.abs(Number($("mAmt").value));
+    if (!amt) return toast("Enter an amount.", "err");
+    try {
+      await api("/api/admin/users/" + encodeURIComponent(u.telegram_id) + "/points", "POST", { amount: sign * amt });
+      modal.classList.add("hidden"); toast("Points updated.", "ok"); loadUsers();
+    } catch (e) { toast(e.message, "err"); }
+  };
+  $("mAdd").onclick = () => apply(1);
+  $("mSub").onclick = () => apply(-1);
+}
+
+async function loadPromos() {
+  $("promoList").innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const d = await api("/api/admin/promos");
+    $("promoList").innerHTML = d.promos.length ? d.promos.map(p => `<div class="card"><div class="line">
+      <span class="ib sm purple">${svg("gift")}</span>
+      <div class="x"><b>${esc(p.code)}</b><span>+${fmt(p.reward)} each · ${p.used_count}/${p.max_uses} used</span></div>
+      <button class="btn red sm" data-pdel="${esc(p.code)}" style="width:auto;padding:9px 14px">Delete</button></div></div>`).join("")
+      : '<div class="empty">No promo codes yet.</div>';
+    $("promoList").querySelectorAll("button[data-pdel]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { await api("/api/admin/promos/" + encodeURIComponent(b.dataset.pdel) + "/delete", "POST"); toast("Code deleted.", "ok"); loadPromos(); }
+      catch (e) { toast(e.message, "err"); b.disabled = false; }
+    });
+  } catch (e) { $("promoList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
+$("pCreate").onclick = async () => {
+  $("pCreate").disabled = true;
+  try {
+    const d = await api("/api/admin/promos", "POST", { code: $("pr_code").value.trim(), reward: Number($("pr_rew").value), maxUses: Number($("pr_max").value) });
+    ["pr_code", "pr_rew", "pr_max"].forEach(i => $(i).value = "");
+    toast("Code created: " + d.code, "ok"); loadPromos();
+  } catch (e) { toast(e.message, "err"); }
+  $("pCreate").disabled = false;
+};
+
+$("bSend").onclick = () => {
+  const text = $("bText").value.trim();
+  if (!text) return toast("Write a message first.", "err");
+  const modal = $("modal");
+  modal.innerHTML = `<div class="sheet">
+    <div class="line" style="margin-bottom:12px"><span class="ib blue">${svg("send")}</span>
+    <div class="x"><b style="font-size:17px">Send to everyone?</b><span>This message goes to all users through the bot.</span></div></div>
+    <div class="row2"><button class="btn dark" id="mNo">Cancel</button><button class="btn" id="mYes">Send</button></div></div>`;
+  modal.classList.remove("hidden");
+  $("mNo").onclick = () => modal.classList.add("hidden");
+  $("mYes").onclick = async () => {
+    modal.classList.add("hidden");
+    $("bSend").disabled = true;
+    let sent = 0, failed = 0;
+    try {
+      let d = await api("/api/admin/broadcast", "POST", { text });
+      sent += d.sent; failed += d.failed;
+      $("bStatus").textContent = "Sending... sent " + sent + ", failed " + failed + ", remaining " + d.remaining;
+      while (d.remaining > 0) {
+        d = await api("/api/admin/broadcast/" + encodeURIComponent(d.id) + "/continue", "POST");
+        sent += d.sent; failed += d.failed;
+        $("bStatus").textContent = "Sending... sent " + sent + ", failed " + failed + ", remaining " + d.remaining;
+      }
+      $("bStatus").textContent = "Done. Sent " + sent + ", failed " + failed + " (blocked the bot).";
+      toast("Broadcast finished.", "ok"); $("bText").value = "";
+    } catch (e) { toast(e.message, "err"); }
+    $("bSend").disabled = false;
+  };
 };
 
 /* ---------------- my friends ---------------- */
@@ -704,6 +971,7 @@ async function loadFriends() {
     const list = d.friends;
     $("iInv").textContent = list.length;
     $("iVer").textContent = list.filter(f => f.verified).length;
+    renderMilestones(list.filter(f => f.verified).length, d.claimed || []);
     $("friendList").innerHTML = list.length ? list.map(f => {
       const name = nameOf(f);
       const letter = esc((name.replace("@", "")[0] || "U").toUpperCase());
