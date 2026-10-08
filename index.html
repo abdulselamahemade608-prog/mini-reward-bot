@@ -120,6 +120,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .notice{background:var(--red);color:#fff;border-radius:20px;font-size:11px;font-weight:800;padding:2px 7px;margin-left:6px}
 
+/* gate */
+.gate{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto;
+  background:radial-gradient(520px 380px at 50% 10%,rgba(99,102,241,.35),transparent 70%),var(--bg)}
+.gate-in{width:100%;max-width:440px;text-align:center;animation:fadeIn .5s both}
+.gate-in .ib{width:76px;height:76px;border-radius:26px;margin:0 auto 18px}
+.gate-in .ib svg{width:40px;height:40px}
+.gate-in h1{font-size:24px;margin-bottom:8px}
+.gate-in p{color:var(--muted);font-size:15px;margin-bottom:22px}
+.gate-in .card{text-align:left}
+.task-done{opacity:.6}
 /* nav */
 nav{position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:flex;padding:7px;border-radius:26px;
   background:rgba(15,23,48,.88);backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 12px 36px rgba(0,0,0,.55)}
@@ -152,16 +162,17 @@ nav button.active svg{stroke:#8ec5ff}
 <div id="toast" class="toast hidden"></div>
 <div id="modal" class="hidden"></div>
 
-<main id="app" class="hidden">
-
-  <div id="verify" class="verify hidden">
-    <div class="line" style="margin-bottom:10px">
-      <span class="ib purple" id="vIcon"></span>
-      <div class="x"><b>Verification required</b><span>Join all required channels to continue.</span></div>
-    </div>
+<div id="gate" class="gate hidden">
+  <div class="gate-in">
+    <span class="ib purple" id="gIc"></span>
+    <h1>Verification required</h1>
+    <p>Join all required channels to continue.</p>
     <div id="channelList"></div>
-    <button class="btn dark sm" id="checkBtn" style="margin-top:6px"></button>
+    <button class="btn dark" id="checkBtn" style="margin-top:6px"></button>
   </div>
+</div>
+
+<main id="app" class="hidden">
 
   <!-- HOME -->
   <section id="v-home" class="view">
@@ -212,13 +223,8 @@ nav button.active svg{stroke:#8ec5ff}
       <button class="btn" id="eWatch" style="margin-top:14px"></button>
     </div>
 
-    <div class="card">
-      <div class="line">
-        <span class="ib green" id="eInvIc"></span>
-        <div class="x"><b>Invite friends</b><span id="eInvSub">-</span></div>
-      </div>
-      <button class="btn green" id="eGoInvite" style="margin-top:14px"></button>
-    </div>
+    <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
+    <div id="taskList"></div>
   </section>
 
   <!-- INVITE -->
@@ -259,8 +265,10 @@ nav button.active svg{stroke:#8ec5ff}
       </div>
       <label>Payout method</label>
       <div class="chips" id="wMethods"></div>
-      <label>Wallet / account</label>
-      <input id="wAddr" type="text" placeholder="Enter your wallet address or account" autocomplete="off">
+      <label>Account owner name</label>
+      <input id="wName" type="text" placeholder="Full name on the account" autocomplete="off" maxlength="100">
+      <label>Account number / phone</label>
+      <input id="wAddr" type="text" placeholder="Account number or phone number" autocomplete="off" maxlength="100">
       <label>Amount</label>
       <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
       <button class="btn green" id="wBtn" style="margin-top:14px"></button>
@@ -268,6 +276,14 @@ nav button.active svg{stroke:#8ec5ff}
 
     <h2><span class="ib sm purple" id="hisIc"></span>Withdrawal history</h2>
     <div id="wHist"></div>
+
+    <div class="card" style="margin-top:6px">
+      <div class="line">
+        <span class="ib teal" id="supIc"></span>
+        <div class="x"><b>Need help?</b><span>For any question or promotion, contact admin.</span></div>
+      </div>
+      <button class="btn dark" id="supportBtn" style="margin-top:14px"></button>
+    </div>
 
     <button class="btn dark hidden" id="adminBtn" style="margin-top:16px"></button>
   </section>
@@ -280,6 +296,7 @@ nav button.active svg{stroke:#8ec5ff}
     </div>
     <div class="seg">
       <button id="segReq" class="on">Requests</button>
+      <button id="segTask">Tasks</button>
       <button id="segSet">Settings</button>
     </div>
 
@@ -290,6 +307,18 @@ nav button.active svg{stroke:#8ec5ff}
         <span class="chip" data-s="rejected">Rejected</span>
       </div>
       <div id="admList"></div>
+    </div>
+
+    <div id="admTask" class="hidden">
+      <div class="card">
+        <label style="margin-top:0">Task title</label><input id="t_title" type="text" maxlength="80" placeholder="Join our channel">
+        <label>Description (optional)</label><input id="t_desc" type="text" maxlength="200" placeholder="Short instruction">
+        <label>Link</label><input id="t_url" type="url" placeholder="https://t.me/yourchannel">
+        <label>Channel to verify (optional)</label><input id="t_chan" type="text" placeholder="@yourchannel (bot must be admin)">
+        <label>Reward (points)</label><input id="t_rew" type="number" step="any" min="0" placeholder="5">
+        <button class="btn green" id="addTask" style="margin-top:16px"></button>
+      </div>
+      <div id="admTaskList"></div>
     </div>
 
     <div id="admSet" class="hidden">
@@ -353,15 +382,16 @@ function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
 function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text + "</span>"; }
 
 /* static icon setup */
-[["vIcon","shield"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
- ["eIc","bolt"],["eAdIc","play"],["eInvIc","users"],["iIc","users"],["i1","users"],["i2","coin"],
+[["gIc","shield"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
+ ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i2","coin"],
  ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
 setBtn("checkBtn","refresh","Check membership");
 setBtn("hWithdraw","wallet","Withdraw");
 setBtn("hInvite","users","Invite");
 setBtn("hWatch","play","Watch ad &amp; earn");
 setBtn("eWatch","play","Watch ad &amp; earn");
-setBtn("eGoInvite","share","Get my invite link");
+setBtn("supportBtn","send","Contact admin");
+setBtn("addTask","check","Add task");
 setBtn("shareBtn","share","Share");
 setBtn("copyBtn","copy","Copy");
 setBtn("wBtn","send","Request withdrawal");
@@ -372,8 +402,9 @@ document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.t
 
 /* ---------------- state / helpers ---------------- */
 let ME = null, BOT_USERNAME = "", adController = null, watching = false;
-let wMethod = "USDT", admStatus = "pending", currentTab = "home";
-const METHODS = ["USDT", "TON", "Telebirr", "Other"];
+let wMethod = "CBE", admStatus = "pending", currentTab = "home";
+const METHODS = ["CBE", "Telebirr", "M-Pesa"];
+const SUPPORT_BOT = "Adewa_eran_support_bot";
 
 let toastTimer;
 function toast(msg, type) {
@@ -430,7 +461,6 @@ function render() {
   const adR = st.ad_reward ?? 1, invR = st.invite_reward ?? 1, max = st.max_ads_per_day ?? 100, minW = st.min_withdraw ?? 100;
   $("hAdSub").textContent = "+" + fmt(adR) + " points per ad";
   $("eAdSub").textContent = "+" + fmt(adR) + " points per ad";
-  $("eInvSub").textContent = "+" + fmt(invR) + " points per friend";
   $("iReward").textContent = fmt(invR);
   $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
   $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
@@ -444,18 +474,33 @@ function render() {
     setBtn("adminBtn", "shield", "Admin panel" + (ME.pending_withdrawals ? '<span class="notice">' + ME.pending_withdrawals + "</span>" : ""));
   }
 
-  // verification
-  const box = $("verify");
-  if (ME.allJoined) box.classList.add("hidden");
-  else {
-    box.classList.remove("hidden");
-    $("channelList").innerHTML = (ME.channels || []).map(c => {
-      const h = String(c.channel).replace(/^@/, "");
-      const href = h.startsWith("-") ? "#" : "https://t.me/" + esc(h);
-      return `<div class="line" style="margin-bottom:8px"><span class="dot" style="background:${c.joined ? "#22c55e" : "#ef4444"}"></span><a href="${href}" target="_blank" rel="noopener">${esc(c.channel)}</a></div>`;
-    }).join("");
-  }
+  applyGate();
 }
+
+function applyGate() {
+  const ok = !!(ME && ME.allJoined);
+  $("gate").classList.toggle("hidden", ok);
+  $("app").classList.toggle("hidden", !ok);
+  $("nav").classList.toggle("hidden", !ok);
+  if (ok) return;
+  $("channelList").innerHTML = (ME.channels || []).map((c, i) => {
+    const h = String(c.channel).replace(/^@/, "");
+    const hint = c.error ? "Bot must be admin in this channel" : (c.joined ? "Joined" : "Not joined yet");
+    return `<div class="card" style="padding:13px"><div class="line">
+      <span class="ib sm ${c.joined ? "green" : "purple"}">${svg(c.joined ? "check" : "send")}</span>
+      <div class="x"><b class="ellip">${esc(c.channel)}</b><span>${esc(hint)}</span></div>
+      ${c.joined ? statusBadge("approved") : `<button class="btn sm" data-j="${esc(h)}" style="width:auto;padding:10px 18px">Join</button>`}
+    </div></div>`;
+  }).join("");
+  $("channelList").querySelectorAll("button[data-j]").forEach(b => b.onclick = () => openLink("https://t.me/" + b.dataset.j));
+}
+
+function openLink(url) {
+  if (tg && /^https:\/\/t\.me\//i.test(url) && tg.openTelegramLink) tg.openTelegramLink(url);
+  else if (tg && tg.openLink) tg.openLink(url);
+  else window.open(url, "_blank");
+}
+$("supportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
 
 async function refreshMe() {
   const d = await api("/api/me");
@@ -515,7 +560,6 @@ $("copyBtn").onclick = async () => {
   catch (e) { toast("Copy failed.", "err"); }
 };
 $("hInvite").onclick = () => showTab("invite");
-$("eGoInvite").onclick = () => showTab("invite");
 $("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
 
 /* ---------------- withdraw ---------------- */
@@ -528,7 +572,7 @@ renderMethods();
 $("wBtn").onclick = async () => {
   const btn = $("wBtn"); btn.disabled = true;
   try {
-    await api("/api/withdraw", "POST", { amount: Number($("wAmt").value), method: wMethod, address: $("wAddr").value.trim() });
+    await api("/api/withdraw", "POST", { amount: Number($("wAmt").value), method: wMethod, accountName: $("wName").value.trim(), address: $("wAddr").value.trim() });
     $("wAmt").value = "";
     toast("Withdrawal requested. Waiting for approval.", "ok");
     await refreshMe(); loadHistory();
@@ -548,7 +592,7 @@ async function loadHistory() {
       const ic = w.status === "approved" ? ["check","green"] : w.status === "rejected" ? ["x","redg"] : ["clock","orange"];
       return `<div class="card" style="padding:13px"><div class="line">
         <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
-        <div class="x"><b>${fmt(w.amount)} · ${esc(w.method)}</b><span>${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</span></div>
+        <div class="x"><b>${fmt(w.amount)} · ${esc(w.method)}</b><span>${esc(w.account_name || "")} · ${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</span></div>
         ${statusBadge(w.status)}</div></div>`;
     }).join("") : '<div class="empty">No withdrawals yet.</div>';
   } catch (e) { $("wHist").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
@@ -557,12 +601,21 @@ async function loadHistory() {
 /* ---------------- admin ---------------- */
 $("adminBtn").onclick = () => { openAdmin(); };
 $("adminBack").onclick = () => showTab("profile");
-$("segReq").onclick = () => { $("segReq").classList.add("on"); $("segSet").classList.remove("on"); $("admReq").classList.remove("hidden"); $("admSet").classList.add("hidden"); loadAdmin(); };
-$("segSet").onclick = () => {
-  $("segSet").classList.add("on"); $("segReq").classList.remove("on"); $("admSet").classList.remove("hidden"); $("admReq").classList.add("hidden");
-  const s = ME.settings || {};
-  $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100; $("a_min").value = s.min_withdraw ?? 100;
-};
+function admSeg(name) {
+  [["segReq","admReq","req"],["segTask","admTask","task"],["segSet","admSet","set"]].forEach(a => {
+    $(a[0]).classList.toggle("on", a[2] === name);
+    $(a[1]).classList.toggle("hidden", a[2] !== name);
+  });
+  if (name === "req") loadAdmin();
+  if (name === "task") loadAdminTasks();
+  if (name === "set") {
+    const s = ME.settings || {};
+    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100; $("a_min").value = s.min_withdraw ?? 100;
+  }
+}
+$("segReq").onclick = () => admSeg("req");
+$("segTask").onclick = () => admSeg("task");
+$("segSet").onclick = () => admSeg("set");
 document.querySelectorAll("#admFilter .chip").forEach(c => c.onclick = () => {
   admStatus = c.dataset.s;
   document.querySelectorAll("#admFilter .chip").forEach(x => x.classList.toggle("on", x === c));
@@ -586,7 +639,7 @@ async function loadAdmin() {
           <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · ${fmtDate(w.created_at)}</span></div>
           ${statusBadge(w.status)}</div>
         <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.amount)} <span class="muted">${esc(w.method)}</span></div>
-        <div class="linkbox" style="margin:8px 0">${esc(w.address)}</div>
+        <div class="linkbox" style="margin:8px 0"><span class="muted">Owner</span><br><b>${esc(w.account_name || "-")}</b><br><span class="muted" style="display:block;margin-top:8px">Account</span><b>${esc(w.address)}</b></div>
         ${w.admin_note ? `<div class="muted" style="margin-bottom:8px">Note: ${esc(w.admin_note)}</div>` : ""}
         ${w.status === "pending" ? `<div class="row2" style="margin-top:8px">
           <button class="btn green sm" data-a="approve" data-id="${esc(w.id)}">${svg("check")}<span>Accept</span></button>
@@ -632,6 +685,75 @@ $("saveSettings").onclick = async () => {
   } catch (e) { toast(e.message, "err"); }
 };
 
+/* ---------------- tasks ---------------- */
+const taskState = {};   // id -> "started"
+
+async function loadTasks() {
+  try {
+    const d = await api("/api/tasks");
+    $("taskList").innerHTML = d.tasks.length ? d.tasks.map(t => {
+      const started = t.completed ? false : (t.started || taskState[t.id]);
+      let action;
+      if (t.completed) action = statusBadge("approved").replace("Approved", "Done");
+      else if (started) action = `<button class="btn green sm" data-claim="${esc(t.id)}" style="width:auto;padding:10px 18px">Claim</button>`;
+      else action = `<button class="btn sm" data-start="${esc(t.id)}" style="width:auto;padding:10px 18px">Start</button>`;
+      return `<div class="card ${t.completed ? "task-done" : ""}"><div class="line">
+        <span class="ib ${t.completed ? "green" : "orange"}">${svg(t.completed ? "check" : "star")}</span>
+        <div class="x"><b>${esc(t.title)}</b><span>${esc(t.description || "")}</span><span style="display:block;color:#fbbf24;font-weight:700">+${fmt(t.reward)} points</span></div>
+        ${action}</div></div>`;
+    }).join("") : '<div class="empty">No tasks right now. Check back soon.</div>';
+
+    $("taskList").querySelectorAll("button[data-start]").forEach(b => b.onclick = async () => {
+      const id = b.dataset.start, t = d.tasks.find(x => String(x.id) === id);
+      b.disabled = true;
+      try {
+        await api("/api/tasks/" + encodeURIComponent(id) + "/start", "POST");
+        taskState[id] = "started";
+        openLink(t.url);
+        loadTasks();
+      } catch (e) { toast(e.message, "err"); b.disabled = false; }
+    });
+    $("taskList").querySelectorAll("button[data-claim]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const r = await api("/api/tasks/" + encodeURIComponent(b.dataset.claim) + "/claim", "POST");
+        toast("+" + fmt(r.reward) + " points", "ok");
+        await refreshMe(); loadTasks();
+      } catch (e) { toast(e.message, "err"); b.disabled = false; }
+    });
+  } catch (e) { $("taskList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
+
+async function loadAdminTasks() {
+  $("admTaskList").innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const d = await api("/api/admin/tasks");
+    $("admTaskList").innerHTML = d.tasks.length ? d.tasks.map(t => `<div class="card"><div class="line">
+      <span class="ib sm orange">${svg("star")}</span>
+      <div class="x"><b class="ellip">${esc(t.title)}</b><span>+${fmt(t.reward)} · ${t.completions} done${t.channel ? " · " + esc(t.channel) : ""}</span></div>
+      <button class="btn red sm" data-del="${esc(t.id)}" style="width:auto;padding:9px 14px">Delete</button></div></div>`).join("")
+      : '<div class="empty">No tasks yet.</div>';
+    $("admTaskList").querySelectorAll("button[data-del]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { await api("/api/admin/tasks/" + encodeURIComponent(b.dataset.del) + "/delete", "POST"); toast("Task deleted.", "ok"); loadAdminTasks(); }
+      catch (e) { toast(e.message, "err"); b.disabled = false; }
+    });
+  } catch (e) { $("admTaskList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+}
+
+$("addTask").onclick = async () => {
+  $("addTask").disabled = true;
+  try {
+    await api("/api/admin/tasks", "POST", {
+      title: $("t_title").value.trim(), description: $("t_desc").value.trim(),
+      url: $("t_url").value.trim(), channel: $("t_chan").value.trim(), reward: Number($("t_rew").value)
+    });
+    ["t_title","t_desc","t_url","t_chan","t_rew"].forEach(i => $(i).value = "");
+    toast("Task added.", "ok"); loadAdminTasks();
+  } catch (e) { toast(e.message, "err"); }
+  $("addTask").disabled = false;
+};
+
 /* ---------------- tabs ---------------- */
 function showTab(name) {
   currentTab = name;
@@ -640,6 +762,7 @@ function showTab(name) {
   window.scrollTo(0, 0);
   if (name === "home") loadTop();
   if (name === "profile") loadHistory();
+  if (name === "earn") loadTasks();
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $("checkBtn").onclick = async () => {
@@ -660,8 +783,7 @@ async function init() {
     }
     await refreshMe();
     $("spName").textContent = nameOf(ME.user);
-    $("app").classList.remove("hidden");
-    $("nav").classList.remove("hidden");
+    applyGate();
     loadTop();
     const wait = Math.max(0, 2300 - (performance.now() - t0));
     setTimeout(() => { $("splash").classList.add("out"); setTimeout(() => $("splash").remove(), 700); }, wait);
