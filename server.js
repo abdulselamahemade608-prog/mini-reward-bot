@@ -13,7 +13,12 @@ app.use(express.json({ limit: "1mb" }));
 /* ============================ ENV ============================ */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
-const BOT_USERNAME = process.env.BOT_USERNAME || "";
+const BOT_USERNAME = String(process.env.BOT_USERNAME || "").replace(/^@/, "");
+const APP_URL = String(process.env.APP_URL || "https://mini-reward-bot.vercel.app").replace(/\/+$/, "");
+const WEBHOOK_SECRET = String(process.env.WEBHOOK_SECRET || "");
+const PROOF_CHANNEL = String(process.env.PROOF_CHANNEL || "").trim();
+const PROOF_MASK = String(process.env.PROOF_MASK || "true").toLowerCase() !== "false";
+const APP_BUTTON_TEXT = process.env.APP_BUTTON_TEXT || "Adewa Eran";
 const ADMIN_ID = String(process.env.ADMIN_ID || "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52614");
@@ -151,6 +156,8 @@ async function ensureDatabase() {
                     UNIQUE(task_id, telegram_id)
                 );
             `);
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS fee NUMERIC NOT NULL DEFAULT 0;`);
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS final_amount NUMERIC;`);
             await pool.query(`ALTER TABLE mr_users ADD COLUMN IF NOT EXISTS last_broadcast BIGINT NOT NULL DEFAULT 0;`);
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS mr_broadcasts (
@@ -191,7 +198,7 @@ async function ensureDatabase() {
             `);
             await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
-                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100'),('verify_ads','1'),('daily_withdraw_limit','0'),('milestone_5','5'),('milestone_10','15'),('milestone_25','50')
+                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100'),('verify_ads','1'),('daily_withdraw_limit','0'),('milestone_5','5'),('milestone_10','15'),('milestone_25','50'),('withdraw_fee_percent','25')
                 ON CONFLICT(key) DO NOTHING;
             `);
             await pool.query(`
@@ -379,7 +386,7 @@ async function createOrUpdateUser(tgUser, referralCode) {
     let referredBy = null;
     if (referralCode) {
         const inviter = await pool.query(
-            `SELECT telegram_id FROM mr_users WHERE referral_code = $1`,
+            `SELECT telegram_id FROM mr_users WHERE referral_code = $1 OR telegram_id::text = $1`,
             [referralCode]
         );
         if (inviter.rows.length) {
@@ -803,9 +810,9 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
         await requireDatabase();
 
         const { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads,
-                daily_withdraw_limit, milestone_5, milestone_10, milestone_25 } = req.body || {};
+                daily_withdraw_limit, milestone_5, milestone_10, milestone_25, withdraw_fee_percent } = req.body || {};
         const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads,
-            daily_withdraw_limit, milestone_5, milestone_10, milestone_25 };
+            daily_withdraw_limit, milestone_5, milestone_10, milestone_25, withdraw_fee_percent };
 
         for (const [key, value] of Object.entries(settings)) {
             if (value === undefined || value === null) continue;
@@ -928,6 +935,15 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             return res.status(403).json({ ok: false, error: "Join all required channels first." });
         }
 
+        const feeRes = await pool.query(
+            `SELECT value FROM mr_app_settings WHERE key = 'withdraw_fee_percent'`
+        );
+        let feePct = Number(feeRes.rows[0]?.value);
+        if (!Number.isFinite(feePct)) feePct = 25;
+        feePct = Math.min(Math.max(feePct, 0), 90);
+        const fee = Math.round(amount * feePct) / 100;
+        const finalAmount = Math.round((amount - fee) * 100) / 100;
+
         const client = await pool.connect();
         try {
             await client.query("BEGIN");
@@ -963,8 +979,9 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
                 [telegramId, amount]
             );
             await client.query(
-                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address, account_name) VALUES($1,$2,$3,$4,$5)`,
-                [telegramId, amount, method, address, accountName]
+                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address, account_name, fee, final_amount)
+                 VALUES($1,$2,$3,$4,$5,$6,$7)`,
+                [telegramId, amount, method, address, accountName, fee, finalAmount]
             );
 
             await client.query("COMMIT");
@@ -990,13 +1007,13 @@ app.get("/api/withdrawals", authenticate, async (req, res) => {
     try {
         await requireDatabase();
         const r = await pool.query(
-            `SELECT id, amount, method, address, account_name, status, admin_note, created_at, processed_at
+            `SELECT id, amount, fee, COALESCE(final_amount, amount) AS final_amount, method, address, account_name, status, admin_note, created_at, processed_at
              FROM mr_withdrawals WHERE telegram_id = $1 ORDER BY id DESC LIMIT 30`,
             [String(req.telegramUser.id)]
         );
         res.json({
             ok: true,
-            withdrawals: r.rows.map(w => ({ ...w, amount: Number(w.amount) }))
+            withdrawals: r.rows.map(w => ({ ...w, amount: Number(w.amount), fee: Number(w.fee), final_amount: Number(w.final_amount) }))
         });
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
@@ -1014,7 +1031,7 @@ app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) =
             params.push(status);
         }
         const r = await pool.query(
-            `SELECT w.id, w.telegram_id, w.amount, w.method, w.address, w.account_name, w.status,
+            `SELECT w.id, w.telegram_id, w.amount, w.fee, COALESCE(w.final_amount, w.amount) AS final_amount, w.method, w.address, w.account_name, w.status,
                     w.admin_note, w.created_at, w.processed_at,
                     u.username, u.first_name, u.last_name
              FROM mr_withdrawals w
@@ -1025,7 +1042,7 @@ app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) =
         );
         res.json({
             ok: true,
-            withdrawals: r.rows.map(w => ({ ...w, amount: Number(w.amount) }))
+            withdrawals: r.rows.map(w => ({ ...w, amount: Number(w.amount), fee: Number(w.fee), final_amount: Number(w.final_amount) }))
         });
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
@@ -1095,7 +1112,9 @@ app.post("/api/admin/withdrawals/:id", authenticate, requireAdmin, async (req, r
 
         const amt = Number(w.amount);
         if (action === "approve") {
-            await notifyUser(w.telegram_id, `Your withdrawal of ${amt} has been approved.`);
+            const fin = Number(w.final_amount ?? w.amount);
+            await notifyUser(w.telegram_id, `Your withdrawal has been approved and paid. Final amount: ${fin.toFixed(2)}`);
+            await postProof(w);
         } else {
             await notifyUser(
                 w.telegram_id,
@@ -1432,6 +1451,136 @@ app.post("/api/admin/broadcast/:id/continue", authenticate, requireAdmin, async 
         res.json({ ok: true, id: String(b.rows[0].id), ...out });
     } catch (error) {
         console.error("/api/admin/broadcast/continue", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ======================= PROOF CHANNEL POST ======================= */
+
+function maskNumber(v) {
+    const t = String(v);
+    if (!PROOF_MASK || t.length < 8) return t;
+    return t.slice(0, 3) + "*".repeat(t.length - 6) + t.slice(-3);
+}
+
+async function postProof(w) {
+    if (!PROOF_CHANNEL) return;
+    try {
+        const amt = Number(w.amount);
+        const fee = Number(w.fee || 0);
+        const fin = Number(w.final_amount ?? amt - fee);
+        const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
+        const label = w.method === "CBE" ? "CBE Account" : `${w.method} Number`;
+
+        const text =
+            "\u{1F4B8} New Withdrawal Request\n\n" +
+            `\u{1F4B8} User ID: ${w.telegram_id}\n` +
+            `\u{1F4B8} ${label}: ${maskNumber(w.address)}\n` +
+            `\u{1F4B8} Requested Amount: ${amt.toFixed(2)} Birr\n` +
+            `\u{1F4B3} ${pct}% Service Fee: ${fee.toFixed(2)} Birr\n` +
+            `\u{1F4B3} Final Amount: ${fin.toFixed(2)} Birr\n\n` +
+            "\u{1F4B8} Status: Paid";
+
+        await telegram("sendMessage", { chat_id: PROOF_CHANNEL, text });
+    } catch (e) {
+        console.error("postProof", e.message); // bot must be admin of the proof channel
+    }
+}
+
+/* ========================== BOT WEBHOOK ========================== */
+
+async function registerFromStart(from, payload) {
+    const id = String(from.id);
+
+    const ex = await pool.query(`SELECT 1 FROM mr_users WHERE telegram_id = $1`, [id]);
+    if (ex.rows.length) return; // existing users can not be referred
+
+    let referredBy = null;
+    if (/^\d{4,15}$/.test(payload) && payload !== id) {
+        const inv = await pool.query(`SELECT telegram_id FROM mr_users WHERE telegram_id = $1`, [payload]);
+        if (inv.rows.length) referredBy = String(inv.rows[0].telegram_id);
+    } else if (payload.startsWith("ref_")) {
+        const inv = await pool.query(
+            `SELECT telegram_id FROM mr_users WHERE referral_code = $1`,
+            [payload.slice(4)]
+        );
+        if (inv.rows.length && String(inv.rows[0].telegram_id) !== id) {
+            referredBy = String(inv.rows[0].telegram_id);
+        }
+    }
+
+    await pool.query(
+        `INSERT INTO mr_users(telegram_id, username, first_name, last_name, referral_code, referred_by)
+         VALUES($1,$2,$3,$4,$5,$6)
+         ON CONFLICT(telegram_id) DO NOTHING`,
+        [
+            id,
+            from.username || null,
+            from.first_name || null,
+            from.last_name || null,
+            crypto.randomBytes(8).toString("hex"),
+            referredBy
+        ]
+    );
+}
+
+app.post("/api/telegram-webhook", async (req, res) => {
+    if (!WEBHOOK_SECRET) return res.status(503).json({ ok: false });
+    if (req.headers["x-telegram-bot-api-secret-token"] !== WEBHOOK_SECRET) {
+        return res.status(403).json({ ok: false });
+    }
+
+    try {
+        const msg = req.body?.message;
+        if (
+            msg && msg.chat?.type === "private" && msg.from && !msg.from.is_bot &&
+            typeof msg.text === "string" && /^\/start(@\w+)?(\s|$)/.test(msg.text)
+        ) {
+            const payload = (msg.text.split(/\s+/)[1] || "").trim();
+
+            await requireDatabase();
+            await registerFromStart(msg.from, payload);
+
+            const name = msg.from.first_name || "friend";
+            await telegram("sendMessage", {
+                chat_id: msg.chat.id,
+                text:
+                    `Welcome, ${name}!\n\n` +
+                    "Earn rewards by watching ads, completing tasks and inviting friends.\n\n" +
+                    "Tap the button below to open the app.",
+                reply_markup: {
+                    inline_keyboard: [[{ text: APP_BUTTON_TEXT, web_app: { url: APP_URL } }]]
+                }
+            });
+        }
+    } catch (error) {
+        console.error("telegram-webhook", error.message);
+    }
+
+    res.json({ ok: true }); // always 200 so Telegram does not retry forever
+});
+
+// open once in the browser after deploy:  /api/setup-webhook?key=YOUR_WEBHOOK_SECRET
+app.get("/api/setup-webhook", async (req, res) => {
+    try {
+        if (!WEBHOOK_SECRET) {
+            return res.status(503).json({ ok: false, error: "Set the WEBHOOK_SECRET environment variable first." });
+        }
+        if (req.query.key !== WEBHOOK_SECRET) {
+            return res.status(403).json({ ok: false, error: "Wrong key." });
+        }
+        const url = APP_URL + "/api/telegram-webhook";
+        await telegram("setWebhook", {
+            url,
+            secret_token: WEBHOOK_SECRET,
+            allowed_updates: ["message"],
+            drop_pending_updates: true
+        });
+        await telegram("setChatMenuButton", {
+            menu_button: { type: "web_app", text: APP_BUTTON_TEXT, web_app: { url: APP_URL } }
+        });
+        res.json({ ok: true, webhook: url });
+    } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
 });
