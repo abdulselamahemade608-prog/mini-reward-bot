@@ -6,8 +6,8 @@
 <meta charset="UTF-8">
 
 <meta
-name="viewport"
-content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
 >
 
 <title>Reward Mini App</title>
@@ -18,145 +18,506 @@ content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
 
 <style>
 
-*{
-    box-sizing:border-box;
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#f5f7fb;
-    color:#172033;
+body {
+    margin: 0;
+    font-family:
+        Inter,
+        Arial,
+        sans-serif;
+
+    background:
+        #f4f7fb;
+
+    color:
+        #172033;
 }
 
-.app{
-    max-width:600px;
-    margin:auto;
-    min-height:100vh;
-    padding-bottom:90px;
+button {
+    font-family: inherit;
 }
 
-header{
-    padding:20px;
+.app {
+    max-width: 520px;
+    margin: auto;
+    min-height: 100vh;
+    padding: 16px;
+    padding-bottom: 100px;
 }
 
-.balance{
-    background:#111827;
-    color:white;
-    border-radius:24px;
-    padding:22px;
-    margin-bottom:18px;
+.hidden {
+    display: none !important;
 }
 
-.balance small{
-    opacity:.7;
+
+/* LOADING */
+
+.loading {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
-.balance h1{
-    margin:8px 0 0;
+.spinner {
+    width: 42px;
+    height: 42px;
+    border: 4px solid #dce3ef;
+    border-top-color: #1877f2;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
 }
 
-.card{
-    background:white;
-    border-radius:20px;
-    padding:18px;
-    margin:12px 16px;
-    box-shadow:0 4px 20px rgba(0,0,0,.05);
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-.profile{
-    display:flex;
-    align-items:center;
-    gap:12px;
+
+/* HEADER */
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 18px;
 }
 
-.avatar{
-    width:55px;
-    height:55px;
-    border-radius:50%;
-    object-fit:cover;
-    background:#ddd;
+.user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-button{
-    width:100%;
-    border:0;
-    padding:15px;
-    border-radius:14px;
-    font-size:16px;
-    font-weight:bold;
-    margin-top:12px;
+.avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #dce3ef;
 }
 
-.primary{
-    background:#2481cc;
-    color:white;
+.user-name {
+    font-weight: 800;
+    font-size: 16px;
 }
 
-.secondary{
-    background:#edf3f8;
-    color:#172033;
+.user-id {
+    font-size: 12px;
+    color: #7d8798;
 }
 
-.hidden{
-    display:none;
+
+/* BALANCE */
+
+.balance {
+    background:
+        linear-gradient(
+            135deg,
+            #1769e0,
+            #3c8df7
+        );
+
+    color: white;
+
+    border-radius: 24px;
+
+    padding: 22px;
+
+    margin-bottom: 16px;
+
+    box-shadow:
+        0 12px 30px
+        rgba(24,105,224,.18);
 }
 
-.nav{
-    position:fixed;
-    bottom:0;
-    left:0;
-    right:0;
-    max-width:600px;
-    margin:auto;
-    background:white;
-    display:flex;
-    justify-content:space-around;
-    padding:10px;
-    box-shadow:0 -4px 20px rgba(0,0,0,.08);
+.balance-label {
+    opacity: .85;
+    font-size: 13px;
 }
 
-.nav button{
-    background:none;
-    margin:0;
-    padding:8px;
-    font-size:12px;
+.balance-value {
+    font-size: 34px;
+    font-weight: 900;
+    margin-top: 4px;
 }
 
-.leader{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:10px 0;
-    border-bottom:1px solid #eee;
+
+/* CARDS */
+
+.grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 12px;
+
+    margin-bottom: 18px;
 }
 
-.leader img{
-    width:40px;
-    height:40px;
-    border-radius:50%;
+.card {
+    background: white;
+
+    border-radius: 20px;
+
+    padding: 18px;
+
+    box-shadow:
+        0 5px 18px
+        rgba(22,34,55,.06);
 }
 
-.rank{
-    width:30px;
-    font-weight:bold;
+.card-icon {
+    font-size: 25px;
 }
 
-.stat-grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
+.card-title {
+    font-weight: 800;
+    margin-top: 10px;
 }
 
-.stat{
-    background:#f5f7fb;
-    border-radius:14px;
-    padding:15px;
+.card-value {
+    color: #6c7789;
+    font-size: 13px;
+    margin-top: 4px;
 }
 
-.stat b{
-    display:block;
-    font-size:22px;
+
+/* ACTION */
+
+.action {
+    border: 0;
+
+    width: 100%;
+
+    background:
+        #1877f2;
+
+    color: white;
+
+    padding: 15px;
+
+    border-radius: 16px;
+
+    font-size: 16px;
+
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+.action:disabled {
+    opacity: .55;
+}
+
+
+/* SECTIONS */
+
+.section {
+    margin-top: 18px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 900;
+    margin-bottom: 10px;
+}
+
+
+/* LEADERBOARD */
+
+.leader {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    background: white;
+
+    padding: 12px;
+
+    border-radius: 16px;
+
+    margin-bottom: 8px;
+}
+
+.rank {
+    width: 30px;
+    font-weight: 900;
+    text-align: center;
+}
+
+.leader-avatar {
+    width: 40px;
+    height: 40px;
+
+    border-radius: 50%;
+
+    object-fit: cover;
+
+    background: #e6ebf3;
+}
+
+.leader-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.leader-name {
+    font-weight: 800;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+.leader-stats {
+    color: #8993a4;
+    font-size: 11px;
+}
+
+.points {
+    font-weight: 900;
+}
+
+
+/* CHANNELS */
+
+.channel {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    background: white;
+
+    border-radius: 16px;
+
+    padding: 13px;
+
+    margin-bottom: 8px;
+}
+
+.channel-name {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.channel-status {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.join-btn {
+    border: 0;
+
+    background: #1877f2;
+
+    color: white;
+
+    padding: 10px 14px;
+
+    border-radius: 12px;
+
+    font-weight: 800;
+}
+
+
+/* NAV */
+
+.nav {
+    position: fixed;
+
+    left: 50%;
+
+    bottom: 12px;
+
+    transform: translateX(-50%);
+
+    width:
+        min(
+            calc(100% - 24px),
+            500px
+        );
+
+    background: rgba(
+        255,
+        255,
+        255,
+        .96
+    );
+
+    backdrop-filter:
+        blur(14px);
+
+    border-radius: 22px;
+
+    padding: 8px;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 4px;
+
+    box-shadow:
+        0 8px 30px
+        rgba(0,0,0,.12);
+
+    z-index: 100;
+}
+
+.nav button {
+    border: 0;
+
+    background: transparent;
+
+    padding: 9px 3px;
+
+    border-radius: 15px;
+
+    color: #7a8495;
+
+    font-size: 11px;
+
+    font-weight: 800;
+}
+
+.nav button.active {
+    background: #e9f2ff;
+    color: #1877f2;
+}
+
+
+/* MODAL */
+
+.modal {
+    position: fixed;
+
+    inset: 0;
+
+    background:
+        rgba(0,0,0,.42);
+
+    display: flex;
+
+    align-items: flex-end;
+
+    justify-content: center;
+
+    z-index: 200;
+}
+
+.modal-box {
+    width:
+        min(
+            100%,
+            520px
+        );
+
+    background: white;
+
+    border-radius:
+        25px
+        25px
+        0
+        0;
+
+    padding: 22px;
+
+    max-height: 85vh;
+
+    overflow-y: auto;
+}
+
+.modal-title {
+    font-size: 21px;
+    font-weight: 900;
+
+    margin-bottom: 14px;
+}
+
+.close {
+    border: 0;
+
+    width: 100%;
+
+    padding: 13px;
+
+    border-radius: 14px;
+
+    margin-top: 12px;
+
+    font-weight: 800;
+
+    background: #edf1f6;
+}
+
+
+/* PROFILE */
+
+.profile-head {
+    text-align: center;
+
+    background: white;
+
+    padding: 25px;
+
+    border-radius: 22px;
+}
+
+.profile-avatar {
+    width: 88px;
+    height: 88px;
+
+    border-radius: 50%;
+
+    object-fit: cover;
+
+    background: #e4eaf3;
+}
+
+.profile-name {
+    font-size: 21px;
+    font-weight: 900;
+
+    margin-top: 10px;
+}
+
+.profile-id {
+    color: #818b9c;
+    font-size: 12px;
+}
+
+
+/* MESSAGE */
+
+.message {
+    padding: 13px;
+
+    border-radius: 14px;
+
+    background: #fff4d7;
+
+    color: #775600;
+
+    font-size: 13px;
+
+    margin-bottom: 12px;
 }
 
 </style>
@@ -166,499 +527,1795 @@ button{
 
 <body>
 
-<div class="app">
+<div id="loading" class="loading">
 
-<header>
+    <div>
 
-<div class="balance">
+        <div class="spinner"></div>
 
-<small>Your Points</small>
+        <p>
+            Connecting to Telegram...
+        </p>
 
-<h1 id="points">0</h1>
+    </div>
 
 </div>
 
-<div class="card profile">
 
-<img
-id="avatar"
-class="avatar"
-src=""
+<div
+    id="app"
+    class="app hidden"
 >
 
-<div>
+    <div
+        id="message"
+        class="message hidden"
+    ></div>
 
-<strong id="name">Loading...</strong>
 
-<div id="username">@username</div>
+    <!-- HEADER -->
+
+    <div class="header">
+
+        <div class="user">
+
+            <img
+                id="headerAvatar"
+                class="avatar"
+                alt="Profile"
+            >
+
+            <div>
+
+                <div
+                    id="headerName"
+                    class="user-name"
+                >
+                    User
+                </div>
+
+                <div
+                    id="headerId"
+                    class="user-id"
+                >
+                    ID
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- VERIFICATION -->
+
+    <section
+        id="verification"
+        class="hidden"
+    >
+
+        <div class="card">
+
+            <div class="section-title">
+                🔒 Verification Required
+            </div>
+
+            <p>
+                Join all required channels
+                before using the Mini App.
+            </p>
+
+            <div id="channels"></div>
+
+            <button
+                id="checkChannels"
+                class="action"
+            >
+                🔄 Check Again
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- MAIN -->
+
+    <main id="mainContent">
+
+
+        <!-- HOME -->
+
+        <section
+            id="homePage"
+            class="page"
+        >
+
+            <div class="balance">
+
+                <div class="balance-label">
+                    Your Points
+                </div>
+
+                <div
+                    id="points"
+                    class="balance-value"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="grid">
+
+                <div class="card">
+
+                    <div class="card-icon">
+                        📺
+                    </div>
+
+                    <div class="card-title">
+                        Ads
+                    </div>
+
+                    <div
+                        id="adsCount"
+                        class="card-value"
+                    >
+                        0 watched
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-icon">
+                        👥
+                    </div>
+
+                    <div class="card-title">
+                        Invites
+                    </div>
+
+                    <div
+                        id="inviteCount"
+                        class="card-value"
+                    >
+                        0 invited
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-icon">
+                        🏆
+                    </div>
+
+                    <div class="card-title">
+                        Rank
+                    </div>
+
+                    <div
+                        id="rank"
+                        class="card-value"
+                    >
+                        #
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-icon">
+                        🎁
+                    </div>
+
+                    <div class="card-title">
+                        Rewards
+                    </div>
+
+                    <div
+                        id="rewardCount"
+                        class="card-value"
+                    >
+                        Top 30
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <button
+                id="watchAd"
+                class="action"
+            >
+                📺 Watch Ad & Earn
+            </button>
+
+
+            <div class="section">
+
+                <div class="section-title">
+                    🎁 Leaderboard Rewards
+                </div>
+
+                <div
+                    id="rewardList"
+                ></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- INVITE -->
+
+        <section
+            id="invitePage"
+            class="page hidden"
+        >
+
+            <div class="card">
+
+                <div class="section-title">
+                    👥 Invite Friends
+                </div>
+
+                <p>
+                    Invite friends using your
+                    personal referral link.
+                </p>
+
+                <div
+                    id="refLink"
+                    style="
+                        padding:13px;
+                        background:#f1f4f8;
+                        border-radius:14px;
+                        overflow-wrap:anywhere;
+                        font-size:13px;
+                    "
+                ></div>
+
+                <button
+                    id="shareInvite"
+                    class="action"
+                    style="margin-top:12px"
+                >
+                    📤 Share Invite
+                </button>
+
+            </div>
+
+
+            <div class="grid">
+
+                <div class="card">
+
+                    <div class="card-title">
+                        Invited
+                    </div>
+
+                    <div
+                        id="inviteTotal"
+                        class="balance-value"
+                        style="font-size:26px"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+                <div class="card">
+
+                    <div class="card-title">
+                        Reward Points
+                    </div>
+
+                    <div
+                        id="invitePoints"
+                        class="balance-value"
+                        style="font-size:26px"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- LEADERBOARD -->
+
+        <section
+            id="leaderPage"
+            class="page hidden"
+        >
+
+            <div class="section-title">
+                🏆 Top 30
+            </div>
+
+            <div
+                id="leaderboard"
+            ></div>
+
+        </section>
+
+
+        <!-- PROFILE -->
+
+        <section
+            id="profilePage"
+            class="page hidden"
+        >
+
+            <div class="profile-head">
+
+                <img
+                    id="profileAvatar"
+                    class="profile-avatar"
+                    alt="Profile"
+                >
+
+                <div
+                    id="profileName"
+                    class="profile-name"
+                >
+                    User
+                </div>
+
+                <div
+                    id="profileId"
+                    class="profile-id"
+                ></div>
+
+            </div>
+
+
+            <div class="grid" style="margin-top:12px">
+
+                <div class="card">
+
+                    <div class="card-title">
+                        📺 Ads
+                    </div>
+
+                    <div
+                        id="profileAds"
+                        class="card-value"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-title">
+                        👥 Invites
+                    </div>
+
+                    <div
+                        id="profileInvites"
+                        class="card-value"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-title">
+                        🏆 Rank
+                    </div>
+
+                    <div
+                        id="profileRank"
+                        class="card-value"
+                    >
+                        #
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-title">
+                        ⭐ Points
+                    </div>
+
+                    <div
+                        id="profilePoints"
+                        class="card-value"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ADMIN -->
+
+        <section
+            id="adminPage"
+            class="page hidden"
+        >
+
+            <div class="section-title">
+                👑 Admin
+            </div>
+
+            <div class="card">
+
+                <div class="card-title">
+                    Ad Reward
+                </div>
+
+                <input
+                    id="adminAdReward"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="1"
+                    style="
+                        width:100%;
+                        margin-top:10px;
+                        padding:13px;
+                        border:1px solid #dce2ea;
+                        border-radius:12px;
+                    "
+                >
+
+            </div>
+
+
+            <div class="card" style="margin-top:10px">
+
+                <div class="card-title">
+                    Invite Reward
+                </div>
+
+                <input
+                    id="adminInviteReward"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="1"
+                    style="
+                        width:100%;
+                        margin-top:10px;
+                        padding:13px;
+                        border:1px solid #dce2ea;
+                        border-radius:12px;
+                    "
+                >
+
+            </div>
+
+
+            <div class="card" style="margin-top:10px">
+
+                <div class="card-title">
+                    Daily Ad Limit
+                </div>
+
+                <input
+                    id="adminAdLimit"
+                    type="number"
+                    min="1"
+                    value="100"
+                    style="
+                        width:100%;
+                        margin-top:10px;
+                        padding:13px;
+                        border:1px solid #dce2ea;
+                        border-radius:12px;
+                    "
+                >
+
+            </div>
+
+
+            <button
+                id="saveAdmin"
+                class="action"
+                style="margin-top:12px"
+            >
+                💾 Save Settings
+            </button>
+
+
+            <div
+                class="section-title"
+                style="margin-top:25px"
+            >
+                🎁 Leaderboard Rewards
+            </div>
+
+
+            <div class="card">
+
+                <input
+                    id="rewardPosition"
+                    type="number"
+                    min="1"
+                    max="30"
+                    placeholder="Position"
+                    style="
+                        width:100%;
+                        padding:13px;
+                        margin-bottom:8px;
+                        border:1px solid #dce2ea;
+                        border-radius:12px;
+                    "
+                >
+
+                <input
+                    id="rewardTitle"
+                    type="text"
+                    placeholder="Reward title"
+                    style="
+                        width:100%;
+                        padding:13px;
+                        margin-bottom:8px;
+                        border:1px solid #dce2ea;
+                        border-radius:12px;
+                    "
+                >
+
+                <input
+                    id="rewardDescription"
+                    type="text"
+                    placeholder="Description"
+                    style="
+                        width:100%;
+                        padding:13px;
+                        border:1px solid #dce2ea;
+                        border-radius:12px;
+                    "
+                >
+
+                <button
+                    id="saveReward"
+                    class="action"
+                    style="margin-top:10px"
+                >
+                    Save Reward
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
 
 </div>
 
-</div>
 
-</header>
+<!-- NAVIGATION -->
 
-
-<section id="home">
-
-<div class="card">
-
-<h2>Watch Ads</h2>
-
-<p>
-Watch a rewarded advertisement and receive points.
-</p>
-
-<button
-class="primary"
-onclick="watchAd()"
+<nav
+    id="nav"
+    class="nav hidden"
 >
-▶ Watch Ad
-</button>
 
-</div>
+    <button
+        data-page="homePage"
+        class="active"
+    >
+        📺<br>
+        Ads
+    </button>
 
+    <button
+        data-page="invitePage"
+    >
+        👥<br>
+        Invite
+    </button>
 
-<div class="card">
+    <button
+        data-page="leaderPage"
+    >
+        🏆<br>
+        Leaderboard
+    </button>
 
-<h2>Invite Friends</h2>
+    <button
+        data-page="profilePage"
+    >
+        👤<br>
+        Profile
+    </button>
 
-<p>
-Invite friends and increase your ranking.
-</p>
+    <button
+        id="adminNav"
+        data-page="adminPage"
+        class="hidden"
+    >
+        👑<br>
+        Admin
+    </button>
 
-<button
-class="secondary"
-onclick="invite()"
->
-Invite Friends
-</button>
-
-</div>
-
-</section>
-
-
-<section
-id="leaderboard"
-class="hidden"
->
-
-<div class="card">
-
-<h2>🏆 Top 30</h2>
-
-<div id="leaders">
-Loading...
-</div>
-
-</div>
-
-</section>
-
-
-<section
-id="profilePage"
-class="hidden"
->
-
-<div class="card">
-
-<h2>Profile</h2>
-
-<div class="stat-grid">
-
-<div class="stat">
-
-<small>Ads</small>
-
-<b id="ads">0</b>
-
-</div>
-
-<div class="stat">
-
-<small>Invites</small>
-
-<b id="invites">0</b>
-
-</div>
-
-<div class="stat">
-
-<small>Rank</small>
-
-<b id="rank">-</b>
-
-</div>
-
-<div class="stat">
-
-<small>Points</small>
-
-<b id="profilePoints">0</b>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="card">
-
-<h3>📊 Weekly Activity</h3>
-
-<p>
-Your activity graph will appear here.
-</p>
-
-</div>
-
-</section>
-
-
-<div class="nav">
-
-<button onclick="showPage('home')">
-🏠<br>Ads
-</button>
-
-<button onclick="invite()">
-👥<br>Invite
-</button>
-
-<button onclick="showPage('leaderboard')">
-🏆<br>Top
-</button>
-
-<button onclick="showPage('profilePage')">
-👤<br>Profile
-</button>
-
-</div>
-
-</div>
+</nav>
 
 
 <script>
 
-const tg = window.Telegram.WebApp;
+/* =========================================================
+   TELEGRAM
+========================================================= */
 
-tg.ready();
+const tg =
+    window.Telegram?.WebApp;
 
-tg.expand();
+if (tg) {
+
+    tg.ready();
+
+    tg.expand();
+
+}
 
 
-const initData = tg.initData;
+/* =========================================================
+   STATE
+========================================================= */
+
+let currentUser = null;
+
+let AdController = null;
+
+let adInProgress = false;
 
 
-/* =========================================
+/* =========================================================
+   ELEMENTS
+========================================================= */
+
+const $ = id =>
+    document.getElementById(id);
+
+
+/* =========================================================
    API
-========================================= */
+========================================================= */
 
-async function api(path, options = {}) {
+async function api(
+    endpoint,
+    options = {}
+) {
 
-    options.headers = {
+    const headers = {
+        "Content-Type":
+            "application/json",
 
-        ...(options.headers || {}),
-
-        "Content-Type":"application/json",
-
-        "x-telegram-init-data":initData
-
+        "X-Telegram-Init-Data":
+            tg?.initData || ""
     };
 
     const response =
-        await fetch(path, options);
-
-    return response.json();
-}
-
-
-/* =========================================
-   LOAD USER
-========================================= */
-
-async function loadUser(){
+        await fetch(
+            endpoint,
+            {
+                ...options,
+                headers: {
+                    ...headers,
+                    ...(options.headers || {})
+                }
+            }
+        );
 
     const data =
-        await api("/api/me");
+        await response.json();
 
-    if(!data.ok){
+    if (!response.ok) {
 
-        alert(data.error);
-
-        return;
-    }
-
-    const u = data.user;
-
-    document.getElementById("name")
-        .textContent =
-        u.first_name || "User";
-
-    document.getElementById("username")
-        .textContent =
-        u.username
-        ? "@" + u.username
-        : "No username";
-
-    document.getElementById("points")
-        .textContent =
-        u.points;
-
-    if(u.photo_url){
-
-        document.getElementById("avatar")
-            .src = u.photo_url;
-    }
-}
-
-
-/* =========================================
-   ADSGRAM
-========================================= */
-
-const AdController =
-    window.Adsgram.init({
-
-        blockId:
-            "YOUR_ADSGRAM_BLOCK_ID"
-
-    });
-
-
-async function watchAd(){
-
-    try{
-
-        const result =
-            await AdController.show();
-
-        if(!result.done){
-
-            return;
-        }
-
-        const rewardToken =
-            crypto.randomUUID();
-
-        const reward =
-            await api(
-                "/api/ad-reward",
-                {
-                    method:"POST",
-
-                    body:JSON.stringify({
-                        rewardToken
-                    })
-                }
-            );
-
-        if(reward.ok){
-
-            alert(
-                "+" +
-                reward.reward +
-                " points"
-            );
-
-            loadUser();
-        }
-
-    }catch(error){
-
-        console.log(error);
-
-        alert(
-            "No advertisement available."
+        throw new Error(
+            data.error ||
+            "Request failed"
         );
+
     }
+
+    return data;
+
 }
 
 
-/* =========================================
-   INVITE
-========================================= */
+/* =========================================================
+   MESSAGE
+========================================================= */
 
-function invite(){
+function showMessage(text) {
 
-    const username =
+    $("message").textContent =
+        text;
+
+    $("message")
+        .classList
+        .remove("hidden");
+
+}
+
+
+function hideMessage() {
+
+    $("message")
+        .classList
+        .add("hidden");
+
+}
+
+
+/* =========================================================
+   AVATAR
+========================================================= */
+
+function setImage(
+    element,
+    url
+) {
+
+    if (url) {
+
+        element.src = url;
+
+    } else {
+
+        element.src =
+            "https://via.placeholder.com/100";
+
+    }
+
+}
+
+
+/* =========================================================
+   INIT
+========================================================= */
+
+async function init() {
+
+    try {
+
+        if (!tg?.initData) {
+
+            throw new Error(
+                "Open this Mini App from Telegram."
+            );
+
+        }
+
+        const ref =
+            new URLSearchParams(
+                window.location.search
+            ).get("ref");
+
+        const query =
+            ref
+                ? `?ref=${encodeURIComponent(ref)}`
+                : "";
+
+        const data =
+            await api(
+                `/api/me${query}`
+            );
+
+        currentUser =
+            data.user;
+
+        renderUser();
+
+        setupAds(
+            data.adsgram.blockId
+        );
+
+        if (!data.allJoined) {
+
+            showVerification(
+                data.channels
+            );
+
+        } else {
+
+            showMain();
+
+            loadRewards();
+
+        }
+
+        $("loading")
+            .classList
+            .add("hidden");
+
+        $("app")
+            .classList
+            .remove("hidden");
+
+    } catch (error) {
+
+        $("loading").innerHTML = `
+            <div>
+                <h3>Unable to open app</h3>
+                <p>${escapeHtml(
+                    error.message
+                )}</p>
+            </div>
+        `;
+
+    }
+
+}
+
+
+/* =========================================================
+   RENDER USER
+========================================================= */
+
+function renderUser() {
+
+    const u =
+        currentUser;
+
+    $("headerName").textContent =
+        u.first_name ||
+        u.username ||
+        "User";
+
+    $("headerId").textContent =
+        `ID: ${u.telegram_id}`;
+
+    $("points").textContent =
+        formatNumber(u.points);
+
+    $("adsCount").textContent =
+        `${u.total_ads} watched`;
+
+    $("inviteCount").textContent =
+        `${u.total_invites} invited`;
+
+    $("rank").textContent =
+        `#${u.rank}`;
+
+    $("inviteTotal").textContent =
+        u.total_invites;
+
+    $("invitePoints").textContent =
+        formatNumber(u.points);
+
+    $("profileName").textContent =
+        u.first_name ||
+        u.username ||
+        "User";
+
+    $("profileId").textContent =
+        `Telegram ID: ${u.telegram_id}`;
+
+    $("profileAds").textContent =
+        u.total_ads;
+
+    $("profileInvites").textContent =
+        u.total_invites;
+
+    $("profileRank").textContent =
+        `#${u.rank}`;
+
+    $("profilePoints").textContent =
+        formatNumber(u.points);
+
+    setImage(
+        $("headerAvatar"),
+        u.photo_url
+    );
+
+    setImage(
+        $("profileAvatar"),
+        u.photo_url
+    );
+
+
+    const botUsername =
+        window.BOT_USERNAME ||
         "YOUR_BOT_USERNAME";
 
-    const user =
-        tg.initDataUnsafe?.user;
-
-    if(!user){
-
-        return;
-    }
+    const code =
+        u.referral_code;
 
     const link =
-        `https://t.me/${username}?start=ref_${user.id}`;
+        `https://t.me/${botUsername}?start=ref_${code}`;
 
-    const text =
-        encodeURIComponent(
-            "Join this Mini App and compete with me!"
-        );
+    $("refLink").textContent =
+        link;
 
-    tg.openTelegramLink(
-        `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`
-    );
+
+    if (u.is_admin) {
+
+        $("adminNav")
+            .classList
+            .remove("hidden");
+
+    }
+
 }
 
 
-/* =========================================
-   LEADERBOARD
-========================================= */
+/* =========================================================
+   VERIFICATION
+========================================================= */
 
-async function loadLeaderboard(){
+function showVerification(
+    channels
+) {
 
-    const data =
-        await api(
-            "/api/leaderboard"
-        );
+    $("mainContent")
+        .classList
+        .add("hidden");
 
-    if(!data.ok){
+    $("nav")
+        .classList
+        .add("hidden");
 
-        return;
-    }
+    $("verification")
+        .classList
+        .remove("hidden");
 
-    const container =
-        document.getElementById("leaders");
+    renderChannels(channels);
 
-    container.innerHTML = "";
+}
 
-    data.users.forEach(user => {
+
+function renderChannels(
+    channels
+) {
+
+    $("channels").innerHTML = "";
+
+    for (
+        const channel
+        of channels
+    ) {
 
         const row =
             document.createElement("div");
 
         row.className =
-            "leader";
+            "channel";
 
-        row.innerHTML = `
+        const name =
+            document.createElement("div");
 
-            <div class="rank">
-                ${user.rank}
-            </div>
+        name.className =
+            "channel-name";
 
-            <img
-                src="${user.photo_url || ""}"
-            >
+        name.textContent =
+            channel.channel;
 
-            <div style="flex:1">
+        const right =
+            document.createElement("div");
 
-                <strong>
-                    ${user.first_name || "User"}
-                </strong>
+        if (channel.joined) {
 
-                <div>
-                    ${user.username
-                        ? "@" + user.username
-                        : ""}
-                </div>
+            const status =
+                document.createElement("span");
 
-            </div>
+            status.className =
+                "channel-status";
 
-            <div>
+            status.textContent =
+                "✅ Joined";
 
-                <b>${user.ads_count}</b>
-                <small> ads</small>
+            right.appendChild(status);
 
-                <br>
+        } else {
 
-                <b>${user.invite_count}</b>
-                <small> invites</small>
+            const button =
+                document.createElement("button");
 
-            </div>
+            button.className =
+                "join-btn";
 
-        `;
+            button.textContent =
+                "JOIN";
 
-        container.appendChild(row);
+            button.addEventListener(
+                "click",
+                () => {
 
-    });
-}
+                    const username =
+                        channel.channel
+                            .replace("@", "");
 
+                    if (tg) {
 
-/* =========================================
-   PROFILE
-========================================= */
+                        tg.openTelegramLink(
+                            `https://t.me/${username}`
+                        );
 
-async function loadProfile(){
+                    }
 
-    const data =
-        await api("/api/profile");
+                }
+            );
 
-    if(!data.ok){
+            right.appendChild(button);
 
-        return;
-    }
+        }
 
-    const u = data.user;
+        row.appendChild(name);
 
-    document.getElementById("ads")
-        .textContent =
-        u.total_ads;
+        row.appendChild(right);
 
-    document.getElementById("invites")
-        .textContent =
-        u.total_invites;
-
-    document.getElementById("rank")
-        .textContent =
-        data.rank || "-";
-
-    document.getElementById("profilePoints")
-        .textContent =
-        u.points;
-}
-
-
-/* =========================================
-   PAGE SWITCH
-========================================= */
-
-function showPage(page){
-
-    document
-        .getElementById("home")
-        .classList.add("hidden");
-
-    document
-        .getElementById("leaderboard")
-        .classList.add("hidden");
-
-    document
-        .getElementById("profilePage")
-        .classList.add("hidden");
-
-    document
-        .getElementById(page)
-        .classList.remove("hidden");
-
-    if(page === "leaderboard"){
-
-        loadLeaderboard();
+        $("channels")
+            .appendChild(row);
 
     }
 
-    if(page === "profilePage"){
-
-        loadProfile();
-
-    }
 }
 
 
-/* =========================================
+/* =========================================================
+   RECHECK CHANNELS
+========================================================= */
+
+$("checkChannels")
+    .addEventListener(
+        "click",
+        async () => {
+
+            try {
+
+                $("checkChannels")
+                    .disabled = true;
+
+                const data =
+                    await api(
+                        "/api/channels"
+                    );
+
+                renderChannels(
+                    data.channels
+                );
+
+                if (data.allJoined) {
+
+                    const me =
+                        await api("/api/me");
+
+                    currentUser =
+                        me.user;
+
+                    renderUser();
+
+                    showMain();
+
+                    loadRewards();
+
+                }
+
+            } catch (error) {
+
+                showMessage(
+                    error.message
+                );
+
+            } finally {
+
+                $("checkChannels")
+                    .disabled = false;
+
+            }
+
+        }
+    );
+
+
+/* =========================================================
+   SHOW MAIN
+========================================================= */
+
+function showMain() {
+
+    $("verification")
+        .classList
+        .add("hidden");
+
+    $("mainContent")
+        .classList
+        .remove("hidden");
+
+    $("nav")
+        .classList
+        .remove("hidden");
+
+}
+
+
+/* =========================================================
+   ADSGRAM
+========================================================= */
+
+function setupAds(
+    blockId
+) {
+
+    try {
+
+        if (!window.Adsgram) {
+
+            console.error(
+                "AdsGram SDK not loaded"
+            );
+
+            return;
+
+        }
+
+        AdController =
+            window.Adsgram.init({
+                blockId: String(
+                    blockId || "52614"
+                )
+            });
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   WATCH AD
+========================================================= */
+
+$("watchAd")
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (adInProgress) {
+                return;
+            }
+
+            if (!currentUser?.is_verified) {
+
+                showMessage(
+                    "Join all required channels first."
+                );
+
+                return;
+
+            }
+
+            if (!AdController) {
+
+                showMessage(
+                    "Ads are not ready yet."
+                );
+
+                return;
+
+            }
+
+            adInProgress = true;
+
+            $("watchAd")
+                .disabled = true;
+
+            try {
+
+                const rewardKey =
+                    `${currentUser.telegram_id}-${Date.now()}-${cryptoRandom()}`;
+
+                let rewarded = false;
+
+                const rewardHandler =
+                    () => {
+
+                        rewarded = true;
+
+                    };
+
+                AdController.addEventListener(
+                    "onReward",
+                    rewardHandler
+                );
+
+                await AdController.show();
+
+                AdController.removeEventListener(
+                    "onReward",
+                    rewardHandler
+                );
+
+                /*
+                 * Reward only after the
+                 * rewarded event fires.
+                 */
+
+                if (!rewarded) {
+
+                    showMessage(
+                        "Ad finished without a reward confirmation."
+                    );
+
+                    return;
+
+                }
+
+                const result =
+                    await api(
+                        "/api/ad-reward",
+                        {
+                            method: "POST",
+
+                            body:
+                                JSON.stringify({
+                                    rewardKey
+                                })
+                        }
+                    );
+
+                currentUser.points =
+                    result.user.points;
+
+                currentUser.ads_count =
+                    result.user.ads_count;
+
+                currentUser.total_ads =
+                    result.user.total_ads;
+
+                renderUser();
+
+                showMessage(
+                    `🎉 +${result.reward} points earned!`
+                );
+
+            } catch (error) {
+
+                showMessage(
+                    "No reward was added: " +
+                    error.message
+                );
+
+            } finally {
+
+                adInProgress = false;
+
+                $("watchAd")
+                    .disabled = false;
+
+            }
+
+        }
+    );
+
+
+/* =========================================================
+   REWARDS
+========================================================= */
+
+async function loadRewards() {
+
+    try {
+
+        const data =
+            await api(
+                "/api/rewards"
+            );
+
+        $("rewardList")
+            .innerHTML = "";
+
+        data.rewards.forEach(
+            reward => {
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+                item.className =
+                    "card";
+
+                item.style.marginBottom =
+                    "8px";
+
+                item.innerHTML = `
+                    <strong>
+                        #${escapeHtml(
+                            String(
+                                reward.position
+                            )
+                        )}
+                        ${escapeHtml(
+                            reward.title
+                        )}
+                    </strong>
+
+                    <div
+                        style="
+                            color:#7f8999;
+                            font-size:12px;
+                            margin-top:4px
+                        "
+                    >
+                        ${escapeHtml(
+                            reward.description || ""
+                        )}
+                    </div>
+                `;
+
+                $("rewardList")
+                    .appendChild(item);
+
+            }
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+    }
+
+}
+
+
+/* =========================================================
+   LEADERBOARD
+========================================================= */
+
+async function loadLeaderboard() {
+
+    try {
+
+        const data =
+            await api(
+                "/api/leaderboard"
+            );
+
+        $("leaderboard")
+            .innerHTML = "";
+
+        data.leaderboard.forEach(
+            user => {
+
+                const row =
+                    document.createElement(
+                        "div"
+                    );
+
+                row.className =
+                    "leader";
+
+                const img =
+                    user.photo_url ||
+                    "https://via.placeholder.com/50";
+
+                const name =
+                    user.first_name ||
+                    user.username ||
+                    "User";
+
+                row.innerHTML = `
+                    <div class="rank">
+                        ${user.rank}
+                    </div>
+
+                    <img
+                        class="leader-avatar"
+                        src="${escapeAttr(img)}"
+                        alt=""
+                    >
+
+                    <div class="leader-info">
+
+                        <div class="leader-name">
+                            ${escapeHtml(name)}
+                        </div>
+
+                        <div class="leader-stats">
+                            📺 ${user.ads}
+                            &nbsp; • &nbsp;
+                            👥 ${user.invites}
+                        </div>
+
+                    </div>
+
+                    <div class="points">
+                        ${formatNumber(
+                            user.points
+                        )}
+                    </div>
+                `;
+
+                $("leaderboard")
+                    .appendChild(row);
+
+            }
+        );
+
+    } catch (error) {
+
+        showMessage(
+            error.message
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+document
+    .querySelectorAll(
+        ".nav button[data-page]"
+    )
+    .forEach(
+        button => {
+
+            button.addEventListener(
+                "click",
+                async () => {
+
+                    const page =
+                        button.dataset.page;
+
+                    document
+                        .querySelectorAll(
+                            ".page"
+                        )
+                        .forEach(
+                            x =>
+                                x.classList
+                                    .add("hidden")
+                        );
+
+                    $(page)
+                        .classList
+                        .remove("hidden");
+
+                    document
+                        .querySelectorAll(
+                            ".nav button"
+                        )
+                        .forEach(
+                            x =>
+                                x.classList
+                                    .remove("active")
+                        );
+
+                    button.classList
+                        .add("active");
+
+                    if (
+                        page ===
+                        "leaderPage"
+                    ) {
+
+                        await loadLeaderboard();
+
+                    }
+
+                }
+            );
+
+        }
+    );
+
+
+/* =========================================================
+   SHARE
+========================================================= */
+
+$("shareInvite")
+    .addEventListener(
+        "click",
+        () => {
+
+            const link =
+                $("refLink")
+                    .textContent;
+
+            const text =
+                "Join me and earn rewards!";
+
+            const shareUrl =
+                `https://t.me/share/url?url=${encodeURIComponent(
+                    link
+                )}&text=${encodeURIComponent(
+                    text
+                )}`;
+
+            if (tg) {
+
+                tg.openTelegramLink(
+                    shareUrl
+                );
+
+            }
+
+        }
+    );
+
+
+/* =========================================================
+   ADMIN SETTINGS
+========================================================= */
+
+$("saveAdmin")
+    .addEventListener(
+        "click",
+        async () => {
+
+            try {
+
+                const adReward =
+                    Number(
+                        $("adminAdReward").value
+                    );
+
+                const inviteReward =
+                    Number(
+                        $("adminInviteReward").value
+                    );
+
+                const adLimit =
+                    Number(
+                        $("adminAdLimit").value
+                    );
+
+                if (
+                    !Number.isFinite(
+                        adReward
+                    ) ||
+                    adReward < 0
+                ) {
+                    throw new Error(
+                        "Invalid ad reward"
+                    );
+                }
+
+                if (
+                    !Number.isFinite(
+                        inviteReward
+                    ) ||
+                    inviteReward < 0
+                ) {
+                    throw new Error(
+                        "Invalid invite reward"
+                    );
+                }
+
+                if (
+                    !Number.isInteger(
+                        adLimit
+                    ) ||
+                    adLimit < 1
+                ) {
+                    throw new Error(
+                        "Invalid ad limit"
+                    );
+                }
+
+                await api(
+                    "/api/admin/settings",
+                    {
+                        method: "POST",
+
+                        body:
+                            JSON.stringify({
+                                ad_reward:
+                                    adReward,
+
+                                invite_reward:
+                                    inviteReward,
+
+                                max_ads_per_day:
+                                    adLimit
+                            })
+                    }
+                );
+
+                showMessage(
+                    "✅ Settings saved."
+                );
+
+            } catch (error) {
+
+                showMessage(
+                    error.message
+                );
+
+            }
+
+        }
+    );
+
+
+/* =========================================================
+   ADMIN REWARD
+========================================================= */
+
+$("saveReward")
+    .addEventListener(
+        "click",
+        async () => {
+
+            try {
+
+                const position =
+                    Number(
+                        $("rewardPosition")
+                            .value
+                    );
+
+                const title =
+                    $("rewardTitle")
+                        .value
+                        .trim();
+
+                const description =
+                    $("rewardDescription")
+                        .value
+                        .trim();
+
+                if (
+                    !Number.isInteger(
+                        position
+                    ) ||
+                    position < 1 ||
+                    position > 30
+                ) {
+
+                    throw new Error(
+                        "Position must be 1-30"
+                    );
+
+                }
+
+                if (!title) {
+
+                    throw new Error(
+                        "Reward title required"
+                    );
+
+                }
+
+                await api(
+                    "/api/admin/reward",
+                    {
+                        method: "POST",
+
+                        body:
+                            JSON.stringify({
+                                position,
+                                title,
+                                description,
+                                enabled: true
+                            })
+                    }
+                );
+
+                showMessage(
+                    "✅ Reward saved."
+                );
+
+                loadRewards();
+
+            } catch (error) {
+
+                showMessage(
+                    error.message
+                );
+
+            }
+
+        }
+    );
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function formatNumber(
+    value
+) {
+
+    const n =
+        Number(value);
+
+    if (!Number.isFinite(n)) {
+        return "0";
+    }
+
+    return n.toLocaleString();
+}
+
+
+function cryptoRandom() {
+
+    if (
+        window.crypto &&
+        window.crypto.getRandomValues
+    ) {
+
+        const array =
+            new Uint32Array(2);
+
+        window.crypto
+            .getRandomValues(array);
+
+        return (
+            array[0].toString(36) +
+            array[1].toString(36)
+        );
+
+    }
+
+    return Math.random()
+        .toString(36)
+        .slice(2);
+
+}
+
+
+function escapeHtml(
+    value
+) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+function escapeAttr(
+    value
+) {
+
+    return escapeHtml(value)
+        .replaceAll("`", "&#096;");
+}
+
+
+/* =========================================================
    START
-========================================= */
+========================================================= */
 
-loadUser();
+init();
 
 </script>
 
 </body>
 
-</html>
+    </html>
