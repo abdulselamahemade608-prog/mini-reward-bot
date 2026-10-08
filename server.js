@@ -18,6 +18,10 @@ const APP_URL = String(process.env.APP_URL || "https://mini-reward-bot.vercel.ap
 const WEBHOOK_SECRET = String(process.env.WEBHOOK_SECRET || "");
 const PROOF_CHANNEL = String(process.env.PROOF_CHANNEL || "").trim();
 const PROOF_MASK = String(process.env.PROOF_MASK || "true").toLowerCase() !== "false";
+// Adsgram server-to-server confirmation. When ADSGRAM_SECRET is set, points for
+// ads are given ONLY after Adsgram itself calls /api/adsgram-reward for that user.
+const ADSGRAM_SECRET = String(process.env.ADSGRAM_SECRET || "");
+const STRICT_ADS = ADSGRAM_SECRET.length > 0;
 const APP_BUTTON_TEXT = process.env.APP_BUTTON_TEXT || "Adewa Eran";
 const ADMIN_ID = String(process.env.ADMIN_ID || "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
@@ -158,6 +162,15 @@ async function ensureDatabase() {
             `);
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS fee NUMERIC NOT NULL DEFAULT 0;`);
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS final_amount NUMERIC;`);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_ad_credits (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    used BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_ad_credits_user ON mr_ad_credits(telegram_id, used);`);
             await pool.query(`ALTER TABLE mr_users ADD COLUMN IF NOT EXISTS last_broadcast BIGINT NOT NULL DEFAULT 0;`);
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS mr_broadcasts (
@@ -244,6 +257,7 @@ app.get("/api/health", async (req, res) => {
         res.json({
             ok: true,
             version: "bot-webhook-v1",
+            adsStrict: STRICT_ADS,
             database: true,
             adsgramBlock: ADSGRAM_BLOCK_ID,
             env: {
@@ -673,7 +687,7 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
             [telegramId]
         );
         const secs = last.rows[0].secs;
-        if (secs !== null && Number(secs) < AD_COOLDOWN_SECONDS) {
+        if (!STRICT_ADS && secs !== null && Number(secs) < AD_COOLDOWN_SECONDS) {
             return res.status(429).json({ ok: false, error: "Too fast. Please wait a moment." });
         }
 
@@ -703,9 +717,29 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
         try {
             await client.query("BEGIN");
 
+            let finalKey = `${telegramId}:${rewardKey}`;
+            if (STRICT_ADS) {
+                // consume ONE credit that Adsgram confirmed for this user (server-to-server)
+                const credit = await client.query(
+                    `UPDATE mr_ad_credits SET used = TRUE
+                     WHERE id = (
+                         SELECT id FROM mr_ad_credits
+                         WHERE telegram_id = $1 AND used = FALSE
+                           AND created_at > NOW() - INTERVAL '15 minutes'
+                         ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED
+                     ) RETURNING id`,
+                    [telegramId]
+                );
+                if (!credit.rows.length) {
+                    await client.query("ROLLBACK");
+                    return res.status(409).json({ ok: false, pending: true, error: "Waiting for ad confirmation..." });
+                }
+                finalKey = `credit:${credit.rows[0].id}`;
+            }
+
             await client.query(
                 `INSERT INTO mr_ad_rewards(telegram_id, reward, reward_key) VALUES($1,$2,$3)`,
-                [telegramId, reward, `${telegramId}:${rewardKey}`]
+                [telegramId, reward, finalKey]
             );
 
             await client.query(
@@ -752,6 +786,40 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
 });
 
 /* =========================== LEADERBOARD =========================== */
+
+// Adsgram calls this (GET) after a user finishes a rewarded ad.
+// Reward URL to put in Adsgram:  https://YOUR-APP/api/adsgram-reward?userid=[userId]&secret=YOUR_SECRET
+app.get("/api/adsgram-reward", async (req, res) => {
+    try {
+        if (!ADSGRAM_SECRET) return res.status(503).json({ ok: false, error: "ADSGRAM_SECRET is not set." });
+
+        const a = Buffer.from(String(req.query.secret || ""));
+        const b = Buffer.from(ADSGRAM_SECRET);
+        if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+            return res.status(403).json({ ok: false });
+        }
+
+        const userId = String(req.query.userid ?? req.query.userId ?? "").trim();
+        if (!/^\d{3,15}$/.test(userId)) return res.status(400).json({ ok: false, error: "Bad userid." });
+
+        await requireDatabase();
+        const u = await pool.query(`SELECT 1 FROM mr_users WHERE telegram_id = $1`, [userId]);
+        if (!u.rows.length) return res.status(404).json({ ok: false, error: "Unknown user." });
+
+        const pend = await pool.query(
+            `SELECT COUNT(*)::int AS c FROM mr_ad_credits
+             WHERE telegram_id = $1 AND used = FALSE AND created_at > NOW() - INTERVAL '15 minutes'`,
+            [userId]
+        );
+        if (pend.rows[0].c >= 3) return res.json({ ok: true, ignored: true });
+
+        await pool.query(`INSERT INTO mr_ad_credits(telegram_id) VALUES($1)`, [userId]);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error("/api/adsgram-reward", error.message);
+        res.status(500).json({ ok: false });
+    }
+});
 
 app.get("/api/leaderboard", authenticate, async (req, res) => {
     try {
