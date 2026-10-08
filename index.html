@@ -499,7 +499,11 @@ async function api(path, method, body) {
   });
   let data = {};
   try { data = await res.json(); } catch (e) {}
-  if (!res.ok || data.ok === false) throw new Error(data.error || ("Request failed (" + res.status + ")"));
+  if (!res.ok || data.ok === false) {
+    const err = new Error(data.error || ("Request failed (" + res.status + ")"));
+    err.pending = !!data.pending;
+    throw err;
+  }
   return data;
 }
 
@@ -615,7 +619,11 @@ async function watchAd() {
   try {
     const r = await getCtrl().show();
     if (!r || !r.done) return toast("Ad was not completed.");
-    const d = await api("/api/ad-reward", "POST", { rewardKey: newKey() });
+    let d = null;
+    for (let i = 0; i < 8; i++) {   // wait for Adsgram to confirm the ad on the server
+      try { d = await api("/api/ad-reward", "POST", { rewardKey: newKey() }); break; }
+      catch (e) { if (!e.pending || i === 7) throw e; await new Promise(r => setTimeout(r, 1500)); }
+    }
     toast("+" + fmt(d.reward) + " points", "ok");
     await refreshMe();
   } catch (e) {
