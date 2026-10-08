@@ -151,9 +151,47 @@ async function ensureDatabase() {
                     UNIQUE(task_id, telegram_id)
                 );
             `);
+            await pool.query(`ALTER TABLE mr_users ADD COLUMN IF NOT EXISTS last_broadcast BIGINT NOT NULL DEFAULT 0;`);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_broadcasts (
+                    id BIGSERIAL PRIMARY KEY,
+                    text TEXT NOT NULL,
+                    admin_id TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_promo_codes (
+                    code TEXT PRIMARY KEY,
+                    reward NUMERIC NOT NULL,
+                    max_uses INTEGER NOT NULL,
+                    used_count INTEGER NOT NULL DEFAULT 0,
+                    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_promo_redemptions (
+                    id BIGSERIAL PRIMARY KEY,
+                    code TEXT NOT NULL,
+                    telegram_id BIGINT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE(code, telegram_id)
+                );
+            `);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_milestone_claims (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    milestone INTEGER NOT NULL,
+                    reward NUMERIC NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE(telegram_id, milestone)
+                );
+            `);
             await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
-                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100'),('verify_ads','1')
+                VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100'),('verify_ads','1'),('daily_withdraw_limit','0'),('milestone_5','5'),('milestone_10','15'),('milestone_25','50')
                 ON CONFLICT(key) DO NOTHING;
             `);
             await pool.query(`
@@ -398,7 +436,7 @@ async function tryVerifyReferral(userId, joined) {
     if (!r.rows.length) return;
 
     const sRes = await pool.query(
-        `SELECT key, value FROM mr_app_settings WHERE key IN ('verify_ads','invite_reward')`
+        `SELECT key, value FROM mr_app_settings WHERE key IN ('verify_ads','invite_reward','milestone_5','milestone_10','milestone_25')`
     );
     const set = {};
     for (const x of sRes.rows) set[x.key] = Number(x.value);
@@ -409,6 +447,7 @@ async function tryVerifyReferral(userId, joined) {
 
     const inviterId = r.rows[0].inviter_id;
     let paid = false;
+    const bonuses = [];
 
     const client = await pool.connect();
     try {
@@ -429,6 +468,31 @@ async function tryVerifyReferral(userId, joined) {
                 [inviterId, reward]
             );
             paid = true;
+
+            // invite milestones (one-time bonus when the verified count is reached)
+            const cnt = await client.query(
+                `SELECT total_invites FROM mr_users WHERE telegram_id = $1`,
+                [inviterId]
+            );
+            const total = Number(cnt.rows[0].total_invites);
+            for (const m of [5, 10, 25]) {
+                const bonus = Number(set["milestone_" + m]);
+                if (total >= m && Number.isFinite(bonus) && bonus > 0) {
+                    const ins = await client.query(
+                        `INSERT INTO mr_milestone_claims(telegram_id, milestone, reward)
+                         VALUES($1,$2,$3)
+                         ON CONFLICT(telegram_id, milestone) DO NOTHING RETURNING id`,
+                        [inviterId, m, bonus]
+                    );
+                    if (ins.rows.length) {
+                        await client.query(
+                            `UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`,
+                            [inviterId, bonus]
+                        );
+                        bonuses.push({ m, bonus });
+                    }
+                }
+            }
         }
         await client.query("COMMIT");
     } catch (error) {
@@ -440,6 +504,9 @@ async function tryVerifyReferral(userId, joined) {
 
     if (paid) {
         notifyUser(inviterId, `Your friend is verified. You earned ${reward} points!`);
+        for (const b of bonuses) {
+            notifyUser(inviterId, `Milestone reached: ${b.m} verified friends! Bonus +${b.bonus} points.`);
+        }
     }
 }
 
@@ -735,8 +802,10 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
     try {
         await requireDatabase();
 
-        const { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads } = req.body || {};
-        const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads };
+        const { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads,
+                daily_withdraw_limit, milestone_5, milestone_10, milestone_25 } = req.body || {};
+        const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads,
+            daily_withdraw_limit, milestone_5, milestone_10, milestone_25 };
 
         for (const [key, value] of Object.entries(settings)) {
             if (value === undefined || value === null) continue;
@@ -833,6 +902,27 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         const minWithdraw = Number(minRes.rows[0]?.value || 100);
         if (amount < minWithdraw) {
             return res.status(400).json({ ok: false, error: `Minimum withdrawal is ${minWithdraw}.` });
+        }
+
+        const limRes = await pool.query(
+            `SELECT value FROM mr_app_settings WHERE key = 'daily_withdraw_limit'`
+        );
+        const dailyLimit = Number(limRes.rows[0]?.value || 0);
+        if (dailyLimit > 0) {
+            const used = await pool.query(
+                `SELECT COALESCE(SUM(amount),0) AS s FROM mr_withdrawals
+                 WHERE telegram_id = $1 AND status <> 'rejected'
+                   AND created_at >= date_trunc('day', NOW())`,
+                [telegramId]
+            );
+            const usedToday = Number(used.rows[0].s);
+            if (usedToday + amount > dailyLimit) {
+                const left = Math.max(0, dailyLimit - usedToday);
+                return res.status(400).json({
+                    ok: false,
+                    error: `Daily withdrawal limit is ${dailyLimit}. You can still withdraw ${left} today.`
+                });
+            }
         }
         if (!allJoinedOf(await checkAllChannels(telegramId))) {
             return res.status(403).json({ ok: false, error: "Join all required channels first." });
@@ -1036,8 +1126,312 @@ app.get("/api/referrals", authenticate, async (req, res) => {
              LIMIT 100`,
             [String(req.telegramUser.id)]
         );
-        res.json({ ok: true, friends: r.rows });
+        const cl = await pool.query(
+            `SELECT milestone FROM mr_milestone_claims WHERE telegram_id = $1`,
+            [String(req.telegramUser.id)]
+        );
+        res.json({ ok: true, friends: r.rows, claimed: cl.rows.map(x => x.milestone) });
     } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ============================ PROMO CODES ============================ */
+
+const PROMO_RE = /^[A-Z0-9_-]{3,32}$/;
+
+app.post("/api/promo/redeem", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        const telegramId = String(req.telegramUser.id);
+        const code = String(req.body?.code || "").trim().toUpperCase();
+        if (!PROMO_RE.test(code)) {
+            return res.status(400).json({ ok: false, error: "Invalid promo code." });
+        }
+        if (!allJoinedOf(await checkAllChannels(telegramId))) {
+            return res.status(403).json({ ok: false, error: "Join all required channels first." });
+        }
+        const me = await pool.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1`, [telegramId]);
+        if (!me.rows.length || me.rows[0].is_banned) {
+            return res.status(403).json({ ok: false, error: "Account not allowed." });
+        }
+
+        const client = await pool.connect();
+        let reward = 0;
+        try {
+            await client.query("BEGIN");
+            const pr = await client.query(`SELECT * FROM mr_promo_codes WHERE code = $1 FOR UPDATE`, [code]);
+            if (!pr.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ ok: false, error: "Invalid promo code." });
+            }
+            const promo = pr.rows[0];
+            if (!promo.enabled) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ ok: false, error: "This code is disabled." });
+            }
+            if (promo.used_count >= promo.max_uses) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ ok: false, error: "This code has reached its limit." });
+            }
+            const ins = await client.query(
+                `INSERT INTO mr_promo_redemptions(code, telegram_id) VALUES($1,$2)
+                 ON CONFLICT(code, telegram_id) DO NOTHING RETURNING id`,
+                [code, telegramId]
+            );
+            if (!ins.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ ok: false, error: "You already used this code." });
+            }
+            reward = Number(promo.reward);
+            await client.query(`UPDATE mr_promo_codes SET used_count = used_count + 1 WHERE code = $1`, [code]);
+            await client.query(
+                `UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`,
+                [telegramId, reward]
+            );
+            await client.query("COMMIT");
+        } catch (e) {
+            await client.query("ROLLBACK").catch(() => {});
+            throw e;
+        } finally {
+            client.release();
+        }
+        res.json({ ok: true, reward });
+    } catch (error) {
+        console.error("/api/promo/redeem", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.get("/api/admin/promos", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const r = await pool.query(
+            `SELECT code, reward, max_uses, used_count, enabled FROM mr_promo_codes
+             ORDER BY created_at DESC LIMIT 100`
+        );
+        res.json({ ok: true, promos: r.rows.map(p => ({ ...p, reward: Number(p.reward) })) });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/promos", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        let code = String(req.body?.code || "").trim().toUpperCase();
+        const reward = Number(req.body?.reward);
+        const maxUses = Number(req.body?.maxUses);
+
+        if (!code) code = crypto.randomBytes(4).toString("hex").toUpperCase();
+        if (!PROMO_RE.test(code)) {
+            return res.status(400).json({ ok: false, error: "Code: 3-32 characters, A-Z, 0-9, _ or -" });
+        }
+        if (!Number.isFinite(reward) || reward <= 0 || reward > 1000000) {
+            return res.status(400).json({ ok: false, error: "Reward must be greater than 0." });
+        }
+        if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 1000000) {
+            return res.status(400).json({ ok: false, error: "Number of people must be 1 or more." });
+        }
+        try {
+            await pool.query(
+                `INSERT INTO mr_promo_codes(code, reward, max_uses) VALUES($1,$2,$3)`,
+                [code, reward, maxUses]
+            );
+        } catch (e) {
+            if (e.code === "23505") return res.status(409).json({ ok: false, error: "This code already exists." });
+            throw e;
+        }
+        res.json({ ok: true, code });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/promos/:code/delete", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const code = String(req.params.code || "").toUpperCase();
+        if (!PROMO_RE.test(code)) return res.status(400).json({ ok: false, error: "Invalid code." });
+        await pool.query(`DELETE FROM mr_promo_redemptions WHERE code = $1`, [code]);
+        await pool.query(`DELETE FROM mr_promo_codes WHERE code = $1`, [code]);
+        res.json({ ok: true });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ========================== ADMIN DASHBOARD ========================== */
+
+app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const r = await pool.query(`
+            SELECT
+              (SELECT COUNT(*)::int FROM mr_users) AS total_users,
+              (SELECT COUNT(*)::int FROM mr_users WHERE created_at >= date_trunc('day', NOW())) AS new_today,
+              (SELECT COUNT(*)::int FROM mr_users WHERE is_banned = TRUE) AS banned,
+              (SELECT COUNT(*)::int FROM mr_ad_rewards WHERE created_at >= date_trunc('day', NOW())) AS ads_today,
+              (SELECT COUNT(*)::int FROM mr_ad_rewards) AS ads_total,
+              (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved') AS paid_total,
+              (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved' AND processed_at >= date_trunc('day', NOW())) AS paid_today,
+              (SELECT COUNT(*)::int FROM mr_withdrawals WHERE status = 'pending') AS pending_count,
+              (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'pending') AS pending_amount,
+              (SELECT COUNT(*)::int FROM mr_referrals WHERE verified = TRUE) AS verified_refs
+        `);
+        const x = r.rows[0];
+        for (const k of ["paid_total", "paid_today", "pending_amount"]) x[k] = Number(x[k]);
+        res.json({ ok: true, stats: x });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ========================== ADMIN USERS ========================== */
+
+app.get("/api/admin/users", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const q = String(req.query.q || "").trim().slice(0, 50);
+        const cols = `telegram_id, username, first_name, last_name, photo_url, points,
+                      total_ads, total_invites, is_banned, created_at`;
+        let r;
+        if (!q) {
+            r = await pool.query(`SELECT ${cols} FROM mr_users ORDER BY created_at DESC LIMIT 20`);
+        } else {
+            const like = "%" + q.replace(/^@/, "").replace(/[\\%_]/g, m => "\\" + m) + "%";
+            r = await pool.query(
+                `SELECT ${cols} FROM mr_users
+                 WHERE telegram_id::text = $1 OR username ILIKE $2 OR first_name ILIKE $2 OR last_name ILIKE $2
+                 ORDER BY created_at DESC LIMIT 20`,
+                [q, like]
+            );
+        }
+        res.json({ ok: true, users: r.rows.map(u => ({ ...u, points: Number(u.points) })) });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/users/:id/ban", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const id = String(req.params.id);
+        if (!isId(id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        if (id === ADMIN_ID) return res.status(400).json({ ok: false, error: "You cannot ban the admin." });
+        const banned = req.body?.banned === true;
+        const r = await pool.query(
+            `UPDATE mr_users SET is_banned = $2, updated_at = NOW() WHERE telegram_id = $1 RETURNING telegram_id`,
+            [id, banned]
+        );
+        if (!r.rows.length) return res.status(404).json({ ok: false, error: "User not found." });
+        await pool.query(
+            `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+            [ADMIN_ID, banned ? "ban_user" : "unban_user", id]
+        );
+        res.json({ ok: true });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/users/:id/points", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const id = String(req.params.id);
+        if (!isId(id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const amount = Number(req.body?.amount);
+        if (!Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 10000000) {
+            return res.status(400).json({ ok: false, error: "Enter a non-zero amount." });
+        }
+        const r = await pool.query(
+            `UPDATE mr_users SET points = points + $2, updated_at = NOW()
+             WHERE telegram_id = $1 AND points + $2 >= 0 RETURNING points`,
+            [id, amount]
+        );
+        if (!r.rows.length) {
+            const ex = await pool.query(`SELECT 1 FROM mr_users WHERE telegram_id = $1`, [id]);
+            return res.status(ex.rows.length ? 400 : 404).json({
+                ok: false,
+                error: ex.rows.length ? "Not enough points to subtract." : "User not found."
+            });
+        }
+        await pool.query(
+            `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+            [ADMIN_ID, "adjust_points", JSON.stringify({ user: id, amount })]
+        );
+        res.json({ ok: true, points: Number(r.rows[0].points) });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ============================ BROADCAST ============================ */
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// sends in small batches so it fits inside a serverless time limit;
+// the admin page keeps calling "continue" until nothing remains.
+async function runBroadcast(id, text) {
+    let sent = 0, failed = 0;
+    for (let round = 0; round < 3; round++) {
+        const batch = await pool.query(
+            `SELECT telegram_id FROM mr_users
+             WHERE is_banned = FALSE AND last_broadcast < $1
+             ORDER BY telegram_id LIMIT 25`,
+            [id]
+        );
+        if (!batch.rows.length) break;
+
+        const ids = batch.rows.map(r => String(r.telegram_id));
+        const results = await Promise.allSettled(
+            ids.map(uid => telegram("sendMessage", { chat_id: Number(uid), text }))
+        );
+        for (const r of results) r.status === "fulfilled" ? sent++ : failed++;
+
+        await pool.query(
+            `UPDATE mr_users SET last_broadcast = $1 WHERE telegram_id = ANY($2::bigint[])`,
+            [id, ids]
+        );
+        await sleep(1100);
+    }
+    const rem = await pool.query(
+        `SELECT COUNT(*)::int AS c FROM mr_users WHERE is_banned = FALSE AND last_broadcast < $1`,
+        [id]
+    );
+    return { sent, failed, remaining: rem.rows[0].c };
+}
+
+app.post("/api/admin/broadcast", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const text = String(req.body?.text || "").trim();
+        if (!text || text.length > 1000) {
+            return res.status(400).json({ ok: false, error: "Message must be 1-1000 characters." });
+        }
+        const ins = await pool.query(
+            `INSERT INTO mr_broadcasts(text, admin_id) VALUES($1,$2) RETURNING id`,
+            [text, ADMIN_ID]
+        );
+        const id = ins.rows[0].id;
+        const out = await runBroadcast(id, text);
+        res.json({ ok: true, id: String(id), ...out });
+    } catch (error) {
+        console.error("/api/admin/broadcast", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/broadcast/:id/continue", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const b = await pool.query(`SELECT id, text FROM mr_broadcasts WHERE id = $1`, [req.params.id]);
+        if (!b.rows.length) return res.status(404).json({ ok: false, error: "Broadcast not found." });
+        const out = await runBroadcast(b.rows[0].id, b.rows[0].text);
+        res.json({ ok: true, id: String(b.rows[0].id), ...out });
+    } catch (error) {
+        console.error("/api/admin/broadcast/continue", error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
