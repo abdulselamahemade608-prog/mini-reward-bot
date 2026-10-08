@@ -243,12 +243,16 @@ app.get("/api/health", async (req, res) => {
         await pool.query("SELECT 1");
         res.json({
             ok: true,
+            version: "bot-webhook-v1",
             database: true,
             adsgramBlock: ADSGRAM_BLOCK_ID,
             env: {
                 BOT_TOKEN: !!BOT_TOKEN,
+                BOT_USERNAME: !!BOT_USERNAME,
                 ADMIN_ID: !!ADMIN_ID,
-                DATABASE_URL: true
+                DATABASE_URL: true,
+                WEBHOOK_SECRET: !!WEBHOOK_SECRET,
+                PROOF_CHANNEL: !!PROOF_CHANNEL
             }
         });
     } catch (error) {
