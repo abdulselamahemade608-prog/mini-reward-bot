@@ -87,6 +87,7 @@ h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
 .btn.glass{background:rgba(255,255,255,.16);box-shadow:none;backdrop-filter:blur(6px)}
 .btn.green{background:linear-gradient(135deg,#22c55e,#10b981);box-shadow:0 8px 20px rgba(34,197,94,.3)}
 .btn.red{background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 8px 20px rgba(239,68,68,.3)}
+.btn.pinkb{background:linear-gradient(135deg,#ec4899,#8b5cf6);box-shadow:0 8px 20px rgba(236,72,153,.3)}
 .btn.dark{background:var(--card2);box-shadow:none;border:1px solid var(--line)}
 .btn.sm{padding:11px;font-size:14px;border-radius:13px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
@@ -104,6 +105,8 @@ h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
 .progress i{display:block;height:100%;border-radius:10px;background:linear-gradient(90deg,#22c55e,#06b6d4);transition:width .6s}
 .muted{color:var(--muted);font-size:13px}
 .linkbox{background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:13px;font-size:13px;word-break:break-all;margin:12px 0;color:#bcd0ff}
+.receipt{white-space:pre-wrap;word-break:break-word;background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:14px;
+  font-family:inherit;font-size:14px;line-height:1.6;color:#e6edff;max-height:55vh;overflow:auto}
 label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
 input,select,textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px;color:var(--text);font-size:15px;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--blue)}
@@ -214,6 +217,7 @@ nav button.active svg{stroke:#8ec5ff}
         <div class="x"><b>Watch an ad</b><span id="hAdSub">Earn points instantly</span></div>
       </div>
       <button class="btn" id="hWatch" style="margin-top:14px"></button>
+      <button class="btn pinkb hidden" id="hWatchM" style="margin-top:10px"></button>
     </div>
 
     <h2><span class="ib sm purple" id="topIc"></span>Top earners</h2>
@@ -232,6 +236,7 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="progress"><i id="eBar" style="width:0"></i></div>
       <div class="muted" id="eProg">0 / 0 today</div>
       <button class="btn" id="eWatch" style="margin-top:14px"></button>
+      <button class="btn pinkb hidden" id="eWatchM" style="margin-top:10px"></button>
     </div>
 
     <div class="card">
@@ -293,8 +298,9 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="chips" id="wMethods"></div>
       <label>Account owner name</label>
       <input id="wName" type="text" placeholder="Full name on the account" autocomplete="off" maxlength="100">
-      <label>Account number / phone</label>
-      <input id="wAddr" type="text" placeholder="Account number or phone number" autocomplete="off" maxlength="100">
+      <label id="wAddrLabel">Account number / phone</label>
+      <input id="wAddr" type="text" inputmode="numeric" placeholder="Account number or phone number" autocomplete="off" maxlength="20">
+      <div class="muted" id="wAddrHint" style="margin-top:6px"></div>
       <label>Amount</label>
       <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
       <div class="muted" id="wFee" style="margin-top:8px"></div>
@@ -411,7 +417,7 @@ nav button.active svg{stroke:#8ec5ff}
 
 <script>
 /* =====================================================
-   CONFIG - Adsgram Block ID be-yih file wust new.
+   CONFIG - Adsgram Block ID
 ===================================================== */
 const ADSGRAM_BLOCK_ID = "52630";
 
@@ -426,6 +432,7 @@ const INIT_DATA = tg ? tg.initData : "";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------------- icons (colored badges, no emoji) ---------------- */
 const P = {
@@ -463,6 +470,8 @@ setBtn("hWithdraw","wallet","Withdraw");
 setBtn("hInvite","users","Invite");
 setBtn("hWatch","play","Watch ad &amp; earn");
 setBtn("eWatch","play","Watch ad &amp; earn");
+setBtn("hWatchM","play","Watch Monetag ad &amp; earn");
+setBtn("eWatchM","play","Watch Monetag ad &amp; earn");
 setBtn("supportBtn","send","Contact admin");
 setBtn("addTask","check","Add task");
 setBtn("promoBtn","check","Redeem");
@@ -482,6 +491,14 @@ let ME = null, BOT_USERNAME = "", adController = null, watching = false;
 let wMethod = "CBE", admStatus = "pending", currentTab = "home";
 const METHODS = ["CBE", "Telebirr", "M-Pesa"];
 const SUPPORT_BOT = "Adewa_eran_support_bot";
+
+/* account number rules (must match the server) */
+const ACC_RULES = {
+  "Telebirr": { re: /^09\d{8}$/, len: 10, ph: "09XXXXXXXX", hint: "Telebirr: starts with 09, exactly 10 digits.", err: "Telebirr number must start with 09 and be exactly 10 digits." },
+  "M-Pesa":   { re: /^07\d{8}$/, len: 10, ph: "07XXXXXXXX", hint: "M-Pesa: starts with 07, exactly 10 digits.", err: "M-Pesa number must start with 07 and be exactly 10 digits." },
+  "CBE":      { re: /^1000\d{9}$/, len: 13, ph: "1000XXXXXXXXX", hint: "CBE: starts with 1000 or 10000, exactly 13 digits.", err: "CBE account must start with 1000 or 10000 and be exactly 13 digits." }
+};
+const cleanNum = s => String(s || "").replace(/[\s-]/g, "");
 
 let toastTimer;
 function toast(msg, type) {
@@ -550,6 +567,10 @@ function render() {
 
   $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?start=" + u.telegram_id : "Bot username is not configured";
 
+  const hasM = !!(ME.monetag && ME.monetag.zoneId);
+  $("hWatchM").classList.toggle("hidden", !hasM);
+  $("eWatchM").classList.toggle("hidden", !hasM);
+
   const ab = $("adminBtn");
   ab.classList.toggle("hidden", !u.is_admin);
   if (u.is_admin) {
@@ -584,9 +605,22 @@ function openLink(url) {
 }
 $("supportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
 
+/* ---------------- Monetag SDK ---------------- */
+let monetagLoaded = false;
+function loadMonetag(zone) {
+  if (monetagLoaded || !zone) return;
+  monetagLoaded = true;
+  const s = document.createElement("script");
+  s.src = "https://libtl.com/sdk.js";
+  s.dataset.zone = zone;
+  s.dataset.sdk = "show_" + zone;
+  document.head.appendChild(s);
+}
+
 async function refreshMe() {
   const d = await api("/api/me");
   ME = d; BOT_USERNAME = (d.bot && d.bot.username) || "";
+  if (d.monetag && d.monetag.zoneId) loadMonetag(d.monetag.zoneId);
   render();
 }
 
@@ -612,27 +646,55 @@ function getCtrl() {
 }
 const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
 
+const WATCH_BTNS = ["hWatch", "eWatch", "hWatchM", "eWatchM"];
+function setWatchBusy(b) { watching = b; WATCH_BTNS.forEach(i => $(i).disabled = b); }
+
+// ask the server for the reward (waits for the ad network to confirm when strict)
+async function claimAdReward(provider) {
+  let d = null;
+  for (let i = 0; i < 10; i++) {
+    try { d = await api("/api/ad-reward", "POST", { rewardKey: newKey(), provider }); break; }
+    catch (e) { if (!e.pending || i === 9) throw e; await sleep(1500); }
+  }
+  toast("+" + fmt(d.reward) + " points", "ok");
+  await refreshMe();
+}
+
 async function watchAd() {
   if (watching) return;
   if (ME && !ME.allJoined) return toast("Join all required channels first.", "err");
-  watching = true; ["hWatch","eWatch"].forEach(i => $(i).disabled = true);
+  setWatchBusy(true);
   try {
     const r = await getCtrl().show();
     if (!r || !r.done) return toast("Ad was not completed.");
-    let d = null;
-    for (let i = 0; i < 8; i++) {   // wait for Adsgram to confirm the ad on the server
-      try { d = await api("/api/ad-reward", "POST", { rewardKey: newKey() }); break; }
-      catch (e) { if (!e.pending || i === 7) throw e; await new Promise(r => setTimeout(r, 1500)); }
-    }
-    toast("+" + fmt(d.reward) + " points", "ok");
-    await refreshMe();
+    await claimAdReward("adsgram");
   } catch (e) {
     toast((e && (e.description || e.message)) || "Ad error", "err");
   } finally {
-    watching = false; ["hWatch","eWatch"].forEach(i => $(i).disabled = false);
+    setWatchBusy(false);
+  }
+}
+
+async function watchMonetag() {
+  if (watching) return;
+  if (ME && !ME.allJoined) return toast("Join all required channels first.", "err");
+  const zone = ME && ME.monetag && ME.monetag.zoneId;
+  if (!zone) return toast("Monetag is not configured.", "err");
+  const fn = window["show_" + zone];
+  if (typeof fn !== "function") return toast("Monetag failed to load. Check your internet.", "err");
+  setWatchBusy(true);
+  try {
+    // ymid = telegram id, so Monetag's postback tells the server who watched
+    await fn({ ymid: String(ME.user.telegram_id) });
+    await claimAdReward("monetag");
+  } catch (e) {
+    toast((e && (e.message || e.description)) || "Ad was not completed.", "err");
+  } finally {
+    setWatchBusy(false);
   }
 }
 $("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
+$("hWatchM").onclick = watchMonetag; $("eWatchM").onclick = watchMonetag;
 
 /* ---------------- invite ---------------- */
 $("shareBtn").onclick = () => {
@@ -657,25 +719,57 @@ function updateFee() {
 }
 $("wAmt").addEventListener("input", updateFee);
 
+function updateAddrHint() {
+  const r = ACC_RULES[wMethod];
+  $("wAddr").placeholder = r.ph;
+  $("wAddr").maxLength = r.len;
+  $("wAddrHint").textContent = r.hint;
+  $("wAddrLabel").textContent = wMethod === "CBE" ? "CBE account number" : wMethod + " phone number";
+}
+$("wAddr").addEventListener("input", () => {
+  const v = $("wAddr").value.replace(/\D/g, "");
+  if (v !== $("wAddr").value) $("wAddr").value = v;
+});
+
 function renderMethods() {
   $("wMethods").innerHTML = METHODS.map(m => `<span class="chip ${m === wMethod ? "on" : ""}" data-m="${m}">${m}</span>`).join("");
-  $("wMethods").querySelectorAll(".chip").forEach(c => c.onclick = () => { wMethod = c.dataset.m; renderMethods(); });
+  $("wMethods").querySelectorAll(".chip").forEach(c => c.onclick = () => { wMethod = c.dataset.m; $("wAddr").value = ""; renderMethods(); });
+  updateAddrHint();
 }
 renderMethods();
 
+function showReceipt(text) {
+  const modal = $("modal");
+  modal.innerHTML = `<div class="sheet">
+    <div class="line" style="margin-bottom:12px"><span class="ib green">${svg("check")}</span>
+    <div class="x"><b style="font-size:17px">Request received</b><span>Your withdrawal request was sent to the admin.</span></div></div>
+    <pre class="receipt">${esc(text)}</pre>
+    <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
+  modal.classList.remove("hidden");
+  $("mReceiptOk").onclick = () => modal.classList.add("hidden");
+  modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
+}
+
 $("wBtn").onclick = async () => {
+  const name = $("wName").value.trim();
+  const addr = cleanNum($("wAddr").value);
+  const amount = Number($("wAmt").value);
+
+  if (name.length < 2) return toast("Enter the account owner name.", "err");
+  if (!ACC_RULES[wMethod].re.test(addr)) return toast(ACC_RULES[wMethod].err, "err");
+  if (!Number.isFinite(amount) || amount <= 0) return toast("Enter a valid amount.", "err");
+
   const btn = $("wBtn"); btn.disabled = true;
   try {
-    await api("/api/withdraw", "POST", { amount: Number($("wAmt").value), method: wMethod, accountName: $("wName").value.trim(), address: $("wAddr").value.trim() });
-    $("wAmt").value = "";
-    toast("Withdrawal requested. Waiting for approval.", "ok");
+    const d = await api("/api/withdraw", "POST", { amount, method: wMethod, accountName: name, address: addr });
+    $("wAmt").value = ""; updateFee();
+    showReceipt(d.receipt);
     await refreshMe(); loadHistory();
   } catch (e) { toast(e.message, "err"); }
   btn.disabled = false;
 };
 
 function statusBadge(s) {
-  const icon = s === "approved" ? "check" : s === "rejected" ? "x" : "clock";
   return `<span class="badge ${s}">${s[0].toUpperCase() + s.slice(1)}</span>`;
 }
 
@@ -760,7 +854,7 @@ function handleAction(id, action) {
   const isRej = action === "reject";
   modal.innerHTML = `<div class="sheet">
     <div class="line" style="margin-bottom:12px"><span class="ib ${isRej ? "redg" : "green"}">${svg(isRej ? "x" : "check")}</span>
-    <div class="x"><b style="font-size:17px">${isRej ? "Reject request" : "Accept request"}</b><span>${isRej ? "Points will be returned to the user." : "Confirm you have sent the payment."}</span></div></div>
+    <div class="x"><b style="font-size:17px">${isRej ? "Reject request" : "Accept request"}</b><span>${isRej ? "Points will be returned to the user." : "Confirm you have sent the payment. The bot will ask you for the screenshot."}</span></div></div>
     <input id="mNote" type="text" placeholder="Note (optional)" maxlength="200">
     <div class="row2" style="margin-top:14px">
       <button class="btn dark" id="mCancel">Cancel</button>
@@ -773,7 +867,7 @@ function handleAction(id, action) {
     try {
       await api("/api/admin/withdrawals/" + encodeURIComponent(id), "POST", { action, note: $("mNote").value.trim() });
       modal.classList.add("hidden");
-      toast(isRej ? "Request rejected." : "Request accepted.", "ok");
+      toast(isRej ? "Request rejected." : "Request accepted. Check the bot to send the screenshot.", "ok");
       await refreshMe(); loadAdmin();
     } catch (e) { toast(e.message, "err"); $("mOk").disabled = false; }
   };
@@ -844,8 +938,8 @@ async function showInterstitial() {
 setInterval(() => {
   if (!ADSGRAM_INTERSTITIAL_ID) return;
   const now = Date.now(), idle = now - lastActive;
-  if (idle >= 60000) return showInterstitial();                   // idle 60s -> show
-  if (idle < 30000 && now - lastInter >= 30000) showInterstitial(); // using the app -> every 30s
+  if (idle >= 60000) return showInterstitial();
+  if (idle < 30000 && now - lastInter >= 30000) showInterstitial();
 }, 5000);
 
 /* ---------------- admin: dashboard / users / promo / broadcast ---------------- */
@@ -1117,4 +1211,4 @@ async function init() {
 init();
 </script>
 </body>
-</html>
+  </html>
