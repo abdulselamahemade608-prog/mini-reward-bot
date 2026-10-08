@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+>
+
+<title>Reward Mini App</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:#f5f7fb;
+    color:#172033;
+}
+
+.app{
+    max-width:600px;
+    margin:auto;
+    min-height:100vh;
+    padding-bottom:90px;
+}
+
+header{
+    padding:20px;
+}
+
+.balance{
+    background:#111827;
+    color:white;
+    border-radius:24px;
+    padding:22px;
+    margin-bottom:18px;
+}
+
+.balance small{
+    opacity:.7;
+}
+
+.balance h1{
+    margin:8px 0 0;
+}
+
+.card{
+    background:white;
+    border-radius:20px;
+    padding:18px;
+    margin:12px 16px;
+    box-shadow:0 4px 20px rgba(0,0,0,.05);
+}
+
+.profile{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.avatar{
+    width:55px;
+    height:55px;
+    border-radius:50%;
+    object-fit:cover;
+    background:#ddd;
+}
+
+button{
+    width:100%;
+    border:0;
+    padding:15px;
+    border-radius:14px;
+    font-size:16px;
+    font-weight:bold;
+    margin-top:12px;
+}
+
+.primary{
+    background:#2481cc;
+    color:white;
+}
+
+.secondary{
+    background:#edf3f8;
+    color:#172033;
+}
+
+.hidden{
+    display:none;
+}
+
+.nav{
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    max-width:600px;
+    margin:auto;
+    background:white;
+    display:flex;
+    justify-content:space-around;
+    padding:10px;
+    box-shadow:0 -4px 20px rgba(0,0,0,.08);
+}
+
+.nav button{
+    background:none;
+    margin:0;
+    padding:8px;
+    font-size:12px;
+}
+
+.leader{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid #eee;
+}
+
+.leader img{
+    width:40px;
+    height:40px;
+    border-radius:50%;
+}
+
+.rank{
+    width:30px;
+    font-weight:bold;
+}
+
+.stat-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.stat{
+    background:#f5f7fb;
+    border-radius:14px;
+    padding:15px;
+}
+
+.stat b{
+    display:block;
+    font-size:22px;
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+<div class="app">
+
+<header>
+
+<div class="balance">
+
+<small>Your Points</small>
+
+<h1 id="points">0</h1>
+
+</div>
+
+<div class="card profile">
+
+<img
+id="avatar"
+class="avatar"
+src=""
+>
+
+<div>
+
+<strong id="name">Loading...</strong>
+
+<div id="username">@username</div>
+
+</div>
+
+</div>
+
+</header>
+
+
+<section id="home">
+
+<div class="card">
+
+<h2>Watch Ads</h2>
+
+<p>
+Watch a rewarded advertisement and receive points.
+</p>
+
+<button
+class="primary"
+onclick="watchAd()"
+>
+▶ Watch Ad
+</button>
+
+</div>
+
+
+<div class="card">
+
+<h2>Invite Friends</h2>
+
+<p>
+Invite friends and increase your ranking.
+</p>
+
+<button
+class="secondary"
+onclick="invite()"
+>
+Invite Friends
+</button>
+
+</div>
+
+</section>
+
+
+<section
+id="leaderboard"
+class="hidden"
+>
+
+<div class="card">
+
+<h2>🏆 Top 30</h2>
+
+<div id="leaders">
+Loading...
+</div>
+
+</div>
+
+</section>
+
+
+<section
+id="profilePage"
+class="hidden"
+>
+
+<div class="card">
+
+<h2>Profile</h2>
+
+<div class="stat-grid">
+
+<div class="stat">
+
+<small>Ads</small>
+
+<b id="ads">0</b>
+
+</div>
+
+<div class="stat">
+
+<small>Invites</small>
+
+<b id="invites">0</b>
+
+</div>
+
+<div class="stat">
+
+<small>Rank</small>
+
+<b id="rank">-</b>
+
+</div>
+
+<div class="stat">
+
+<small>Points</small>
+
+<b id="profilePoints">0</b>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<h3>📊 Weekly Activity</h3>
+
+<p>
+Your activity graph will appear here.
+</p>
+
+</div>
+
+</section>
+
+
+<div class="nav">
+
+<button onclick="showPage('home')">
+🏠<br>Ads
+</button>
+
+<button onclick="invite()">
+👥<br>Invite
+</button>
+
+<button onclick="showPage('leaderboard')">
+🏆<br>Top
+</button>
+
+<button onclick="showPage('profilePage')">
+👤<br>Profile
+</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+const tg = window.Telegram.WebApp;
+
+tg.ready();
+
+tg.expand();
+
+
+const initData = tg.initData;
+
+
+/* =========================================
+   API
+========================================= */
+
+async function api(path, options = {}) {
+
+    options.headers = {
+
+        ...(options.headers || {}),
+
+        "Content-Type":"application/json",
+
+        "x-telegram-init-data":initData
+
+    };
+
+    const response =
+        await fetch(path, options);
+
+    return response.json();
+}
+
+
+/* =========================================
+   LOAD USER
+========================================= */
+
+async function loadUser(){
+
+    const data =
+        await api("/api/me");
+
+    if(!data.ok){
+
+        alert(data.error);
+
+        return;
+    }
+
+    const u = data.user;
+
+    document.getElementById("name")
+        .textContent =
+        u.first_name || "User";
+
+    document.getElementById("username")
+        .textContent =
+        u.username
+        ? "@" + u.username
+        : "No username";
+
+    document.getElementById("points")
+        .textContent =
+        u.points;
+
+    if(u.photo_url){
+
+        document.getElementById("avatar")
+            .src = u.photo_url;
+    }
+}
+
+
+/* =========================================
+   ADSGRAM
+========================================= */
+
+const AdController =
+    window.Adsgram.init({
+
+        blockId:
+            "YOUR_ADSGRAM_BLOCK_ID"
+
+    });
+
+
+async function watchAd(){
+
+    try{
+
+        const result =
+            await AdController.show();
+
+        if(!result.done){
+
+            return;
+        }
+
+        const rewardToken =
+            crypto.randomUUID();
+
+        const reward =
+            await api(
+                "/api/ad-reward",
+                {
+                    method:"POST",
+
+                    body:JSON.stringify({
+                        rewardToken
+                    })
+                }
+            );
+
+        if(reward.ok){
+
+            alert(
+                "+" +
+                reward.reward +
+                " points"
+            );
+
+            loadUser();
+        }
+
+    }catch(error){
+
+        console.log(error);
+
+        alert(
+            "No advertisement available."
+        );
+    }
+}
+
+
+/* =========================================
+   INVITE
+========================================= */
+
+function invite(){
+
+    const username =
+        "YOUR_BOT_USERNAME";
+
+    const user =
+        tg.initDataUnsafe?.user;
+
+    if(!user){
+
+        return;
+    }
+
+    const link =
+        `https://t.me/${username}?start=ref_${user.id}`;
+
+    const text =
+        encodeURIComponent(
+            "Join this Mini App and compete with me!"
+        );
+
+    tg.openTelegramLink(
+        `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`
+    );
+}
+
+
+/* =========================================
+   LEADERBOARD
+========================================= */
+
+async function loadLeaderboard(){
+
+    const data =
+        await api(
+            "/api/leaderboard"
+        );
+
+    if(!data.ok){
+
+        return;
+    }
+
+    const container =
+        document.getElementById("leaders");
+
+    container.innerHTML = "";
+
+    data.users.forEach(user => {
+
+        const row =
+            document.createElement("div");
+
+        row.className =
+            "leader";
+
+        row.innerHTML = `
+
+            <div class="rank">
+                ${user.rank}
+            </div>
+
+            <img
+                src="${user.photo_url || ""}"
+            >
+
+            <div style="flex:1">
+
+                <strong>
+                    ${user.first_name || "User"}
+                </strong>
+
+                <div>
+                    ${user.username
+                        ? "@" + user.username
+                        : ""}
+                </div>
+
+            </div>
+
+            <div>
+
+                <b>${user.ads_count}</b>
+                <small> ads</small>
+
+                <br>
+
+                <b>${user.invite_count}</b>
+                <small> invites</small>
+
+            </div>
+
+        `;
+
+        container.appendChild(row);
+
+    });
+}
+
+
+/* =========================================
+   PROFILE
+========================================= */
+
+async function loadProfile(){
+
+    const data =
+        await api("/api/profile");
+
+    if(!data.ok){
+
+        return;
+    }
+
+    const u = data.user;
+
+    document.getElementById("ads")
+        .textContent =
+        u.total_ads;
+
+    document.getElementById("invites")
+        .textContent =
+        u.total_invites;
+
+    document.getElementById("rank")
+        .textContent =
+        data.rank || "-";
+
+    document.getElementById("profilePoints")
+        .textContent =
+        u.points;
+}
+
+
+/* =========================================
+   PAGE SWITCH
+========================================= */
+
+function showPage(page){
+
+    document
+        .getElementById("home")
+        .classList.add("hidden");
+
+    document
+        .getElementById("leaderboard")
+        .classList.add("hidden");
+
+    document
+        .getElementById("profilePage")
+        .classList.add("hidden");
+
+    document
+        .getElementById(page)
+        .classList.remove("hidden");
+
+    if(page === "leaderboard"){
+
+        loadLeaderboard();
+
+    }
+
+    if(page === "profilePage"){
+
+        loadProfile();
+
+    }
+}
+
+
+/* =========================================
+   START
+========================================= */
+
+loadUser();
+
+</script>
+
+</body>
+
+</html>
