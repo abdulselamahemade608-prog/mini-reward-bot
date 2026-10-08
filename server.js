@@ -124,6 +124,29 @@ async function ensureDatabase() {
                     processed_at TIMESTAMPTZ
                 );
             `);
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS account_name TEXT;`);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_tasks (
+                    id BIGSERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    url TEXT NOT NULL,
+                    channel TEXT,
+                    reward NUMERIC NOT NULL DEFAULT 0,
+                    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_task_claims (
+                    id BIGSERIAL PRIMARY KEY,
+                    task_id BIGINT NOT NULL,
+                    telegram_id BIGINT NOT NULL,
+                    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    completed_at TIMESTAMPTZ,
+                    UNIQUE(task_id, telegram_id)
+                );
+            `);
             await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
                 VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100')
@@ -728,7 +751,7 @@ app.post("/api/admin/reward", authenticate, requireAdmin, async (req, res) => {
 
 /* ============================ WITHDRAW ============================ */
 
-const WITHDRAW_METHODS = ["USDT", "TON", "Telebirr", "Other"];
+const WITHDRAW_METHODS = ["CBE", "Telebirr", "M-Pesa"];
 
 async function notifyUser(telegramId, text) {
     try {
@@ -746,12 +769,16 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         const amount = Number(req.body?.amount);
         const method = String(req.body?.method || "").trim();
         const address = String(req.body?.address || "").trim();
+        const accountName = String(req.body?.accountName || "").trim();
 
         if (!WITHDRAW_METHODS.includes(method)) {
             return res.status(400).json({ ok: false, error: "Choose a valid payout method." });
         }
+        if (accountName.length < 2 || accountName.length > 100) {
+            return res.status(400).json({ ok: false, error: "Enter the account owner name." });
+        }
         if (address.length < 3 || address.length > 200) {
-            return res.status(400).json({ ok: false, error: "Enter a valid wallet or account." });
+            return res.status(400).json({ ok: false, error: "Enter a valid account number." });
         }
         if (!Number.isFinite(amount) || amount <= 0) {
             return res.status(400).json({ ok: false, error: "Enter a valid amount." });
@@ -763,6 +790,9 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         const minWithdraw = Number(minRes.rows[0]?.value || 100);
         if (amount < minWithdraw) {
             return res.status(400).json({ ok: false, error: `Minimum withdrawal is ${minWithdraw}.` });
+        }
+        if (!allJoinedOf(await checkAllChannels(telegramId))) {
+            return res.status(403).json({ ok: false, error: "Join all required channels first." });
         }
 
         const client = await pool.connect();
@@ -800,8 +830,8 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
                 [telegramId, amount]
             );
             await client.query(
-                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address) VALUES($1,$2,$3,$4)`,
-                [telegramId, amount, method, address]
+                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address, account_name) VALUES($1,$2,$3,$4,$5)`,
+                [telegramId, amount, method, address, accountName]
             );
 
             await client.query("COMMIT");
@@ -827,7 +857,7 @@ app.get("/api/withdrawals", authenticate, async (req, res) => {
     try {
         await requireDatabase();
         const r = await pool.query(
-            `SELECT id, amount, method, address, status, admin_note, created_at, processed_at
+            `SELECT id, amount, method, address, account_name, status, admin_note, created_at, processed_at
              FROM mr_withdrawals WHERE telegram_id = $1 ORDER BY id DESC LIMIT 30`,
             [String(req.telegramUser.id)]
         );
@@ -851,7 +881,7 @@ app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) =
             params.push(status);
         }
         const r = await pool.query(
-            `SELECT w.id, w.telegram_id, w.amount, w.method, w.address, w.status,
+            `SELECT w.id, w.telegram_id, w.amount, w.method, w.address, w.account_name, w.status,
                     w.admin_note, w.created_at, w.processed_at,
                     u.username, u.first_name, u.last_name
              FROM mr_withdrawals w
@@ -943,6 +973,185 @@ app.post("/api/admin/withdrawals/:id", authenticate, requireAdmin, async (req, r
         res.json({ ok: true });
     } catch (error) {
         console.error("/api/admin/withdrawals", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ============================== TASKS ============================== */
+
+const isId = v => /^\d+$/.test(String(v));
+
+app.get("/api/tasks", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        const r = await pool.query(
+            `SELECT t.id, t.title, t.description, t.url, t.channel, t.reward,
+                    (c.completed_at IS NOT NULL) AS completed,
+                    (c.started_at IS NOT NULL) AS started
+             FROM mr_tasks t
+             LEFT JOIN mr_task_claims c ON c.task_id = t.id AND c.telegram_id = $1
+             WHERE t.enabled = TRUE
+             ORDER BY t.id DESC`,
+            [String(req.telegramUser.id)]
+        );
+        res.json({ ok: true, tasks: r.rows.map(t => ({ ...t, reward: Number(t.reward) })) });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/tasks/:id/start", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const telegramId = String(req.telegramUser.id);
+
+        if (!allJoinedOf(await checkAllChannels(telegramId))) {
+            return res.status(403).json({ ok: false, error: "Join all required channels first." });
+        }
+        const t = await pool.query(`SELECT id FROM mr_tasks WHERE id = $1 AND enabled = TRUE`, [req.params.id]);
+        if (!t.rows.length) return res.status(404).json({ ok: false, error: "Task not found." });
+
+        await pool.query(
+            `INSERT INTO mr_task_claims(task_id, telegram_id) VALUES($1,$2)
+             ON CONFLICT(task_id, telegram_id) DO NOTHING`,
+            [req.params.id, telegramId]
+        );
+        res.json({ ok: true });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/tasks/:id/claim", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const telegramId = String(req.telegramUser.id);
+
+        if (!allJoinedOf(await checkAllChannels(telegramId))) {
+            return res.status(403).json({ ok: false, error: "Join all required channels first." });
+        }
+
+        const me = await pool.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1`, [telegramId]);
+        if (!me.rows.length || me.rows[0].is_banned) {
+            return res.status(403).json({ ok: false, error: "Account not allowed." });
+        }
+
+        const tr = await pool.query(`SELECT * FROM mr_tasks WHERE id = $1 AND enabled = TRUE`, [req.params.id]);
+        if (!tr.rows.length) return res.status(404).json({ ok: false, error: "Task not found." });
+        const task = tr.rows[0];
+
+        const cr = await pool.query(
+            `SELECT completed_at, EXTRACT(EPOCH FROM (NOW() - started_at)) AS secs
+             FROM mr_task_claims WHERE task_id = $1 AND telegram_id = $2`,
+            [task.id, telegramId]
+        );
+        if (!cr.rows.length) return res.status(400).json({ ok: false, error: "Start the task first." });
+        if (cr.rows[0].completed_at) return res.status(409).json({ ok: false, error: "Task already completed." });
+
+        if (task.channel) {
+            const chk = await checkChannel(telegramId, task.channel);
+            if (!chk.joined) return res.status(400).json({ ok: false, error: "Join the channel first, then claim." });
+        } else if (Number(cr.rows[0].secs) < 8) {
+            return res.status(400).json({ ok: false, error: "Please complete the task first." });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            const upd = await client.query(
+                `UPDATE mr_task_claims SET completed_at = NOW()
+                 WHERE task_id = $1 AND telegram_id = $2 AND completed_at IS NULL RETURNING id`,
+                [task.id, telegramId]
+            );
+            if (!upd.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ ok: false, error: "Task already completed." });
+            }
+            await client.query(
+                `UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`,
+                [telegramId, task.reward]
+            );
+            await client.query("COMMIT");
+        } catch (e) {
+            await client.query("ROLLBACK").catch(() => {});
+            throw e;
+        } finally {
+            client.release();
+        }
+
+        res.json({ ok: true, reward: Number(task.reward) });
+    } catch (error) {
+        console.error("/api/tasks/claim", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.get("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const r = await pool.query(
+            `SELECT t.id, t.title, t.description, t.url, t.channel, t.reward, t.enabled,
+                    (SELECT COUNT(*)::int FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL) AS completions
+             FROM mr_tasks t ORDER BY t.id DESC LIMIT 100`
+        );
+        res.json({ ok: true, tasks: r.rows.map(t => ({ ...t, reward: Number(t.reward) })) });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        const title = String(req.body?.title || "").trim();
+        const description = String(req.body?.description || "").trim().slice(0, 200);
+        const url = String(req.body?.url || "").trim();
+        const channel = String(req.body?.channel || "").trim();
+        const reward = Number(req.body?.reward);
+
+        if (!title || title.length > 80) {
+            return res.status(400).json({ ok: false, error: "Title is required (max 80 characters)." });
+        }
+        if (!/^https?:\/\/\S+$/i.test(url)) {
+            return res.status(400).json({ ok: false, error: "Link must start with http:// or https://" });
+        }
+        if (channel && !/^(@[A-Za-z0-9_]{4,}|-100\d+)$/.test(channel)) {
+            return res.status(400).json({ ok: false, error: "Channel must look like @channelname." });
+        }
+        if (!Number.isFinite(reward) || reward <= 0 || reward > 100000) {
+            return res.status(400).json({ ok: false, error: "Reward must be greater than 0." });
+        }
+
+        await pool.query(
+            `INSERT INTO mr_tasks(title, description, url, channel, reward) VALUES($1,$2,$3,$4,$5)`,
+            [title, description, url, channel || null, reward]
+        );
+        res.json({ ok: true });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            await client.query(`DELETE FROM mr_task_claims WHERE task_id = $1`, [req.params.id]);
+            await client.query(`DELETE FROM mr_tasks WHERE id = $1`, [req.params.id]);
+            await client.query("COMMIT");
+        } catch (e) {
+            await client.query("ROLLBACK").catch(() => {});
+            throw e;
+        } finally {
+            client.release();
+        }
+        res.json({ ok: true });
+    } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
 });
