@@ -6,6 +6,8 @@
 <title>Reward Mini App</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<!-- Monetag SDK (zone 11984693) -->
+<script src="https://libtl.com/sdk.js" data-zone="11984693" data-sdk="show_11984693"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -87,7 +89,6 @@ h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
 .btn.glass{background:rgba(255,255,255,.16);box-shadow:none;backdrop-filter:blur(6px)}
 .btn.green{background:linear-gradient(135deg,#22c55e,#10b981);box-shadow:0 8px 20px rgba(34,197,94,.3)}
 .btn.red{background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 8px 20px rgba(239,68,68,.3)}
-.btn.pinkb{background:linear-gradient(135deg,#ec4899,#8b5cf6);box-shadow:0 8px 20px rgba(236,72,153,.3)}
 .btn.dark{background:var(--card2);box-shadow:none;border:1px solid var(--line)}
 .btn.sm{padding:11px;font-size:14px;border-radius:13px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
@@ -117,11 +118,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .badge.pending{background:rgba(245,158,11,.18);color:#fbbf24}
 .badge.approved{background:rgba(34,197,94,.18);color:#4ade80}
 .badge.rejected{background:rgba(239,68,68,.18);color:#f87171}
-.verify{background:linear-gradient(135deg,#2a1f4d,#1b2650);border:1px solid #4a3a8a;border-radius:20px;padding:16px;margin-bottom:14px}
-.verify a{color:#7dc4ff;font-weight:600}
 .empty{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px}
-.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.notice{background:var(--red);color:#fff;border-radius:20px;font-size:11px;font-weight:800;padding:2px 7px;margin-left:6px}
+.txlink{color:#7dc4ff;font-weight:600;text-decoration:underline;cursor:pointer}
 
 .av{position:relative;width:46px;height:46px;border-radius:50%;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;
   font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.12)}
@@ -217,7 +215,6 @@ nav button.active svg{stroke:#8ec5ff}
         <div class="x"><b>Watch an ad</b><span id="hAdSub">Earn points instantly</span></div>
       </div>
       <button class="btn" id="hWatch" style="margin-top:14px"></button>
-      <button class="btn pinkb hidden" id="hWatchM" style="margin-top:10px"></button>
     </div>
 
     <h2><span class="ib sm purple" id="topIc"></span>Top earners</h2>
@@ -236,7 +233,6 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="progress"><i id="eBar" style="width:0"></i></div>
       <div class="muted" id="eProg">0 / 0 today</div>
       <button class="btn" id="eWatch" style="margin-top:14px"></button>
-      <button class="btn pinkb hidden" id="eWatchM" style="margin-top:10px"></button>
     </div>
 
     <div class="card">
@@ -288,20 +284,17 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="stat"><span class="ib orange" id="p3"></span><div class="v" id="pRank">#-</div><div class="l">Rank</div></div>
     </div>
 
-    <h2><span class="ib sm teal" id="wIc"></span>Withdraw</h2>
+    <h2><span class="ib sm teal" id="wIc"></span>Withdraw (BEP20)</h2>
     <div class="card" id="wCard">
       <div class="line" style="margin-bottom:6px">
         <div class="x"><span>Available balance</span><b style="font-size:24px" id="wBal">0</b></div>
         <div class="muted" id="wMin">Min -</div>
       </div>
-      <label>Payout method</label>
-      <div class="chips" id="wMethods"></div>
-      <label>Account owner name</label>
-      <input id="wName" type="text" placeholder="Full name on the account" autocomplete="off" maxlength="100">
-      <label id="wAddrLabel">Account number / phone</label>
-      <input id="wAddr" type="text" inputmode="numeric" placeholder="Account number or phone number" autocomplete="off" maxlength="20">
-      <div class="muted" id="wAddrHint" style="margin-top:6px"></div>
-      <label>Amount</label>
+      <div class="muted" id="wRate" style="margin-bottom:4px"></div>
+      <label>BEP20 wallet address</label>
+      <input id="wAddr" type="text" placeholder="0x..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="42">
+      <div class="muted" style="margin-top:6px">BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.</div>
+      <label>Amount (points)</label>
       <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
       <div class="muted" id="wFee" style="margin-top:8px"></div>
       <button class="btn green" id="wBtn" style="margin-top:14px"></button>
@@ -329,7 +322,7 @@ nav button.active svg{stroke:#8ec5ff}
     </div>
     <div class="seg">
       <button id="segStats" class="on">Dashboard</button>
-      <button id="segReq">Requests</button>
+      <button id="segReq">Payments</button>
       <button id="segUsers">Users</button>
       <button id="segTask">Tasks</button>
       <button id="segPromo">Promo</button>
@@ -370,9 +363,9 @@ nav button.active svg{stroke:#8ec5ff}
 
     <div id="admReq" class="hidden">
       <div class="chips" id="admFilter" style="margin-bottom:12px">
-        <span class="chip on" data-s="pending">Pending</span>
-        <span class="chip" data-s="approved">Approved</span>
-        <span class="chip" data-s="rejected">Rejected</span>
+        <span class="chip on" data-s="approved">Paid</span>
+        <span class="chip" data-s="rejected">Failed</span>
+        <span class="chip" data-s="pending">In progress</span>
       </div>
       <div id="admList"></div>
     </div>
@@ -394,7 +387,9 @@ nav button.active svg{stroke:#8ec5ff}
         <label style="margin-top:0">Ad reward (points)</label><input id="a_ad" type="number" step="any" min="0">
         <label>Invite reward (points)</label><input id="a_inv" type="number" step="any" min="0">
         <label>Daily ads limit</label><input id="a_max" type="number" min="0">
-        <label>Minimum withdrawal</label><input id="a_min" type="number" step="any" min="0">
+        <label>Surprise ad every N seconds (0 = off, min 10)</label><input id="a_auto" type="number" min="0" step="1">
+        <label>Minimum withdrawal (points)</label><input id="a_min" type="number" step="any" min="0">
+        <label>Value of 1 point in USD (e.g. 0.01)</label><input id="a_pv" type="number" step="any" min="0">
         <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
         <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
         <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
@@ -417,13 +412,11 @@ nav button.active svg{stroke:#8ec5ff}
 
 <script>
 /* =====================================================
-   CONFIG - Adsgram Block ID
+   CONFIG
 ===================================================== */
-const ADSGRAM_BLOCK_ID = "52630";
-
-/* Auto-shown ads (Interstitial). Create an "Interstitial" block in Adsgram
-   (its ID starts with "int-") and paste it here. Empty = auto ads are off. */
-const ADSGRAM_INTERSTITIAL_ID = "";
+const ADSGRAM_BLOCK_ID = "52630";          // rewarded block
+const ADSGRAM_INTERSTITIAL_ID = "";        // optional "int-..." block for surprise ads
+const MONETAG_ZONE = "11984693";           // Monetag zone id
 
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#070b16"); tg.setBackgroundColor && tg.setBackgroundColor("#070b16"); } catch (e) {} }
@@ -433,8 +426,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const shortAddr = a => String(a || "").slice(0, 6) + "..." + String(a || "").slice(-4);
 
-/* ---------------- icons (colored badges, no emoji) ---------------- */
+/* ---------------- icons ---------------- */
 const P = {
   home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/>',
   play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/>',
@@ -461,7 +455,6 @@ const svg = n => `<svg viewBox="0 0 24 24">${P[n] || ""}</svg>`;
 function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
 function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text + "</span>"; }
 
-/* static icon setup */
 [["gIc","shield"],["prIc","gift"],["msIc","gift"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
  ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i3","shield"],["frIc","users"],["i2","coin"],
  ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
@@ -470,8 +463,6 @@ setBtn("hWithdraw","wallet","Withdraw");
 setBtn("hInvite","users","Invite");
 setBtn("hWatch","play","Watch ad &amp; earn");
 setBtn("eWatch","play","Watch ad &amp; earn");
-setBtn("hWatchM","play","Watch Monetag ad &amp; earn");
-setBtn("eWatchM","play","Watch Monetag ad &amp; earn");
 setBtn("supportBtn","send","Contact admin");
 setBtn("addTask","check","Add task");
 setBtn("promoBtn","check","Redeem");
@@ -480,25 +471,18 @@ setBtn("pCreate","check","Create code");
 setBtn("bSend","send","Send to everyone");
 setBtn("shareBtn","share","Share");
 setBtn("copyBtn","copy","Copy");
-setBtn("wBtn","send","Request withdrawal");
+setBtn("wBtn","send","Withdraw now");
 setBtn("adminBtn","shield","Admin panel");
 setBtn("saveSettings","check","Save settings");
 const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invite"], profile:["user","Profile"] };
 document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
 
 /* ---------------- state / helpers ---------------- */
-let ME = null, BOT_USERNAME = "", adController = null, watching = false;
-let wMethod = "CBE", admStatus = "pending", currentTab = "home";
-const METHODS = ["CBE", "Telebirr", "M-Pesa"];
+let ME = null, BOT_USERNAME = "", adController = null, interCtrl = null;
+let watching = false, autoBusy = false;
+let admStatus = "approved", currentTab = "home";
 const SUPPORT_BOT = "Adewa_eran_support_bot";
-
-/* account number rules (must match the server) */
-const ACC_RULES = {
-  "Telebirr": { re: /^09\d{8}$/, len: 10, ph: "09XXXXXXXX", hint: "Telebirr: starts with 09, exactly 10 digits.", err: "Telebirr number must start with 09 and be exactly 10 digits." },
-  "M-Pesa":   { re: /^07\d{8}$/, len: 10, ph: "07XXXXXXXX", hint: "M-Pesa: starts with 07, exactly 10 digits.", err: "M-Pesa number must start with 07 and be exactly 10 digits." },
-  "CBE":      { re: /^1000\d{9}$/, len: 13, ph: "1000XXXXXXXXX", hint: "CBE: starts with 1000 or 10000, exactly 13 digits.", err: "CBE account must start with 1000 or 10000 and be exactly 13 digits." }
-};
-const cleanNum = s => String(s || "").replace(/[\s-]/g, "");
+const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
 
 let toastTimer;
 function toast(msg, type) {
@@ -538,6 +522,8 @@ function countUp(el, to) {
 
 const nameOf = u => [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "User");
 const fmtDate = d => d ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+const sym = () => (ME && ME.payout && ME.payout.symbol) || "USDT";
+const explorer = () => (ME && ME.payout && ME.payout.explorer) || "https://bscscan.com/tx/";
 
 /* ---------------- render ---------------- */
 function render() {
@@ -564,19 +550,14 @@ function render() {
   $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
   updateFee();
   $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
+  $("wRate").textContent = "1 point = " + (st.point_value_usd ?? 0.01) + " USD · paid in " + sym() + " (BEP20)";
 
   $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?start=" + u.telegram_id : "Bot username is not configured";
 
-  const hasM = !!(ME.monetag && ME.monetag.zoneId);
-  $("hWatchM").classList.toggle("hidden", !hasM);
-  $("eWatchM").classList.toggle("hidden", !hasM);
-
   const ab = $("adminBtn");
   ab.classList.toggle("hidden", !u.is_admin);
-  if (u.is_admin) {
-    setBtn("adminBtn", "shield", "Admin panel" + (ME.pending_withdrawals ? '<span class="notice">' + ME.pending_withdrawals + "</span>" : ""));
-  }
 
+  scheduleAuto();
   applyGate();
 }
 
@@ -586,7 +567,7 @@ function applyGate() {
   $("app").classList.toggle("hidden", !ok);
   $("nav").classList.toggle("hidden", !ok);
   if (ok) return;
-  $("channelList").innerHTML = (ME.channels || []).map((c, i) => {
+  $("channelList").innerHTML = (ME.channels || []).map(c => {
     const h = String(c.channel).replace(/^@/, "");
     const hint = c.error ? "Bot must be admin in this channel" : (c.joined ? "Joined" : "Not joined yet");
     return `<div class="card" style="padding:13px"><div class="line">
@@ -605,22 +586,9 @@ function openLink(url) {
 }
 $("supportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
 
-/* ---------------- Monetag SDK ---------------- */
-let monetagLoaded = false;
-function loadMonetag(zone) {
-  if (monetagLoaded || !zone) return;
-  monetagLoaded = true;
-  const s = document.createElement("script");
-  s.src = "https://libtl.com/sdk.js";
-  s.dataset.zone = zone;
-  s.dataset.sdk = "show_" + zone;
-  document.head.appendChild(s);
-}
-
 async function refreshMe() {
   const d = await api("/api/me");
   ME = d; BOT_USERNAME = (d.bot && d.bot.username) || "";
-  if (d.monetag && d.monetag.zoneId) loadMonetag(d.monetag.zoneId);
   render();
 }
 
@@ -637,19 +605,51 @@ async function loadTop() {
   } catch (e) { $("topList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
 }
 
-/* ---------------- ads ---------------- */
-function getCtrl() {
-  if (adController) return adController;
-  if (!window.Adsgram) throw new Error("Adsgram failed to load. Check your internet.");
-  adController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
-  return adController;
-}
+/* =====================================================
+   ADS: Adsgram + Monetag in turns
+===================================================== */
 const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
-
-const WATCH_BTNS = ["hWatch", "eWatch", "hWatchM", "eWatchM"];
+const WATCH_BTNS = ["hWatch", "eWatch"];
 function setWatchBusy(b) { watching = b; WATCH_BTNS.forEach(i => $(i).disabled = b); }
 
-// ask the server for the reward (waits for the ad network to confirm when strict)
+const other = p => (p === "adsgram" ? "monetag" : "adsgram");
+function getTurn(key) { try { return localStorage.getItem(key) === "monetag" ? "monetag" : "adsgram"; } catch (e) { return "adsgram"; } }
+function setTurn(key, p) { try { localStorage.setItem(key, p); } catch (e) {} }
+
+function getCtrl() {
+  if (adController) return adController;
+  if (!window.Adsgram) return null;
+  try { adController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID }); } catch (e) { return null; }
+  return adController;
+}
+function getInter() {
+  if (interCtrl) return interCtrl;
+  if (!ADSGRAM_INTERSTITIAL_ID || !window.Adsgram) return null;
+  try { interCtrl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_ID }); } catch (e) { return null; }
+  return interCtrl;
+}
+const monetagFn = () => { const f = window["show_" + MONETAG_ZONE]; return typeof f === "function" ? f : null; };
+
+// returns "done" | "skipped" | "noad"
+async function showProvider(p) {
+  if (p === "adsgram") {
+    const c = getCtrl();
+    if (!c) return "noad";
+    try {
+      const r = await c.show();
+      return r && r.done ? "done" : "skipped";
+    } catch (e) {
+      return e && e.error === false ? "skipped" : "noad";
+    }
+  }
+  const f = monetagFn();
+  if (!f) return "noad";
+  try {
+    await f({ ymid: String(ME.user.telegram_id) });
+    return "done";
+  } catch (e) { return "noad"; }
+}
+
 async function claimAdReward(provider) {
   let d = null;
   for (let i = 0; i < 10; i++) {
@@ -661,40 +661,60 @@ async function claimAdReward(provider) {
 }
 
 async function watchAd() {
-  if (watching) return;
+  if (watching || autoBusy) return;
   if (ME && !ME.allJoined) return toast("Join all required channels first.", "err");
   setWatchBusy(true);
   try {
-    const r = await getCtrl().show();
-    if (!r || !r.done) return toast("Ad was not completed.");
-    await claimAdReward("adsgram");
+    const first = getTurn("adTurn");
+    let used = null, result = "noad";
+    for (const p of [first, other(first)]) {          // whichever is ready is shown
+      const r = await showProvider(p);
+      if (r === "noad") continue;
+      used = p; result = r; break;
+    }
+    if (result === "noad") return toast("Ads not ready. Try again in a moment.", "err");
+    setTurn("adTurn", other(used));                    // next time the other network goes first
+    if (result === "skipped") return toast("Ad was not completed.");
+    await claimAdReward(used);
   } catch (e) {
     toast((e && (e.description || e.message)) || "Ad error", "err");
   } finally {
     setWatchBusy(false);
   }
 }
-
-async function watchMonetag() {
-  if (watching) return;
-  if (ME && !ME.allJoined) return toast("Join all required channels first.", "err");
-  const zone = ME && ME.monetag && ME.monetag.zoneId;
-  if (!zone) return toast("Monetag is not configured.", "err");
-  const fn = window["show_" + zone];
-  if (typeof fn !== "function") return toast("Monetag failed to load. Check your internet.", "err");
-  setWatchBusy(true);
-  try {
-    // ymid = telegram id, so Monetag's postback tells the server who watched
-    await fn({ ymid: String(ME.user.telegram_id) });
-    await claimAdReward("monetag");
-  } catch (e) {
-    toast((e && (e.message || e.description)) || "Ad was not completed.", "err");
-  } finally {
-    setWatchBusy(false);
-  }
-}
 $("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
-$("hWatchM").onclick = watchMonetag; $("eWatchM").onclick = watchMonetag;
+
+/* ---------------- surprise ads (admin sets the seconds) ---------------- */
+let autoTimer = null, autoSec = 0;
+function scheduleAuto() {
+  const s = Number(((ME && ME.settings) || {}).auto_ad_seconds || 0);
+  if (s === autoSec) return;
+  autoSec = s;
+  clearInterval(autoTimer); autoTimer = null;
+  if (s >= 10) autoTimer = setInterval(showAutoAd, s * 1000);
+}
+async function showAutoAd() {
+  if (autoBusy || watching || document.hidden) return;
+  if (!ME || !ME.allJoined) return;
+  if (!$("modal").classList.contains("hidden")) return;
+  autoBusy = true;
+  try {
+    const first = getTurn("autoTurn");
+    for (const p of [first, other(first)]) {
+      let r = "noad";
+      if (p === "adsgram") {
+        const c = getInter();
+        if (c) { try { const x = await c.show(); r = x && x.done ? "done" : "skipped"; } catch (e) { r = e && e.error === false ? "skipped" : "noad"; } }
+      } else {
+        const f = monetagFn();
+        if (f) { try { await f(); r = "done"; } catch (e) { r = "noad"; } }   // no ymid -> never gives points
+      }
+      if (r !== "noad") { setTurn("autoTurn", other(p)); break; }
+    }
+  } finally { autoBusy = false; }
+}
+// pick up changes made by the admin
+setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy) refreshMe().catch(() => {}); }, 60000);
 
 /* ---------------- invite ---------------- */
 $("shareBtn").onclick = () => {
@@ -710,39 +730,24 @@ $("copyBtn").onclick = async () => {
 $("hInvite").onclick = () => showTab("invite");
 $("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
 
-/* ---------------- withdraw ---------------- */
+/* ---------------- withdraw (BEP20 auto payment) ---------------- */
 function updateFee() {
-  const pct = ((ME && ME.settings) || {}).withdraw_fee_percent ?? 25;
+  const st = (ME && ME.settings) || {};
+  const pct = st.withdraw_fee_percent ?? 25;
+  const rate = st.point_value_usd ?? 0.01;
   const amt = Number($("wAmt").value) || 0;
   const fee = Math.round(amt * pct) / 100;
-  $("wFee").textContent = "Service fee " + pct + "%" + (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + (amt - fee).toFixed(2) : "");
+  const fin = amt - fee;
+  $("wFee").textContent = "Service fee " + pct + "%" +
+    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " " + sym() : "");
 }
 $("wAmt").addEventListener("input", updateFee);
-
-function updateAddrHint() {
-  const r = ACC_RULES[wMethod];
-  $("wAddr").placeholder = r.ph;
-  $("wAddr").maxLength = r.len;
-  $("wAddrHint").textContent = r.hint;
-  $("wAddrLabel").textContent = wMethod === "CBE" ? "CBE account number" : wMethod + " phone number";
-}
-$("wAddr").addEventListener("input", () => {
-  const v = $("wAddr").value.replace(/\D/g, "");
-  if (v !== $("wAddr").value) $("wAddr").value = v;
-});
-
-function renderMethods() {
-  $("wMethods").innerHTML = METHODS.map(m => `<span class="chip ${m === wMethod ? "on" : ""}" data-m="${m}">${m}</span>`).join("");
-  $("wMethods").querySelectorAll(".chip").forEach(c => c.onclick = () => { wMethod = c.dataset.m; $("wAddr").value = ""; renderMethods(); });
-  updateAddrHint();
-}
-renderMethods();
 
 function showReceipt(text) {
   const modal = $("modal");
   modal.innerHTML = `<div class="sheet">
     <div class="line" style="margin-bottom:12px"><span class="ib green">${svg("check")}</span>
-    <div class="x"><b style="font-size:17px">Request received</b><span>Your withdrawal request was sent to the admin.</span></div></div>
+    <div class="x"><b style="font-size:17px">Payment sent</b><span>Your withdrawal was paid automatically.</span></div></div>
     <pre class="receipt">${esc(text)}</pre>
     <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
   modal.classList.remove("hidden");
@@ -751,17 +756,15 @@ function showReceipt(text) {
 }
 
 $("wBtn").onclick = async () => {
-  const name = $("wName").value.trim();
-  const addr = cleanNum($("wAddr").value);
+  const addr = $("wAddr").value.trim();
   const amount = Number($("wAmt").value);
 
-  if (name.length < 2) return toast("Enter the account owner name.", "err");
-  if (!ACC_RULES[wMethod].re.test(addr)) return toast(ACC_RULES[wMethod].err, "err");
+  if (!ADDR_RE.test(addr)) return toast("Enter a valid BEP20 address (0x + 40 characters).", "err");
   if (!Number.isFinite(amount) || amount <= 0) return toast("Enter a valid amount.", "err");
 
   const btn = $("wBtn"); btn.disabled = true;
   try {
-    const d = await api("/api/withdraw", "POST", { amount, method: wMethod, accountName: name, address: addr });
+    const d = await api("/api/withdraw", "POST", { amount, address: addr });
     $("wAmt").value = ""; updateFee();
     showReceipt(d.receipt);
     await refreshMe(); loadHistory();
@@ -772,17 +775,21 @@ $("wBtn").onclick = async () => {
 function statusBadge(s) {
   return `<span class="badge ${s}">${s[0].toUpperCase() + s.slice(1)}</span>`;
 }
+const statusLabel = s => s === "approved" ? "Paid" : s === "rejected" ? "Failed" : "Processing";
+const badgeOf = s => `<span class="badge ${s}">${statusLabel(s)}</span>`;
 
 async function loadHistory() {
   try {
     const d = await api("/api/withdrawals");
     $("wHist").innerHTML = d.withdrawals.length ? d.withdrawals.map(w => {
       const ic = w.status === "approved" ? ["check","green"] : w.status === "rejected" ? ["x","redg"] : ["clock","orange"];
+      const tx = w.tx_hash ? ` · <span class="txlink" data-tx="${esc(w.tx_hash)}">View tx</span>` : "";
       return `<div class="card" style="padding:13px"><div class="line">
         <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
-        <div class="x"><b>${fmt(w.amount)} · ${esc(w.method)}</b><span>${esc(w.account_name || "")} · Receive ${fmt(w.final_amount ?? w.amount)} · ${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</span></div>
-        ${statusBadge(w.status)}</div></div>`;
+        <div class="x"><b>${fmt(w.amount)} pts · BEP20</b><span>${esc(shortAddr(w.address))} · ${fmt(w.token_amount ? w.token_amount : 0)} ${esc(sym())} · ${fmtDate(w.created_at)}${tx}</span></div>
+        ${badgeOf(w.status)}</div></div>`;
     }).join("") : '<div class="empty">No withdrawals yet.</div>';
+    $("wHist").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
   } catch (e) { $("wHist").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
 }
 
@@ -803,6 +810,7 @@ function admSeg(name) {
   if (name === "set") {
     const s = ME.settings || {};
     $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100;
+    $("a_auto").value = s.auto_ad_seconds ?? 0; $("a_pv").value = s.point_value_usd ?? 0.01;
     $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
     $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
   }
@@ -835,49 +843,24 @@ async function loadAdmin() {
       return `<div class="card">
         <div class="line"><span class="ib sm blue">${svg("user")}</span>
           <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · ${fmtDate(w.created_at)}</span></div>
-          ${statusBadge(w.status)}</div>
-        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.final_amount)} <span class="muted">to send · ${esc(w.method)}</span></div><div class="muted">Requested ${fmt(w.amount)} · Fee ${fmt(w.fee)}</div>
-        <div class="linkbox" style="margin:8px 0"><span class="muted">Owner</span><br><b>${esc(w.account_name || "-")}</b><br><span class="muted" style="display:block;margin-top:8px">Account</span><b>${esc(w.address)}</b></div>
-        ${w.admin_note ? `<div class="muted" style="margin-bottom:8px">Note: ${esc(w.admin_note)}</div>` : ""}
-        ${w.status === "pending" ? `<div class="row2" style="margin-top:8px">
-          <button class="btn green sm" data-a="approve" data-id="${esc(w.id)}">${svg("check")}<span>Accept</span></button>
-          <button class="btn red sm" data-a="reject" data-id="${esc(w.id)}">${svg("x")}<span>Reject</span></button></div>` : ""}
+          ${badgeOf(w.status)}</div>
+        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.token_amount)} <span class="muted">${esc(sym())} · BEP20</span></div>
+        <div class="muted">Requested ${fmt(w.amount)} pts · Fee ${fmt(w.fee)} · Net ${fmt(w.final_amount)}</div>
+        <div class="linkbox" style="margin:8px 0"><span class="muted">Address</span><br><b>${esc(w.address)}</b>
+          ${w.tx_hash ? `<br><span class="txlink" data-tx="${esc(w.tx_hash)}">View transaction</span>` : ""}</div>
+        ${w.admin_note ? `<div class="muted">Note: ${esc(w.admin_note)}</div>` : ""}
       </div>`;
     }).join("") : '<div class="empty">Nothing here.</div>';
-
-    $("admList").querySelectorAll("button[data-a]").forEach(b => b.onclick = () => handleAction(b.dataset.id, b.dataset.a));
+    $("admList").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
   } catch (e) { $("admList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-
-function handleAction(id, action) {
-  const modal = $("modal");
-  const isRej = action === "reject";
-  modal.innerHTML = `<div class="sheet">
-    <div class="line" style="margin-bottom:12px"><span class="ib ${isRej ? "redg" : "green"}">${svg(isRej ? "x" : "check")}</span>
-    <div class="x"><b style="font-size:17px">${isRej ? "Reject request" : "Accept request"}</b><span>${isRej ? "Points will be returned to the user." : "Confirm you have sent the payment. The bot will ask you for the screenshot."}</span></div></div>
-    <input id="mNote" type="text" placeholder="Note (optional)" maxlength="200">
-    <div class="row2" style="margin-top:14px">
-      <button class="btn dark" id="mCancel">Cancel</button>
-      <button class="btn ${isRej ? "red" : "green"}" id="mOk">Confirm</button></div></div>`;
-  modal.classList.remove("hidden");
-  $("mCancel").onclick = () => modal.classList.add("hidden");
-  modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
-  $("mOk").onclick = async () => {
-    $("mOk").disabled = true;
-    try {
-      await api("/api/admin/withdrawals/" + encodeURIComponent(id), "POST", { action, note: $("mNote").value.trim() });
-      modal.classList.add("hidden");
-      toast(isRej ? "Request rejected." : "Request accepted. Check the bot to send the screenshot.", "ok");
-      await refreshMe(); loadAdmin();
-    } catch (e) { toast(e.message, "err"); $("mOk").disabled = false; }
-  };
 }
 
 $("saveSettings").onclick = async () => {
   try {
     await api("/api/admin/settings", "POST", {
       ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
-      max_ads_per_day: $("a_max").value, min_withdraw: $("a_min").value, verify_ads: $("a_vads").value,
+      max_ads_per_day: $("a_max").value, auto_ad_seconds: $("a_auto").value,
+      min_withdraw: $("a_min").value, point_value_usd: $("a_pv").value, verify_ads: $("a_vads").value,
       daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value
     });
     toast("Settings saved.", "ok"); await refreshMe();
@@ -914,34 +897,6 @@ function renderMilestones(verified, claimed) {
   }).join("");
 }
 
-/* ---------------- auto ads (interstitial) ---------------- */
-let interCtrl = null, interBusy = false, lastInter = Date.now(), lastActive = Date.now();
-function getInter() {
-  if (interCtrl) return interCtrl;
-  if (!ADSGRAM_INTERSTITIAL_ID || !window.Adsgram) return null;
-  try { interCtrl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_ID }); } catch (e) { return null; }
-  return interCtrl;
-}
-async function showInterstitial() {
-  if (interBusy || watching || document.hidden) return;
-  if (!ME || !ME.allJoined) return;
-  if (!$("modal").classList.contains("hidden")) return;
-  if (Date.now() - lastInter < 25000) return;
-  const c = getInter();
-  if (!c) return;
-  interBusy = true; lastInter = Date.now();
-  try { await c.show(); } catch (e) { /* no ad available or skipped: ignore */ }
-  interBusy = false; lastInter = Date.now(); lastActive = Date.now();
-}
-["touchstart", "click", "scroll", "keydown"].forEach(ev =>
-  window.addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
-setInterval(() => {
-  if (!ADSGRAM_INTERSTITIAL_ID) return;
-  const now = Date.now(), idle = now - lastActive;
-  if (idle >= 60000) return showInterstitial();
-  if (idle < 30000 && now - lastInter >= 30000) showInterstitial();
-}, 5000);
-
 /* ---------------- admin: dashboard / users / promo / broadcast ---------------- */
 const tile = (ic, color, v, l) => `<div class="stat"><span class="ib ${color}">${svg(ic)}</span><div class="v">${v}</div><div class="l">${l}</div></div>`;
 
@@ -954,9 +909,9 @@ async function loadStats() {
       tile("star", "green", fmt(d.new_today), "New today") +
       tile("play", "pink", fmt(d.ads_today), "Ads today") +
       tile("play", "purple", fmt(d.ads_total), "Ads total") +
-      tile("wallet", "green", fmt(d.paid_total), "Total paid") +
-      tile("wallet", "teal", fmt(d.paid_today), "Paid today") +
-      tile("clock", "orange", fmt(d.pending_count), "Pending (" + fmt(d.pending_amount) + ")") +
+      tile("wallet", "green", fmt(d.paid_total), "Total paid (pts)") +
+      tile("wallet", "teal", fmt(d.paid_today), "Paid today (pts)") +
+      tile("clock", "orange", fmt(d.pending_count), "In progress") +
       tile("shield", "redg", fmt(d.banned), "Banned") +
       tile("users", "blue", fmt(d.verified_refs), "Verified invites");
   } catch (e) { $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(e.message) + "</div>"; }
@@ -1101,7 +1056,7 @@ async function loadFriends() {
 }
 
 /* ---------------- tasks ---------------- */
-const taskState = {};   // id -> "started"
+const taskState = {};
 
 async function loadTasks() {
   try {
@@ -1211,4 +1166,4 @@ async function init() {
 init();
 </script>
 </body>
-  </html>
+                                                                                                                       </html>
