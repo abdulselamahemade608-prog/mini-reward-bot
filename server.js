@@ -155,6 +155,8 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS final_amount NUMERIC;`);
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS tx_hash TEXT;`);
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS token_amount NUMERIC;`);
+            // when a payout started - used to recover requests that got stuck in 'processing'
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS processing_at TIMESTAMPTZ;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT TRUE;`);
             await pool.query(`ALTER TABLE mr_referrals ALTER COLUMN verified SET DEFAULT FALSE;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;`);
@@ -272,7 +274,7 @@ app.get("/api/health", async (req, res) => {
         await pool.query("SELECT 1");
         res.json({
             ok: true,
-            version: "bot-webhook-v3",
+            version: "bot-webhook-v4",
             adsStrict: STRICT_ADS,
             monetagStrict: STRICT_MONETAG,
             database: true,
@@ -1007,7 +1009,9 @@ function getPayer() {
 }
 
 // Sends native BNB. A DB advisory lock makes sure two payouts never use the same nonce.
-async function sendPayout(to, tokenAmount) {
+// onSent(hash) is called right after the transaction is broadcast, so the hash is saved
+// in the database immediately (even if the serverless function is stopped afterwards).
+async function sendPayout(to, tokenAmount, onSent) {
     const { wallet, provider } = getPayer();
     const lock = await pool.connect();
     try {
@@ -1018,6 +1022,9 @@ async function sendPayout(to, tokenAmount) {
         const gasCost = 21000n * (feeData.gasPrice || 0n);
         if (bal < amt + gasCost) throw new Error("Payout wallet has not enough " + TOKEN_SYMBOL + ".");
         const tx = await wallet.sendTransaction({ to, value: amt });
+        if (typeof onSent === "function") {
+            try { await onSent(tx.hash); } catch (e) { console.error("onSent", e.message); }
+        }
         return tx.hash;
     } finally {
         await lock.query("SELECT pg_advisory_unlock(778899)").catch(() => {});
@@ -1079,21 +1086,37 @@ async function postProof(w) {
     }
 }
 
+// Claims a request ('pending', or a 'processing' one that has been stuck for 3+ minutes),
+// sends the payout, then marks it approved.
 async function approveWithdrawal(id, adminId) {
     const c = await pool.query(
-        `UPDATE mr_withdrawals SET status = 'processing' WHERE id = $1 AND status = 'pending' RETURNING *`,
+        `UPDATE mr_withdrawals SET status = 'processing', processing_at = NOW()
+         WHERE id = $1
+           AND (status = 'pending'
+                OR (status = 'processing' AND (processing_at IS NULL OR processing_at < NOW() - INTERVAL '3 minutes')))
+         RETURNING *`,
         [id]
     );
-    if (!c.rows.length) return { ok: false, error: "Request not found or already processed." };
+    if (!c.rows.length) {
+        return { ok: false, error: "Request not found, still being processed, or already processed." };
+    }
     const row = c.rows[0];
 
-    let txHash;
-    try {
-        txHash = await sendPayout(row.address, Number(row.token_amount));
-    } catch (e) {
-        console.error("payout failed", e.message);
-        await pool.query(`UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1`, [id]).catch(() => {});
-        return { ok: false, error: "Payment failed: " + e.message };
+    // if an earlier attempt already broadcast the transaction, do not pay twice
+    let txHash = row.tx_hash || null;
+    if (!txHash) {
+        try {
+            txHash = await sendPayout(row.address, Number(row.token_amount), async h => {
+                await pool.query(`UPDATE mr_withdrawals SET tx_hash = $2 WHERE id = $1`, [id, h]);
+            });
+        } catch (e) {
+            console.error("payout failed", e.message);
+            await pool.query(
+                `UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1 AND tx_hash IS NULL`,
+                [id]
+            ).catch(() => {});
+            return { ok: false, error: "Payment failed: " + e.message };
+        }
     }
 
     await pool.query(
@@ -1118,6 +1141,8 @@ async function approveWithdrawal(id, adminId) {
     return { ok: true, tx_hash: txHash };
 }
 
+// Rejects a 'pending' request (or a 'processing' one that is stuck without any transaction)
+// and gives the points back to the user.
 async function rejectWithdrawal(id, adminId, note) {
     const client = await pool.connect();
     let w;
@@ -1125,12 +1150,16 @@ async function rejectWithdrawal(id, adminId, note) {
         await client.query("BEGIN");
         const u = await client.query(
             `UPDATE mr_withdrawals SET status='rejected', admin_note=$2, processed_at=NOW()
-             WHERE id=$1 AND status='pending' RETURNING telegram_id, amount`,
+             WHERE id=$1
+               AND (status='pending'
+                    OR (status='processing' AND tx_hash IS NULL
+                        AND (processing_at IS NULL OR processing_at < NOW() - INTERVAL '3 minutes')))
+             RETURNING telegram_id, amount`,
             [id, note]
         );
         if (!u.rows.length) {
             await client.query("ROLLBACK");
-            return { ok: false, error: "Request not found or already processed." };
+            return { ok: false, error: "Request not found, still being processed, or already processed." };
         }
         w = u.rows[0];
         await client.query(
@@ -1163,26 +1192,49 @@ async function handleAdminCallback(cb) {
         await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "Admin only.", show_alert: true }).catch(() => {});
         return;
     }
-    await requireDatabase();
     const approve = m[1] === "approve";
-    let r;
-    try {
-        r = approve
-            ? await approveWithdrawal(m[2], ADMIN_ID)
-            : await rejectWithdrawal(m[2], ADMIN_ID, "Rejected by admin");
-    } catch (e) {
-        r = { ok: false, error: e.message };
-    }
+    const id = m[2];
+
+    // answer right away - Telegram only keeps a button press alive for a short time
     await telegram("answerCallbackQuery", {
         callback_query_id: cb.id,
-        text: r.ok ? (approve ? "Paid \u2705" : "Rejected \u274C") : String(r.error).slice(0, 190),
-        show_alert: !r.ok
+        text: approve ? "Sending payment..." : "Rejecting..."
     }).catch(() => {});
-    if (r.ok && cb.message?.text) {
-        await telegram("editMessageText", {
-            chat_id: cb.message.chat.id,
-            message_id: cb.message.message_id,
-            text: cb.message.text + "\n\n" + (approve ? "\u2705 Approved and paid" : "\u274C Rejected"),
+
+    let r;
+    try {
+        await requireDatabase();
+        r = approve
+            ? await approveWithdrawal(id, ADMIN_ID)
+            : await rejectWithdrawal(id, ADMIN_ID, "Rejected by admin");
+    } catch (e) {
+        console.error("handleAdminCallback", e.message);
+        r = { ok: false, error: e.message };
+    }
+
+    const chatId = cb.message?.chat?.id || Number(ADMIN_ID);
+
+    if (r.ok) {
+        const result = approve
+            ? "\u2705 Approved and paid" + (r.tx_hash ? "\n" + EXPLORER_TX + r.tx_hash : "")
+            : "\u274C Rejected";
+        if (cb.message?.text) {
+            await telegram("editMessageText", {
+                chat_id: chatId,
+                message_id: cb.message.message_id,
+                text: cb.message.text + "\n\n" + result,
+                disable_web_page_preview: true
+            }).catch(async () => {
+                await telegram("sendMessage", { chat_id: chatId, text: `Request #${id}: ${result}`, disable_web_page_preview: true }).catch(() => {});
+            });
+        } else {
+            await telegram("sendMessage", { chat_id: chatId, text: `Request #${id}: ${result}`, disable_web_page_preview: true }).catch(() => {});
+        }
+    } else {
+        // keep the buttons so the admin can try again, and show the reason
+        await telegram("sendMessage", {
+            chat_id: chatId,
+            text: `\u26A0\uFE0F Request #${id}: ${String(r.error).slice(0, 500)}`,
             disable_web_page_preview: true
         }).catch(() => {});
     }
@@ -1364,10 +1416,13 @@ app.get("/api/withdrawals", authenticate, async (req, res) => {
 app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) => {
     try {
         await requireDatabase();
-        const status = String(req.query.status || "approved");
+        const status = String(req.query.status || "pending");
         const params = [];
         let where = "";
-        if (["pending", "approved", "rejected"].includes(status)) {
+        if (status === "pending") {
+            // "In progress" = waiting for the admin, or a payout that is being sent right now
+            where = "WHERE w.status IN ('pending','processing')";
+        } else if (["approved", "rejected"].includes(status)) {
             where = "WHERE w.status = $1";
             params.push(status);
         }
@@ -1583,8 +1638,8 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
                 (SELECT COUNT(*)::int FROM mr_ad_rewards) AS ads_total,
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved') AS paid_total,
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved' AND processed_at >= date_trunc('day', NOW())) AS paid_today,
-                (SELECT COUNT(*)::int FROM mr_withdrawals WHERE status = 'pending') AS pending_count,
-                (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'pending') AS pending_amount,
+                (SELECT COUNT(*)::int FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_count,
+                (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_amount,
                 (SELECT COUNT(*)::int FROM mr_referrals WHERE verified = TRUE) AS verified_refs
         `);
         const x = r.rows[0];
