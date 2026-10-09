@@ -1059,17 +1059,132 @@ async function postProof(w) {
         const fin = Number(w.final_amount ?? amt - fee);
         const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
         const text =
-            "\u{1F4B8} New Withdrawal Request\n\n" +
+            "\u{1F4B8} New Withdrawal proof\n\n" +
             `\u{1F4B8} User ID: ${w.telegram_id}\n` +
             `\u{1F4B8} BEP20 Address: ${maskAddr(w.address)}\n` +
             `\u{1F4B8} Requested Amount: ${amt.toFixed(2)} Points\n` +
             `\u{1F4B3} ${pct}% Service Fee: ${fee.toFixed(2)} Points\n` +
             `\u{1F4B3} Final Amount: ${fin.toFixed(2)} Points (${Number(w.token_amount).toFixed(6)} ${TOKEN_SYMBOL})\n\n` +
-            "\u{1F4B8} Status: Paid\n" +
-            `\u{1F517} Tx: ${EXPLORER_TX}${w.tx_hash}`;
-        await telegram("sendMessage", { chat_id: PROOF_CHANNEL, text, disable_web_page_preview: true });
+            "\u{1F4B8} Status: Paid";
+        await telegram("sendMessage", {
+            chat_id: PROOF_CHANNEL,
+            text,
+            disable_web_page_preview: true,
+            reply_markup: {
+                inline_keyboard: [[{ text: "\u{1F517} View Transaction", url: EXPLORER_TX + w.tx_hash }]]
+            }
+        });
     } catch (e) {
         console.error("postProof", e.message);
+    }
+}
+
+async function approveWithdrawal(id, adminId) {
+    const c = await pool.query(
+        `UPDATE mr_withdrawals SET status = 'processing' WHERE id = $1 AND status = 'pending' RETURNING *`,
+        [id]
+    );
+    if (!c.rows.length) return { ok: false, error: "Request not found or already processed." };
+    const row = c.rows[0];
+
+    let txHash;
+    try {
+        txHash = await sendPayout(row.address, Number(row.token_amount));
+    } catch (e) {
+        console.error("payout failed", e.message);
+        await pool.query(`UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1`, [id]).catch(() => {});
+        return { ok: false, error: "Payment failed: " + e.message };
+    }
+
+    await pool.query(
+        `UPDATE mr_withdrawals SET status='approved', tx_hash=$2, admin_note='Approved', processed_at=NOW() WHERE id=$1`,
+        [id, txHash]
+    );
+    await pool.query(
+        `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+        [adminId, "withdraw_approved", JSON.stringify({ id, user: row.telegram_id, amount: Number(row.amount), tokenAmount: Number(row.token_amount), txHash })]
+    ).catch(() => {});
+
+    const w = {
+        ...row,
+        amount: Number(row.amount), fee: Number(row.fee),
+        final_amount: Number(row.final_amount), token_amount: Number(row.token_amount),
+        tx_hash: txHash
+    };
+    await Promise.allSettled([
+        notifyUser(w.telegram_id, withdrawalText(w, "Paid")),
+        postProof(w)
+    ]);
+    return { ok: true, tx_hash: txHash };
+}
+
+async function rejectWithdrawal(id, adminId, note) {
+    const client = await pool.connect();
+    let w;
+    try {
+        await client.query("BEGIN");
+        const u = await client.query(
+            `UPDATE mr_withdrawals SET status='rejected', admin_note=$2, processed_at=NOW()
+             WHERE id=$1 AND status='pending' RETURNING telegram_id, amount`,
+            [id, note]
+        );
+        if (!u.rows.length) {
+            await client.query("ROLLBACK");
+            return { ok: false, error: "Request not found or already processed." };
+        }
+        w = u.rows[0];
+        await client.query(
+            `UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`,
+            [w.telegram_id, w.amount]
+        );
+        await client.query("COMMIT");
+    } catch (e) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw e;
+    } finally {
+        client.release();
+    }
+    await pool.query(
+        `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+        [adminId, "withdraw_rejected", JSON.stringify({ id, user: w.telegram_id, amount: Number(w.amount) })]
+    ).catch(() => {});
+    await notifyUser(
+        w.telegram_id,
+        `\u274C Your withdrawal request #${id} was rejected. ${Number(w.amount).toFixed(2)} points were returned to your balance.`
+    );
+    return { ok: true };
+}
+
+// Approve / Reject buttons that the bot sends to the admin
+async function handleAdminCallback(cb) {
+    const m = /^wd:(approve|reject):(\d+)$/.exec(String(cb.data || ""));
+    if (!m) return;
+    if (!ADMIN_ID || String(cb.from?.id) !== ADMIN_ID) {
+        await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "Admin only.", show_alert: true }).catch(() => {});
+        return;
+    }
+    await requireDatabase();
+    const approve = m[1] === "approve";
+    let r;
+    try {
+        r = approve
+            ? await approveWithdrawal(m[2], ADMIN_ID)
+            : await rejectWithdrawal(m[2], ADMIN_ID, "Rejected by admin");
+    } catch (e) {
+        r = { ok: false, error: e.message };
+    }
+    await telegram("answerCallbackQuery", {
+        callback_query_id: cb.id,
+        text: r.ok ? (approve ? "Paid \u2705" : "Rejected \u274C") : String(r.error).slice(0, 190),
+        show_alert: !r.ok
+    }).catch(() => {});
+    if (r.ok && cb.message?.text) {
+        await telegram("editMessageText", {
+            chat_id: cb.message.chat.id,
+            message_id: cb.message.message_id,
+            text: cb.message.text + "\n\n" + (approve ? "\u2705 Approved and paid" : "\u274C Rejected"),
+            disable_web_page_preview: true
+        }).catch(() => {});
     }
 }
 
@@ -1164,7 +1279,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             }
 
             const pending = await client.query(
-                `SELECT 1 FROM mr_withdrawals WHERE telegram_id = $1 AND status = 'pending' LIMIT 1`,
+                `SELECT 1 FROM mr_withdrawals WHERE telegram_id = $1 AND status IN ('pending','processing') LIMIT 1`,
                 [telegramId]
             );
             if (pending.rows.length) {
@@ -1191,58 +1306,34 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             client.release();
         }
 
-        // 2) send the payment automatically
-        let txHash;
-        try {
-            txHash = await sendPayout(address, tokenAmount);
-        } catch (e) {
-            console.error("payout failed", e.message);
-            const note = "Payment failed";
-            const c2 = await pool.connect();
-            try {
-                await c2.query("BEGIN");
-                await c2.query(
-                    `UPDATE mr_withdrawals SET status='rejected', admin_note=$2, processed_at=NOW() WHERE id=$1`,
-                    [wid, note]
-                );
-                await c2.query(
-                    `UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`,
-                    [telegramId, amount]
-                );
-                await c2.query("COMMIT");
-            } catch (e2) {
-                await c2.query("ROLLBACK").catch(() => {});
-                console.error("refund failed", e2.message);
-            } finally {
-                c2.release();
-            }
-            if (ADMIN_ID) notifyUser(ADMIN_ID, `\u26A0\uFE0F Auto payout failed (request #${wid}, user ${telegramId}): ${e.message}`);
-            return res.status(502).json({ ok: false, error: "Payment failed. Your points were returned. Try again later." });
-        }
-
-        await pool.query(
-            `UPDATE mr_withdrawals SET status='approved', tx_hash=$2, admin_note='Auto paid', processed_at=NOW() WHERE id=$1`,
-            [wid, txHash]
-        );
-        await pool.query(
-            `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
-            ["auto", "withdraw_auto_paid", JSON.stringify({ id: wid, user: telegramId, amount, tokenAmount, txHash })]
-        ).catch(() => {});
-
+        // 2) the admin approves or rejects; the payment is sent only after approval
         const w = {
             id: wid, telegram_id: telegramId, amount, method: "BEP20", address,
-            fee, final_amount: finalAmount, token_amount: tokenAmount, tx_hash: txHash
+            fee, final_amount: finalAmount, token_amount: tokenAmount
         };
-        const receipt = withdrawalText(w, "Paid");
 
-        await Promise.allSettled([
-            notifyUser(telegramId, receipt),
-            ADMIN_ID ? notifyUser(ADMIN_ID, `\u2705 Auto payout #${wid}\nUser: ${telegramId}\nTo: ${shortAddr(address)}\n${tokenAmount.toFixed(6)} ${TOKEN_SYMBOL}\n${EXPLORER_TX}${txHash}`) : null,
-            postProof(w)
-        ]);
+        if (ADMIN_ID) {
+            await telegram("sendMessage", {
+                chat_id: Number(ADMIN_ID),
+                text: withdrawalText(w, "Pending") + `\n\nRequest #${wid}`,
+                disable_web_page_preview: true,
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: "\u2705 Approve", callback_data: `wd:approve:${wid}` },
+                        { text: "\u274C Reject", callback_data: `wd:reject:${wid}` }
+                    ]]
+                }
+            }).catch(e => console.error("notify admin", e.message));
+        }
 
         const after = await pool.query(`SELECT points FROM mr_users WHERE telegram_id = $1`, [telegramId]);
-        res.json({ ok: true, points: Number(after.rows[0].points), receipt, tx_hash: txHash });
+        res.json({
+            ok: true,
+            pending: true,
+            id: wid,
+            points: Number(after.rows[0].points),
+            receipt: withdrawalText(w, "Pending approval")
+        });
     } catch (error) {
         console.error("/api/withdraw", error);
         res.status(500).json({ ok: false, error: error.message });
@@ -1298,6 +1389,31 @@ app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) =
             }))
         });
     } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/withdrawals/:id/approve", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const r = await approveWithdrawal(req.params.id, ADMIN_ID);
+        res.status(r.ok ? 200 : 400).json(r);
+    } catch (error) {
+        console.error("/api/admin/withdrawals/approve", error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+app.post("/api/admin/withdrawals/:id/reject", authenticate, requireAdmin, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+        const note = String(req.body?.note || "Rejected by admin").slice(0, 200);
+        const r = await rejectWithdrawal(req.params.id, ADMIN_ID, note);
+        res.status(r.ok ? 200 : 400).json(r);
+    } catch (error) {
+        console.error("/api/admin/withdrawals/reject", error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
@@ -1670,6 +1786,9 @@ app.post("/api/telegram-webhook", async (req, res) => {
     }
 
     try {
+        const cb = req.body?.callback_query;
+        if (cb) await handleAdminCallback(cb);
+
         const msg = req.body?.message;
         if (
             msg && msg.chat?.type === "private" && msg.from && !msg.from.is_bot &&
@@ -1711,7 +1830,7 @@ app.get("/api/setup-webhook", async (req, res) => {
         await telegram("setWebhook", {
             url,
             secret_token: WEBHOOK_SECRET,
-            allowed_updates: ["message"],
+            allowed_updates: ["message", "callback_query"],
             drop_pending_updates: true
         });
         await telegram("setChatMenuButton", {
