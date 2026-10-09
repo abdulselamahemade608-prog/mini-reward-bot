@@ -116,6 +116,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .chip.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent}
 .badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
 .badge.pending{background:rgba(245,158,11,.18);color:#fbbf24}
+.badge.processing{background:rgba(59,130,246,.18);color:#60a5fa}
 .badge.approved{background:rgba(34,197,94,.18);color:#4ade80}
 .badge.rejected{background:rgba(239,68,68,.18);color:#f87171}
 .empty{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px}
@@ -363,9 +364,9 @@ nav button.active svg{stroke:#8ec5ff}
 
     <div id="admReq" class="hidden">
       <div class="chips" id="admFilter" style="margin-bottom:12px">
-        <span class="chip on" data-s="approved">Paid</span>
-        <span class="chip" data-s="rejected">Failed</span>
-        <span class="chip" data-s="pending">In progress</span>
+        <span class="chip on" data-s="pending">Pending</span>
+        <span class="chip" data-s="approved">Paid</span>
+        <span class="chip" data-s="rejected">Rejected</span>
       </div>
       <div id="admList"></div>
     </div>
@@ -480,7 +481,7 @@ document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.t
 /* ---------------- state / helpers ---------------- */
 let ME = null, BOT_USERNAME = "", adController = null, interCtrl = null;
 let watching = false, autoBusy = false;
-let admStatus = "approved", currentTab = "home";
+let admStatus = "pending", currentTab = "home";
 const SUPPORT_BOT = "Adewa_eran_support_bot";
 const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -506,6 +507,16 @@ async function api(path, method, body) {
     throw err;
   }
   return data;
+}
+
+// asks the admin to confirm an action (Telegram native popup, or the browser confirm as fallback)
+function confirmBox(message) {
+  return new Promise(resolve => {
+    if (tg && typeof tg.showConfirm === "function") {
+      try { tg.showConfirm(message, ok => resolve(!!ok)); return; } catch (e) {}
+    }
+    resolve(window.confirm(message));
+  });
 }
 
 function countUp(el, to) {
@@ -730,7 +741,7 @@ $("copyBtn").onclick = async () => {
 $("hInvite").onclick = () => showTab("invite");
 $("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
 
-/* ---------------- withdraw (BEP20 auto payment) ---------------- */
+/* ---------------- withdraw (BEP20, admin approves, then auto payment) ---------------- */
 function updateFee() {
   const st = (ME && ME.settings) || {};
   const pct = st.withdraw_fee_percent ?? 25;
@@ -747,7 +758,7 @@ function showReceipt(text) {
   const modal = $("modal");
   modal.innerHTML = `<div class="sheet">
     <div class="line" style="margin-bottom:12px"><span class="ib green">${svg("check")}</span>
-    <div class="x"><b style="font-size:17px">Payment sent</b><span>Your withdrawal was paid automatically.</span></div></div>
+    <div class="x"><b style="font-size:17px">Request sent</b><span>Waiting for admin approval. You will get a message when it is paid.</span></div></div>
     <pre class="receipt">${esc(text)}</pre>
     <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
   modal.classList.remove("hidden");
@@ -775,7 +786,7 @@ $("wBtn").onclick = async () => {
 function statusBadge(s) {
   return `<span class="badge ${s}">${s[0].toUpperCase() + s.slice(1)}</span>`;
 }
-const statusLabel = s => s === "approved" ? "Paid" : s === "rejected" ? "Failed" : "Processing";
+const statusLabel = s => s === "approved" ? "Paid" : s === "rejected" ? "Failed" : s === "processing" ? "Processing" : "Pending";
 const badgeOf = s => `<span class="badge ${s}">${statusLabel(s)}</span>`;
 
 async function loadHistory() {
@@ -840,18 +851,52 @@ async function loadAdmin() {
     const d = await api("/api/admin/withdrawals?status=" + admStatus);
     $("admList").innerHTML = d.withdrawals.length ? d.withdrawals.map(w => {
       const who = [w.first_name, w.last_name].filter(Boolean).join(" ") || (w.username ? "@" + w.username : "User");
+      const open = w.status === "pending" || w.status === "processing";
+      const actions = open ? `
+        <div class="row2" style="margin-top:12px">
+          <button class="btn red sm" data-rj="${esc(w.id)}">${svg("x")}<span>Reject</span></button>
+          <button class="btn green sm" data-ap="${esc(w.id)}">${svg("check")}<span>Approve &amp; pay</span></button>
+        </div>` : "";
       return `<div class="card">
         <div class="line"><span class="ib sm blue">${svg("user")}</span>
-          <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · ${fmtDate(w.created_at)}</span></div>
+          <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · #${esc(w.id)} · ${fmtDate(w.created_at)}</span></div>
           ${badgeOf(w.status)}</div>
         <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.token_amount)} <span class="muted">${esc(sym())} · BEP20</span></div>
         <div class="muted">Requested ${fmt(w.amount)} pts · Fee ${fmt(w.fee)} · Net ${fmt(w.final_amount)}</div>
         <div class="linkbox" style="margin:8px 0"><span class="muted">Address</span><br><b>${esc(w.address)}</b>
           ${w.tx_hash ? `<br><span class="txlink" data-tx="${esc(w.tx_hash)}">View transaction</span>` : ""}</div>
         ${w.admin_note ? `<div class="muted">Note: ${esc(w.admin_note)}</div>` : ""}
+        ${actions}
       </div>`;
     }).join("") : '<div class="empty">Nothing here.</div>';
+
     $("admList").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
+
+    $("admList").querySelectorAll("button[data-ap]").forEach(b => b.onclick = async () => {
+      const id = b.dataset.ap, w = d.withdrawals.find(x => String(x.id) === id);
+      const ok = await confirmBox("Approve request #" + id + " and send " + fmt(w ? w.token_amount : 0) + " " + sym() + " now? This cannot be undone.");
+      if (!ok) return;
+      document.querySelectorAll("#admList button").forEach(x => x.disabled = true);
+      toast("Sending payment... please wait.");
+      try {
+        const r = await api("/api/admin/withdrawals/" + encodeURIComponent(id) + "/approve", "POST", {});
+        toast("Paid \u2705", "ok");
+        if (r && r.tx_hash) console.log("tx", r.tx_hash);
+      } catch (e) { toast(e.message, "err"); }
+      loadAdmin();
+    });
+
+    $("admList").querySelectorAll("button[data-rj]").forEach(b => b.onclick = async () => {
+      const id = b.dataset.rj;
+      const ok = await confirmBox("Reject request #" + id + "? The points will be returned to the user.");
+      if (!ok) return;
+      document.querySelectorAll("#admList button").forEach(x => x.disabled = true);
+      try {
+        await api("/api/admin/withdrawals/" + encodeURIComponent(id) + "/reject", "POST", { note: "Rejected by admin" });
+        toast("Rejected. Points returned.", "ok");
+      } catch (e) { toast(e.message, "err"); }
+      loadAdmin();
+    });
   } catch (e) { $("admList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
 }
 
@@ -911,7 +956,7 @@ async function loadStats() {
       tile("play", "purple", fmt(d.ads_total), "Ads total") +
       tile("wallet", "green", fmt(d.paid_total), "Total paid (pts)") +
       tile("wallet", "teal", fmt(d.paid_today), "Paid today (pts)") +
-      tile("clock", "orange", fmt(d.pending_count), "In progress") +
+      tile("clock", "orange", fmt(d.pending_count), "Pending") +
       tile("shield", "redg", fmt(d.banned), "Banned") +
       tile("users", "blue", fmt(d.verified_refs), "Verified invites");
   } catch (e) { $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(e.message) + "</div>"; }
@@ -1166,4 +1211,4 @@ async function init() {
 init();
 </script>
 </body>
-  </html>
+</html>
