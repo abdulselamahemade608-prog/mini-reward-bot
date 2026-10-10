@@ -1118,16 +1118,67 @@ function buildWithdrawalHtml(w, status, opts = {}) {
 // kept for compatibility - same message, in HTML
 const withdrawalText = (w, status) => buildWithdrawalHtml(w, status);
 
+/*
+ * Proof channel message (short "Withdrawal Successful" style):
+ *
+ *   ⚡ Withdrawal Successful!
+ *   👤 User: name
+ *   💵 Amount: $0.0200 USDT (after $0.01 fee)
+ *   🪙 Network: BEP20
+ *   📦 Address: 0x1234********abcd
+ *   [ Check out ]  <- green button with premium emoji, opens the BscScan tx
+ */
+function buildProofHtml(w, userLabel) {
+    const fee = Number(w.fee || 0);
+    const fin = Number(w.final_amount ?? Number(w.amount) - fee);
+    const tok = Number(w.token_amount || 0);
+
+    // real USD value that was paid = BNB sent * BNB price
+    const usdPaid = tok * BNB_PRICE_USD;
+    // USD value of one point for this withdrawal (so the fee can be shown in USD too)
+    const rate = fin > 0 ? usdPaid / fin : 0;
+    const feeUsd = fee * rate;
+
+    return (
+        `\u26A1 <b>Withdrawal Successful!</b>\n\n` +
+        `\u{1F464} <b>User:</b> ${esc(userLabel || "\u2014")}\n` +
+        `\u{1F4B5} <b>Amount:</b> $${usdPaid.toFixed(4)} USDT (after $${feeUsd.toFixed(2)} fee)\n` +
+        `\u{1FA99} <b>Network:</b> BEP20\n` +
+        `\u{1F4E6} <b>Address:</b> <code>${esc(maskAddr(w.address))}</code>`
+    );
+}
+
 async function postProof(w) {
     if (!PROOF_CHANNEL) return;
     try {
+        // show the user's name / @username instead of the numeric id
+        let userLabel = "\u2014";
+        try {
+            const u = await pool.query(
+                `SELECT username, first_name FROM mr_users WHERE telegram_id = $1`,
+                [w.telegram_id]
+            );
+            if (u.rows.length) {
+                userLabel = u.rows[0].username
+                    ? "@" + u.rows[0].username
+                    : (u.rows[0].first_name || "\u2014");
+            }
+        } catch (e) {
+            console.error("postProof user", e.message);
+        }
+
         await telegram("sendMessage", {
             chat_id: PROOF_CHANNEL,
-            text: buildWithdrawalHtml(w, "Paid", { maskAddress: true }),
+            text: buildProofHtml(w, userLabel),
             parse_mode: "HTML",
             disable_web_page_preview: true,
             reply_markup: {
-                inline_keyboard: [[{ text: "\u{1F517} View Transaction", url: EXPLORER_TX + w.tx_hash }]]
+                inline_keyboard: [[{
+                    text: "Check out",
+                    url: EXPLORER_TX + w.tx_hash,
+                    style: "success",                         // green button
+                    icon_custom_emoji_id: EMOJI_ADDRESS       // telebirr premium emoji
+                }]]
             }
         });
     } catch (e) {
