@@ -415,7 +415,9 @@ nav button.active svg{stroke:#8ec5ff}
 /* =====================================================
    CONFIG
 ===================================================== */
-const ADSGRAM_BLOCK_ID = "52630";          // rewarded block
+// fallback only: the real Adsgram block id comes from the server (/api/me -> adsgram.blockId)
+// so the app and the server always use the same block.
+const ADSGRAM_BLOCK_FALLBACK = "52630";
 const ADSGRAM_INTERSTITIAL_ID = "";        // optional "int-..." block for surprise ads
 const MONETAG_ZONE = "11984693";           // Monetag zone id
 
@@ -426,6 +428,14 @@ const INIT_DATA = tg ? tg.initData : "";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
+// BNB amounts can be very small, so show up to 8 decimals (no trailing zeros)
+const fmtCrypto = n => {
+  const x = Number(n || 0);
+  if (!x) return "0";
+  let t = x.toFixed(8).replace(/0+$/, "");
+  if (t.endsWith(".")) t = t.slice(0, -1);
+  return t;
+};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const shortAddr = a => String(a || "").slice(0, 6) + "..." + String(a || "").slice(-4);
 
@@ -479,7 +489,7 @@ const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invit
 document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
 
 /* ---------------- state / helpers ---------------- */
-let ME = null, BOT_USERNAME = "", adController = null, interCtrl = null;
+let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null;
 let watching = false, autoBusy = false;
 let admStatus = "pending", currentTab = "home";
 const SUPPORT_BOT = "Adewa_eran_support_bot";
@@ -627,10 +637,14 @@ const other = p => (p === "adsgram" ? "monetag" : "adsgram");
 function getTurn(key) { try { return localStorage.getItem(key) === "monetag" ? "monetag" : "adsgram"; } catch (e) { return "adsgram"; } }
 function setTurn(key, p) { try { localStorage.setItem(key, p); } catch (e) {} }
 
+// the block id comes from the server so app and server always match
+const adsgramBlock = () => String((ME && ME.adsgram && ME.adsgram.blockId) || ADSGRAM_BLOCK_FALLBACK);
+
 function getCtrl() {
-  if (adController) return adController;
+  const block = adsgramBlock();
+  if (adController && adControllerBlock === block) return adController;
   if (!window.Adsgram) return null;
-  try { adController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID }); } catch (e) { return null; }
+  try { adController = window.Adsgram.init({ blockId: block }); adControllerBlock = block; } catch (e) { return null; }
   return adController;
 }
 function getInter() {
@@ -750,7 +764,7 @@ function updateFee() {
   const fee = Math.round(amt * pct) / 100;
   const fin = amt - fee;
   $("wFee").textContent = "Service fee " + pct + "%" +
-    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " " + sym() : "");
+    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " USD" : "");
 }
 $("wAmt").addEventListener("input", updateFee);
 
@@ -797,7 +811,7 @@ async function loadHistory() {
       const tx = w.tx_hash ? ` · <span class="txlink" data-tx="${esc(w.tx_hash)}">View tx</span>` : "";
       return `<div class="card" style="padding:13px"><div class="line">
         <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
-        <div class="x"><b>${fmt(w.amount)} pts · BEP20</b><span>${esc(shortAddr(w.address))} · ${fmt(w.token_amount ? w.token_amount : 0)} ${esc(sym())} · ${fmtDate(w.created_at)}${tx}</span></div>
+        <div class="x"><b>${fmt(w.amount)} pts · BEP20</b><span>${esc(shortAddr(w.address))} · ${fmtCrypto(w.token_amount)} ${esc(sym())} · ${fmtDate(w.created_at)}${tx}</span></div>
         ${badgeOf(w.status)}</div></div>`;
     }).join("") : '<div class="empty">No withdrawals yet.</div>';
     $("wHist").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
@@ -861,7 +875,7 @@ async function loadAdmin() {
         <div class="line"><span class="ib sm blue">${svg("user")}</span>
           <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · #${esc(w.id)} · ${fmtDate(w.created_at)}</span></div>
           ${badgeOf(w.status)}</div>
-        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmt(w.token_amount)} <span class="muted">${esc(sym())} · BEP20</span></div>
+        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmtCrypto(w.token_amount)} <span class="muted">${esc(sym())} · BEP20</span></div>
         <div class="muted">Requested ${fmt(w.amount)} pts · Fee ${fmt(w.fee)} · Net ${fmt(w.final_amount)}</div>
         <div class="linkbox" style="margin:8px 0"><span class="muted">Address</span><br><b>${esc(w.address)}</b>
           ${w.tx_hash ? `<br><span class="txlink" data-tx="${esc(w.tx_hash)}">View transaction</span>` : ""}</div>
@@ -874,7 +888,7 @@ async function loadAdmin() {
 
     $("admList").querySelectorAll("button[data-ap]").forEach(b => b.onclick = async () => {
       const id = b.dataset.ap, w = d.withdrawals.find(x => String(x.id) === id);
-      const ok = await confirmBox("Approve request #" + id + " and send " + fmt(w ? w.token_amount : 0) + " " + sym() + " now? This cannot be undone.");
+      const ok = await confirmBox("Approve request #" + id + " and send " + fmtCrypto(w ? w.token_amount : 0) + " " + sym() + " now? This cannot be undone.");
       if (!ok) return;
       document.querySelectorAll("#admList button").forEach(x => x.disabled = true);
       toast("Sending payment... please wait.");
