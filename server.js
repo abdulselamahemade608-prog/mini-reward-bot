@@ -19,6 +19,7 @@ const APP_URL = String(process.env.APP_URL || "https://mini-reward-bot.vercel.ap
 const WEBHOOK_SECRET = String(process.env.WEBHOOK_SECRET || "");
 const PROOF_CHANNEL = String(process.env.PROOF_CHANNEL || "").trim();
 const PROOF_MASK = String(process.env.PROOF_MASK || "true").toLowerCase() !== "false";
+const PROOF_HANDLE = String(process.env.PROOF_HANDLE || "@abdu_monye2").trim();
 
 const ADSGRAM_SECRET = String(process.env.ADSGRAM_SECRET || "");
 const STRICT_ADS = ADSGRAM_SECRET.length > 0;
@@ -50,19 +51,28 @@ const REQUIRED_CHANNELS = String(process.env.REQUIRED_CHANNELS || "")
 
 const isId = v => /^\d+$/.test(String(v));
 
-/*primum emoji*/
+/* ===================== PREMIUM EMOJI (custom emoji ids) ===================== */
+// These MUST be declared with const (ES modules run in strict mode).
 
-WITHDRAW_EMOJI = "6053003027793578665"
-INFO_EMOJI = "6071194666718469290"
-WALLET_EMOJI = "5424818078833715060"
-STAR_EMOJI = "5397782960512444700"
-noti= "5909201569898827582"
-iid = "5316989025037334866"
-telebirr = "5796366529855494419"
-tr = "6267068789146260253"
-feel = "5447458260200214425"
-stat = "6267186570034419608"
-bott = "5294338978130972025"
+const EMOJI_NOTI = "5909201569898827582";    // header
+const EMOJI_USER_ID = "5316989025037334866"; // user id
+const EMOJI_ADDRESS = "5796366529855494419"; // wallet / address
+const EMOJI_AMOUNT = "6267068789146260253";  // requested + final amount
+const EMOJI_FEE = "5447458260200214425";     // service fee
+const EMOJI_STATUS = "6267186570034419608";  // status
+const EMOJI_PROOF = "5294338978130972025";   // proof
+
+// <tg-emoji> needs a normal emoji inside as fallback
+const em = (id, fallback = "\u{1F4B8}") => `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`;
+
+// escape text for Telegram parse_mode: "HTML"
+const esc = s => String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+const stripTags = s => String(s).replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 
 /* ========================== DATABASE ========================== */
 
@@ -412,9 +422,15 @@ async function checkAllChannels(telegramId) {
 
 const allJoinedOf = channels => channels.length === 0 || channels.every(x => x.joined);
 
-async function notifyUser(telegramId, text) {
+// extra = { parse_mode: "HTML" } for premium emoji messages
+async function notifyUser(telegramId, text, extra = {}) {
     try {
-        await telegram("sendMessage", { chat_id: Number(telegramId), text, disable_web_page_preview: true });
+        await telegram("sendMessage", {
+            chat_id: Number(telegramId),
+            text,
+            disable_web_page_preview: true,
+            ...extra
+        });
     } catch (e) {
         console.error("notifyUser", e.message);
     }
@@ -1049,51 +1065,66 @@ async function sendPayout(to, tokenAmount, onSent) {
 
 const shortAddr = a => String(a).slice(0, 6) + "..." + String(a).slice(-4);
 
-function withdrawalText(w, status) {
-    const amt = Number(w.amount);
-    const fee = Number(w.fee || 0);
-    const fin = Number(w.final_amount ?? amt - fee);
-    const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
-    const tok = Number(w.token_amount || 0);
-    return (
-      f"<tg-emoji emoji-id='{noti}'>💸</tg-emoji> "
-        " New Withdrawal Request\n\n" +
-       f"<tg-emoji emoji-id='{iid}'>💸</tg-emoji> "  
-        `User ID: ${w.telegram_id}\n` +
-      f"<tg-emoji emoji-id='{telebirr}'>💸</tg-emoji> "
-        `BEP20 Address: ${w.address}\n` +
-        `\u{1F4B8} Requested Amount: ${amt.toFixed(2)} Points\n` +
-        `\u{1F4B3} ${pct}% Service Fee: ${fee.toFixed(2)} Points\n` +
-        `\u{1F4B3} Final Amount: ${fin.toFixed(2)} Points (${tok.toFixed(6)} ${TOKEN_SYMBOL})\n\n` +
-        `\u{1F4B8} Status: ${status}` +
-        (w.tx_hash ? `\n\u{1F517} Tx: ${EXPLORER_TX}${w.tx_hash}` : "")
-    );
-}
-
 function maskAddr(v) {
     const t = String(v);
     if (!PROOF_MASK || t.length < 12) return t;
     return t.slice(0, 6) + "*".repeat(8) + t.slice(-4);
 }
 
+/*
+ * Builds the withdrawal message in Telegram HTML with premium (custom) emoji.
+ * Use it with parse_mode: "HTML".
+ *   - admin message, user notification and proof channel all use this one function
+ *   - opts.maskAddress = true hides the middle of the address (proof channel)
+ *   - status is plain text: "Pending", "Paid", "Rejected" ...
+ */
+function buildWithdrawalHtml(w, status, opts = {}) {
+    const amt = Number(w.amount);
+    const fee = Number(w.fee || 0);
+    const fin = Number(w.final_amount ?? amt - fee);
+    const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
+    const tok = Number(w.token_amount || 0);
+    const addr = opts.maskAddress ? maskAddr(w.address) : String(w.address);
+
+    let t =
+        `${em(EMOJI_NOTI)} <b>New Withdrawal Request</b>\n\n` +
+
+        `${em(EMOJI_USER_ID)} <b>User ID:</b>\n` +
+        `<code>${esc(w.telegram_id)}</code>\n\n` +
+
+        `${em(EMOJI_ADDRESS)} <b>BEP20 Address:</b>\n` +
+        `<code>${esc(addr)}</code>\n\n` +
+
+        `${em(EMOJI_AMOUNT)} <b>Requested Amount:</b>\n` +
+        `<code>${amt.toFixed(2)} Points</code>\n\n` +
+
+        `${em(EMOJI_FEE, "\u{1F4B3}")} <b>${pct}% Service Fee:</b>\n` +
+        `<code>${fee.toFixed(2)} Points</code>\n\n` +
+
+        `${em(EMOJI_AMOUNT, "\u{1F4B3}")} <b>Final Amount:</b>\n` +
+        `<code>${fin.toFixed(2)} Points (${tok.toFixed(6)} ${esc(TOKEN_SYMBOL)})</code>\n\n` +
+
+        `${em(EMOJI_STATUS)} <b>Status:</b> <i>${esc(status)}</i>`;
+
+    if (w.tx_hash) {
+        t += `\n\n\u{1F517} <a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
+    }
+    if (PROOF_HANDLE) {
+        t += `\n\n${em(EMOJI_PROOF)} <b>Proof :</b> ${esc(PROOF_HANDLE)}`;
+    }
+    return t;
+}
+
+// kept for compatibility - same message, in HTML
+const withdrawalText = (w, status) => buildWithdrawalHtml(w, status);
+
 async function postProof(w) {
     if (!PROOF_CHANNEL) return;
     try {
-        const amt = Number(w.amount);
-        const fee = Number(w.fee || 0);
-        const fin = Number(w.final_amount ?? amt - fee);
-        const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
-        const text =
-            "\u{1F4B8} New Withdrawal proof\n\n" +
-            `\u{1F4B8} User ID: ${w.telegram_id}\n` +
-            `\u{1F4B8} BEP20 Address: ${maskAddr(w.address)}\n` +
-            `\u{1F4B8} Requested Amount: ${amt.toFixed(2)} Points\n` +
-            `\u{1F4B3} ${pct}% Service Fee: ${fee.toFixed(2)} Points\n` +
-            `\u{1F4B3} Final Amount: ${fin.toFixed(2)} Points (${Number(w.token_amount).toFixed(6)} ${TOKEN_SYMBOL})\n\n` +
-            "\u{1F4B8} Status: Paid";
         await telegram("sendMessage", {
             chat_id: PROOF_CHANNEL,
-            text,
+            text: buildWithdrawalHtml(w, "Paid", { maskAddress: true }),
+            parse_mode: "HTML",
             disable_web_page_preview: true,
             reply_markup: {
                 inline_keyboard: [[{ text: "\u{1F517} View Transaction", url: EXPLORER_TX + w.tx_hash }]]
@@ -1102,6 +1133,20 @@ async function postProof(w) {
     } catch (e) {
         console.error("postProof", e.message);
     }
+}
+
+// loads one withdrawal with numbers converted
+async function getWithdrawal(id) {
+    const r = await pool.query(`SELECT * FROM mr_withdrawals WHERE id = $1`, [id]);
+    if (!r.rows.length) return null;
+    const row = r.rows[0];
+    return {
+        ...row,
+        amount: Number(row.amount),
+        fee: Number(row.fee || 0),
+        final_amount: Number(row.final_amount ?? row.amount),
+        token_amount: Number(row.token_amount || 0)
+    };
 }
 
 // Claims a request ('pending', or a 'processing' one that has been stuck for 3+ minutes),
@@ -1153,7 +1198,7 @@ async function approveWithdrawal(id, adminId) {
         tx_hash: txHash
     };
     await Promise.allSettled([
-        notifyUser(w.telegram_id, withdrawalText(w, "Paid")),
+        notifyUser(w.telegram_id, buildWithdrawalHtml(w, "Paid"), { parse_mode: "HTML" }),
         postProof(w)
     ]);
     return { ok: true, tx_hash: txHash };
@@ -1233,20 +1278,34 @@ async function handleAdminCallback(cb) {
     const chatId = cb.message?.chat?.id || Number(ADMIN_ID);
 
     if (r.ok) {
-        const result = approve
-            ? "\u2705 Approved and paid" + (r.tx_hash ? "\n" + EXPLORER_TX + r.tx_hash : "")
-            : "\u274C Rejected";
-        if (cb.message?.text) {
+        // rebuild the message from the database so the premium emoji + formatting stay
+        let newText;
+        try {
+            const w = await getWithdrawal(id);
+            newText = w
+                ? buildWithdrawalHtml(w, approve ? "Paid" : "Rejected") + `\n\nRequest #${esc(id)}`
+                : `Request #${esc(id)}: ${approve ? "\u2705 Approved and paid" : "\u274C Rejected"}`;
+        } catch (e) {
+            newText = `Request #${esc(id)}: ${approve ? "\u2705 Approved and paid" : "\u274C Rejected"}`;
+        }
+        newText += "\n\n" + (approve ? "\u2705 <b>Approved and paid</b>" : "\u274C <b>Rejected</b>");
+
+        if (cb.message?.message_id) {
             await telegram("editMessageText", {
                 chat_id: chatId,
                 message_id: cb.message.message_id,
-                text: cb.message.text + "\n\n" + result,
+                text: newText,
+                parse_mode: "HTML",
                 disable_web_page_preview: true
             }).catch(async () => {
-                await telegram("sendMessage", { chat_id: chatId, text: `Request #${id}: ${result}`, disable_web_page_preview: true }).catch(() => {});
+                await telegram("sendMessage", {
+                    chat_id: chatId, text: newText, parse_mode: "HTML", disable_web_page_preview: true
+                }).catch(() => {});
             });
         } else {
-            await telegram("sendMessage", { chat_id: chatId, text: `Request #${id}: ${result}`, disable_web_page_preview: true }).catch(() => {});
+            await telegram("sendMessage", {
+                chat_id: chatId, text: newText, parse_mode: "HTML", disable_web_page_preview: true
+            }).catch(() => {});
         }
     } else {
         // keep the buttons so the admin can try again, and show the reason
@@ -1385,7 +1444,8 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         if (ADMIN_ID) {
             await telegram("sendMessage", {
                 chat_id: Number(ADMIN_ID),
-                text: withdrawalText(w, "Pending") + `\n\nRequest #${wid}`,
+                text: buildWithdrawalHtml(w, "Pending") + `\n\nRequest #${esc(wid)}`,
+                parse_mode: "HTML",
                 disable_web_page_preview: true,
                 reply_markup: {
                     inline_keyboard: [[
@@ -1402,7 +1462,8 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             pending: true,
             id: wid,
             points: Number(after.rows[0].points),
-            receipt: withdrawalText(w, "Pending approval")
+            // the mini app shows plain text, so remove the HTML tags here
+            receipt: stripTags(buildWithdrawalHtml(w, "Pending approval"))
         });
     } catch (error) {
         console.error("/api/withdraw", error);
