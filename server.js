@@ -1087,9 +1087,9 @@ function buildWithdrawalHtml(w, status, opts = {}) {
     const addr = opts.maskAddress ? maskAddr(w.address) : String(w.address);
 
     let t =
-        `${em(EMOJI_NOTI)} <b>New Withdrawal Request</b>\n\n` +
+        `${em(EMOJI_NOTI)} <b>New Withdrawal Request</b>\n` +
 
-        `${em(EMOJI_USER_ID)} <b>User ID:</b>\n` +
+        `${em(EMOJI_USER_ID)} <b>User ID:</b>` +
         `<code>${esc(w.telegram_id)}</code>\n\n` +
 
         `${em(EMOJI_ADDRESS)} <b>BEP20 Address:</b>\n` +
