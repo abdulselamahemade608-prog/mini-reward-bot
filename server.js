@@ -1345,11 +1345,11 @@ async function handleAdminCallback(cb) {
             const w = await getWithdrawal(id);
             newText = w
                 ? buildWithdrawalHtml(w, approve ? "Paid" : "Rejected") + `\n\nRequest #${esc(id)}`
-                : `Request #${esc(id)}: ${approve ? "\u2705 Approved and paid" : "\u274C Rejected"}`;
+                : `Request #${esc(id)}: \u2705 Done`;
         } catch (e) {
-            newText = `Request #${esc(id)}: ${approve ? "\u2705 Approved and paid" : "\u274C Rejected"}`;
+            newText = `Request #${esc(id)}: \u2705 Done`;
         }
-        newText += "\n\n" + (approve ? "\u2705 <b>Approved and paid</b>" : "\u274C <b>Rejected</b>");
+        newText += "\n\n\u2705 <b>Done</b>";
 
         if (cb.message?.message_id) {
             await telegram("editMessageText", {
