@@ -1200,6 +1200,15 @@ async function getWithdrawal(id) {
     };
 }
 
+// Short message the USER gets when the admin approves:
+// "✅ Your withdrawal request for 0.10 bnb has been approved 💸"
+function approvedUserText(w) {
+    // 0.10 / 0.000027 style: at least 2 decimals, trailing zeros removed, never scientific notation
+    let amt = Number(w.token_amount || 0).toFixed(6).replace(/0+$/, "");
+    if (/\.\d?$/.test(amt)) amt = Number(amt).toFixed(2);
+    return `\u2705 Your withdrawal request for ${amt} ${TOKEN_SYMBOL.toLowerCase()} has been approved \u{1F4B8}`;
+}
+
 // Claims a request ('pending', or a 'processing' one that has been stuck for 3+ minutes),
 // sends the payout, then marks it approved.
 async function approveWithdrawal(id, adminId) {
@@ -1249,7 +1258,8 @@ async function approveWithdrawal(id, adminId) {
         tx_hash: txHash
     };
     await Promise.allSettled([
-        notifyUser(w.telegram_id, buildWithdrawalHtml(w, "Paid"), { parse_mode: "HTML" }),
+        // user gets ONLY the short approval line
+        notifyUser(w.telegram_id, approvedUserText(w)),
         postProof(w)
     ]);
     return { ok: true, tx_hash: txHash };
