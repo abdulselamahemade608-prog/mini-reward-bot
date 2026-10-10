@@ -30,7 +30,7 @@ const STRICT_MONETAG = MONETAG_SECRET.length > 0;
 const APP_BUTTON_TEXT = process.env.APP_BUTTON_TEXT || "Adewa Eran";
 const ADMIN_ID = String(process.env.ADMIN_ID || "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
-const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52614");
+const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
 const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
 /* ---- BNB auto payment (native BNB on BNB Smart Chain) ---- */
@@ -182,6 +182,8 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS token_amount NUMERIC;`);
             // when a payout started - used to recover requests that got stuck in 'processing'
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS processing_at TIMESTAMPTZ;`);
+            // message id of the request sent to the admin in the bot (so it can be edited to "Done")
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS admin_msg_id BIGINT;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT TRUE;`);
             await pool.query(`ALTER TABLE mr_referrals ALTER COLUMN verified SET DEFAULT FALSE;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;`);
@@ -1084,6 +1086,7 @@ function buildWithdrawalHtml(w, status, opts = {}) {
     const fin = Number(w.final_amount ?? amt - fee);
     const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
     const tok = Number(w.token_amount || 0);
+    const tokTxt = tok.toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0");
     const addr = opts.maskAddress ? maskAddr(w.address) : String(w.address);
 
     let t =
@@ -1102,7 +1105,7 @@ function buildWithdrawalHtml(w, status, opts = {}) {
         `<code>${fee.toFixed(2)} Points</code>\n\n` +
 
         `${em(EMOJI_AMOUNT, "\u{1F4B3}")} <b>Final Amount:</b>\n` +
-        `<code>${fin.toFixed(2)} Points (${tok.toFixed(6)} ${esc(TOKEN_SYMBOL)})</code>\n\n` +
+        `<code>${fin.toFixed(2)} Points (${tokTxt} ${esc(TOKEN_SYMBOL)})</code>\n\n` +
 
         `${em(EMOJI_STATUS)} <b>Status:</b> <i>${esc(status)}</i>`;
 
@@ -1207,6 +1210,31 @@ function approvedUserText(w) {
     let amt = Number(w.token_amount || 0).toFixed(6).replace(/0+$/, "");
     if (/\.\d?$/.test(amt)) amt = Number(amt).toFixed(2);
     return `\u2705 Your withdrawal request for ${amt} ${TOKEN_SYMBOL.toLowerCase()} has been approved \u{1F4B8}`;
+}
+
+// Text of the admin message after the request is finished
+function adminDoneText(w, id, approve) {
+    return buildWithdrawalHtml(w, approve ? "Paid" : "Rejected") +
+        `\n\nRequest #${esc(id)}\n\n\u2705 <b>Done</b>`;
+}
+
+// When the admin approves/rejects inside the mini app, also change the old bot message
+// (remove the Approve/Reject buttons and show "Done").
+async function syncAdminMessage(id, approve) {
+    try {
+        if (!ADMIN_ID) return;
+        const w = await getWithdrawal(id);
+        if (!w || !w.admin_msg_id) return;
+        await telegram("editMessageText", {
+            chat_id: Number(ADMIN_ID),
+            message_id: Number(w.admin_msg_id),
+            text: adminDoneText(w, id, approve),
+            parse_mode: "HTML",
+            disable_web_page_preview: true
+        });
+    } catch (e) {
+        console.error("syncAdminMessage", e.message);
+    }
 }
 
 // Claims a request ('pending', or a 'processing' one that has been stuck for 3+ minutes),
@@ -1344,12 +1372,11 @@ async function handleAdminCallback(cb) {
         try {
             const w = await getWithdrawal(id);
             newText = w
-                ? buildWithdrawalHtml(w, approve ? "Paid" : "Rejected") + `\n\nRequest #${esc(id)}`
-                : `Request #${esc(id)}: \u2705 Done`;
+                ? adminDoneText(w, id, approve)
+                : `Request #${esc(id)}\n\n\u2705 <b>Done</b>`;
         } catch (e) {
-            newText = `Request #${esc(id)}: \u2705 Done`;
+            newText = `Request #${esc(id)}\n\n\u2705 <b>Done</b>`;
         }
-        newText += "\n\n\u2705 <b>Done</b>";
 
         if (cb.message?.message_id) {
             await telegram("editMessageText", {
@@ -1503,7 +1530,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         };
 
         if (ADMIN_ID) {
-            await telegram("sendMessage", {
+            const sent = await telegram("sendMessage", {
                 chat_id: Number(ADMIN_ID),
                 text: buildWithdrawalHtml(w, "Pending") + `\n\nRequest #${esc(wid)}`,
                 parse_mode: "HTML",
@@ -1514,7 +1541,11 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
                         { text: "\u274C Reject", callback_data: `wd:reject:${wid}` }
                     ]]
                 }
-            }).catch(e => console.error("notify admin", e.message));
+            }).catch(e => { console.error("notify admin", e.message); return null; });
+            if (sent && sent.message_id) {
+                await pool.query(`UPDATE mr_withdrawals SET admin_msg_id = $2 WHERE id = $1`, [wid, sent.message_id])
+                    .catch(e => console.error("save admin_msg_id", e.message));
+            }
         }
 
         const after = await pool.query(`SELECT points FROM mr_users WHERE telegram_id = $1`, [telegramId]);
@@ -1593,6 +1624,7 @@ app.post("/api/admin/withdrawals/:id/approve", authenticate, requireAdmin, async
         await requireDatabase();
         if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
         const r = await approveWithdrawal(req.params.id, ADMIN_ID);
+        if (r.ok) await syncAdminMessage(req.params.id, true);
         res.status(r.ok ? 200 : 400).json(r);
     } catch (error) {
         console.error("/api/admin/withdrawals/approve", error);
@@ -1606,6 +1638,7 @@ app.post("/api/admin/withdrawals/:id/reject", authenticate, requireAdmin, async 
         if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
         const note = String(req.body?.note || "Rejected by admin").slice(0, 200);
         const r = await rejectWithdrawal(req.params.id, ADMIN_ID, note);
+        if (r.ok) await syncAdminMessage(req.params.id, false);
         res.status(r.ok ? 200 : 400).json(r);
     } catch (error) {
         console.error("/api/admin/withdrawals/reject", error);
@@ -2031,7 +2064,15 @@ app.get("/api/setup-webhook", async (req, res) => {
         await telegram("setChatMenuButton", {
             menu_button: { type: "web_app", text: APP_BUTTON_TEXT, web_app: { url: APP_URL } }
         });
-        res.json({ ok: true, webhook: url });
+        // show what Telegram really saved, so you can check that callback_query is allowed
+        const info = await telegram("getWebhookInfo").catch(() => null);
+        res.json({
+            ok: true,
+            webhook: url,
+            allowed_updates: info?.allowed_updates || null,
+            pending_update_count: info?.pending_update_count ?? null,
+            last_error_message: info?.last_error_message || null
+        });
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
