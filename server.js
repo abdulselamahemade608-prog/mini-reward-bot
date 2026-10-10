@@ -50,7 +50,22 @@ const REQUIRED_CHANNELS = String(process.env.REQUIRED_CHANNELS || "")
 
 const isId = v => /^\d+$/.test(String(v));
 
+/*primum emoji*/
+
+WITHDRAW_EMOJI = "6053003027793578665"
+INFO_EMOJI = "6071194666718469290"
+WALLET_EMOJI = "5424818078833715060"
+STAR_EMOJI = "5397782960512444700"
+noti= "5909201569898827582"
+iid = "5316989025037334866"
+telebirr = "5796366529855494419"
+tr = "6267068789146260253"
+feel = "5447458260200214425"
+stat = "6267186570034419608"
+bott = "5294338978130972025"
+
 /* ========================== DATABASE ========================== */
+
 
 const pool = DATABASE_URL
     ? new Pool({
@@ -1041,9 +1056,12 @@ function withdrawalText(w, status) {
     const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
     const tok = Number(w.token_amount || 0);
     return (
-        "\u{1F4B8} New Withdrawal Request\n\n" +
-        `\u{1F4B8} User ID: ${w.telegram_id}\n` +
-        `\u{1F4B8} BEP20 Address: ${w.address}\n` +
+      f"<tg-emoji emoji-id='{noti}'>💸</tg-emoji> "
+        " New Withdrawal Request\n\n" +
+       f"<tg-emoji emoji-id='{iid}'>💸</tg-emoji> "  
+        `User ID: ${w.telegram_id}\n` +
+      f"<tg-emoji emoji-id='{telebirr}'>💸</tg-emoji> "
+        `BEP20 Address: ${w.address}\n` +
         `\u{1F4B8} Requested Amount: ${amt.toFixed(2)} Points\n` +
         `\u{1F4B3} ${pct}% Service Fee: ${fee.toFixed(2)} Points\n` +
         `\u{1F4B3} Final Amount: ${fin.toFixed(2)} Points (${tok.toFixed(6)} ${TOKEN_SYMBOL})\n\n` +
