@@ -40,9 +40,78 @@ const BSC_CHAIN_ID = Number(process.env.BSC_CHAIN_ID || 56);
 const TOKEN_DECIMALS = 18; // native BNB has 18 decimals
 const TOKEN_SYMBOL = String(process.env.TOKEN_SYMBOL || "BNB");
 // BNB price in USD, used to convert points (point_value_usd) into BNB. Update it in Vercel env when the price changes.
-const BNB_PRICE_USD = Number(process.env.BNB_PRICE_USD || 740);
+// Now only a LAST-RESORT fallback: the live price is fetched automatically (see getBnbPrice below).
+const BNB_PRICE_USD = Number(process.env.BNB_PRICE_USD || 0);
 const EXPLORER_TX = String(process.env.EXPLORER_TX_URL || "https://bscscan.com/tx/");
-const PAY_READY = !!(BSC_RPC_URL && PAYOUT_PRIVATE_KEY && BNB_PRICE_USD > 0);
+const PAY_READY = !!(BSC_RPC_URL && PAYOUT_PRIVATE_KEY);
+
+/* ===================== LIVE BNB PRICE (automatic) ===================== */
+// Tries several public price APIs one after another (some block certain server regions),
+// keeps the answer for 60 seconds, and rejects crazy values.
+const PRICE_TTL_MS = 60 * 1000;
+const PRICE_STALE_OK_MS = 15 * 60 * 1000;   // if every source fails, a price up to 15 min old is still used
+let priceCache = { value: 0, at: 0, source: "" };
+
+async function fetchJson(url) {
+    const r = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json" } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+}
+
+const PRICE_SOURCES = [
+    ["binance",       async () => Number((await fetchJson("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT")).price)],
+    ["coingecko",     async () => Number((await fetchJson("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd")).binancecoin.usd)],
+    ["cryptocompare", async () => Number((await fetchJson("https://min-api.cryptocompare.com/data/price?fsym=BNB&tsyms=USD")).USD)],
+    ["coinbase",      async () => Number((await fetchJson("https://api.coinbase.com/v2/prices/BNB-USD/spot")).data.amount)]
+];
+
+async function getBnbPrice() {
+    const now = Date.now();
+    if (priceCache.value && now - priceCache.at < PRICE_TTL_MS) return priceCache.value;
+
+    for (const [name, load] of PRICE_SOURCES) {
+        try {
+            const p = await load();
+            if (Number.isFinite(p) && p >= 10 && p <= 100000) {
+                priceCache = { value: p, at: Date.now(), source: name };
+                return p;
+            }
+            console.error("bnb price: bad value from", name, p);
+        } catch (e) {
+            console.error("bnb price:", name, e.message);
+        }
+    }
+    if (priceCache.value && now - priceCache.at < PRICE_STALE_OK_MS) return priceCache.value;
+    if (BNB_PRICE_USD > 0) return BNB_PRICE_USD;
+    throw new Error("BNB price is not available right now. Please try again in a minute.");
+}
+
+/* ===================== PAYOUT LIMITS (bot-wide) ===================== */
+// withdraw_hourly_limit : max number of withdrawal requests the whole bot accepts per rolling hour (0 = off)
+// daily_bot_budget_bnb  : max BNB the bot pays out per day, all users together (0 = off)
+// `db` can be the pool or a transaction client.
+async function getPayoutLimits(db, st) {
+    const hourlyLimit = Number(st.withdraw_hourly_limit) || 0;
+    const budgetLimit = Number(st.daily_bot_budget_bnb) || 0;
+    const r = await db.query(
+        `SELECT
+            (SELECT COUNT(*)::int FROM mr_withdrawals
+              WHERE status <> 'rejected' AND created_at >= NOW() - INTERVAL '1 hour') AS h,
+            (SELECT COALESCE(SUM(token_amount),0) FROM mr_withdrawals
+              WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS d`
+    );
+    const hourlyUsed = Number(r.rows[0].h);
+    const budgetUsed = Number(r.rows[0].d);
+    return {
+        hourly: { limit: hourlyLimit, used: hourlyUsed, full: hourlyLimit > 0 && hourlyUsed >= hourlyLimit },
+        budget: {
+            limit: budgetLimit,
+            used: budgetUsed,
+            left: Math.max(0, budgetLimit - budgetUsed),
+            full: budgetLimit > 0 && budgetUsed >= budgetLimit
+        }
+    };
+}
 
 const REQUIRED_CHANNELS = String(process.env.REQUIRED_CHANNELS || "")
     .split(",")
@@ -50,6 +119,39 @@ const REQUIRED_CHANNELS = String(process.env.REQUIRED_CHANNELS || "")
     .filter(Boolean);
 
 const isId = v => /^\d+$/.test(String(v));
+
+const WITHDRAW_TZ = String(process.env.WITHDRAW_TZ || "Africa/Addis_Ababa");
+const WITHDRAW_TZ_LABEL = String(process.env.WITHDRAW_TZ_LABEL || "EAT");
+function fmtServerDate(ms) {
+    try {
+        return new Date(ms).toLocaleString("en-GB", {
+            timeZone: WITHDRAW_TZ, day: "numeric", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: false
+        }) + " " + WITHDRAW_TZ_LABEL;
+    } catch (e) {
+        return new Date(ms).toISOString();
+    }
+}
+function fmtWait(ms) {
+    const m = Math.max(1, Math.ceil(ms / 60000));
+    const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
+    const parts = [];
+    if (d) parts.push(d + "d");
+    if (h) parts.push(h + "h");
+    if (mi && !d) parts.push(mi + "m");
+    return parts.join(" ") || "1m";
+}
+// when this user may send the next withdrawal request (ms, 0 = now). cooldownHours = 0 means no wait.
+async function nextWithdrawAt(db, telegramId, cooldownHours) {
+    const hrs = Number(cooldownHours) || 0;
+    if (hrs <= 0) return 0;
+    const r = await db.query(
+        `SELECT MAX(created_at) AS t FROM mr_withdrawals WHERE telegram_id = $1 AND status <> 'rejected'`,
+        [telegramId]
+    );
+    if (!r.rows[0] || !r.rows[0].t) return 0;
+    return new Date(r.rows[0].t).getTime() + hrs * 3600 * 1000;
+}
 
 /* ===================== PREMIUM EMOJI (custom emoji ids) ===================== */
 // These MUST be declared with const (ES modules run in strict mode).
@@ -184,6 +286,8 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS processing_at TIMESTAMPTZ;`);
             // message id of the request sent to the admin in the bot (so it can be edited to "Done")
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS admin_msg_id BIGINT;`);
+            // fixed USD value of the request; the BNB amount is recalculated from it with the live price at payment time
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS usd_amount NUMERIC;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT TRUE;`);
             await pool.query(`ALTER TABLE mr_referrals ALTER COLUMN verified SET DEFAULT FALSE;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;`);
@@ -261,7 +365,9 @@ async function ensureDatabase() {
                 INSERT INTO mr_app_settings(key, value)
                 VALUES ('ad_reward','1'),('invite_reward','1'),('max_ads_per_day','100'),('min_withdraw','100'),('verify_ads','1'),
                        ('daily_withdraw_limit','0'),('milestone_5','5'),('milestone_10','15'),('milestone_25','50'),
-                       ('withdraw_fee_percent','25'),('point_value_usd','0.01'),('auto_ad_seconds','0')
+                       ('withdraw_fee_percent','25'),('point_value_usd','0.01'),('auto_ad_seconds','0'),
+                       ('withdraw_hourly_limit','0'),('daily_bot_budget','0'),
+                       ('daily_bot_budget_bnb','0'),('withdraw_cooldown_hours','0'),('withdraw_closed_until','0')
                 ON CONFLICT(key) DO NOTHING;
             `);
             await pool.query(`
@@ -656,9 +762,20 @@ app.get("/api/me", authenticate, async (req, res) => {
             [telegramId]
         );
 
+        // live BNB price (cached 60s) + current payout limits, shown in the app
+        let bnbPrice = null;
+        try { bnbPrice = await getBnbPrice(); } catch (e) { bnbPrice = priceCache.value || null; }
+        let limits = null;
+        try { limits = await getPayoutLimits(pool, settings); } catch (e) { console.error("limits", e.message); }
+
+        let withdrawNextAt = 0;
+        try { withdrawNextAt = await nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours); }
+        catch (e) { console.error("withdrawNextAt", e.message); }
+
         res.json({
             ok: true,
             settings,
+            withdraw_next_at: withdrawNextAt,
             today_ads: todayRes.rows[0].c,
             user: {
                 telegram_id: user.telegram_id,
@@ -680,7 +797,7 @@ app.get("/api/me", authenticate, async (req, res) => {
             allJoined,
             adsgram: { blockId: ADSGRAM_BLOCK_ID },
             monetag: { zoneId: MONETAG_ZONE_ID },
-            payout: { symbol: TOKEN_SYMBOL, ready: PAY_READY, explorer: EXPLORER_TX },
+            payout: { symbol: TOKEN_SYMBOL, ready: PAY_READY, explorer: EXPLORER_TX, bnb_price: bnbPrice, limits },
             bot: { username: BOT_USERNAME }
         });
     } catch (error) {
@@ -966,10 +1083,12 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
 
         const { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads,
                 daily_withdraw_limit, milestone_5, milestone_10, milestone_25, withdraw_fee_percent,
-                point_value_usd, auto_ad_seconds } = req.body || {};
+                point_value_usd, auto_ad_seconds, withdraw_hourly_limit, daily_bot_budget,
+                daily_bot_budget_bnb, withdraw_cooldown_hours, withdraw_closed_until } = req.body || {};
         const settings = { ad_reward, invite_reward, max_ads_per_day, min_withdraw, verify_ads,
             daily_withdraw_limit, milestone_5, milestone_10, milestone_25, withdraw_fee_percent,
-            point_value_usd, auto_ad_seconds };
+            point_value_usd, auto_ad_seconds, withdraw_hourly_limit, daily_bot_budget,
+            daily_bot_budget_bnb, withdraw_cooldown_hours, withdraw_closed_until };
 
         for (const [key, value] of Object.entries(settings)) {
             if (value === undefined || value === null || value === "") continue;
@@ -1137,7 +1256,9 @@ function buildProofHtml(w, userLabel) {
     const tok = Number(w.token_amount || 0);
 
     // real USD value that was paid = BNB sent * BNB price
-    const usdPaid = tok * BNB_PRICE_USD;
+    const usdPaid = (w.usd_amount !== null && w.usd_amount !== undefined)
+        ? Number(w.usd_amount)
+        : tok * (priceCache.value || BNB_PRICE_USD || 0);
     // USD value of one point for this withdrawal (so the fee can be shown in USD too)
     const rate = fin > 0 ? usdPaid / fin : 0;
     const feeUsd = fee * rate;
@@ -1257,6 +1378,14 @@ async function approveWithdrawal(id, adminId) {
     let txHash = row.tx_hash || null;
     if (!txHash) {
         try {
+            // the user is paid the fixed USD value, converted with the live price right now
+            if (row.usd_amount !== null && row.usd_amount !== undefined) {
+                const price = await getBnbPrice();
+                const fresh = Math.floor((Number(row.usd_amount) / price) * 1e8) / 1e8;
+                if (!(fresh > 0)) throw new Error("Amount is too small to pay out.");
+                await pool.query(`UPDATE mr_withdrawals SET token_amount = $2 WHERE id = $1`, [id, fresh]);
+                row.token_amount = fresh;
+            }
             txHash = await sendPayout(row.address, Number(row.token_amount), async h => {
                 await pool.query(`UPDATE mr_withdrawals SET tx_hash = $2 WHERE id = $1`, [id, h]);
             });
@@ -1429,10 +1558,29 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
 
         const sRes = await pool.query(
             `SELECT key, value FROM mr_app_settings
-             WHERE key IN ('min_withdraw','daily_withdraw_limit','withdraw_fee_percent','point_value_usd')`
+             WHERE key IN ('min_withdraw','daily_withdraw_limit','withdraw_fee_percent','point_value_usd','withdraw_hourly_limit','daily_bot_budget_bnb','withdraw_cooldown_hours','withdraw_closed_until')`
         );
         const S = {};
         for (const r of sRes.rows) S[r.key] = Number(r.value);
+
+        // withdrawals closed by the admin until a date
+        const closedUntil = (Number(S.withdraw_closed_until) || 0) * 1000;
+        if (closedUntil > Date.now()) {
+            return res.status(403).json({
+                ok: false,
+                error: "Withdraw requests are closed for today. They will open on " + fmtServerDate(closedUntil) + "."
+            });
+        }
+
+        // one request per account every N hours
+        const nextAt = await nextWithdrawAt(pool, telegramId, S.withdraw_cooldown_hours);
+        if (nextAt > Date.now()) {
+            return res.status(429).json({
+                ok: false,
+                error: "You can send your next withdraw request in " + fmtWait(nextAt - Date.now()) +
+                       " (" + fmtServerDate(nextAt) + ")."
+            });
+        }
 
         const minWithdraw = Number.isFinite(S.min_withdraw) ? S.min_withdraw : 100;
         if (amount < minWithdraw) {
@@ -1465,9 +1613,16 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         const fee = Math.round(amount * feePct) / 100;
         const finalAmount = Math.round((amount - fee) * 100) / 100;
 
-        // points -> USD (point_value_usd) -> BNB (BNB_PRICE_USD)
+        // points -> USD (point_value_usd) -> BNB (live price)
         const rate = Number.isFinite(S.point_value_usd) ? S.point_value_usd : 0.01;
-        const tokenAmount = Math.floor((finalAmount * rate / BNB_PRICE_USD) * 1e8) / 1e8;
+        const usdAmount = Math.round(finalAmount * rate * 1e8) / 1e8;
+        let livePrice;
+        try {
+            livePrice = await getBnbPrice();
+        } catch (e) {
+            return res.status(503).json({ ok: false, error: e.message });
+        }
+        const tokenAmount = Math.floor((usdAmount / livePrice) * 1e8) / 1e8;
         if (!(tokenAmount > 0)) {
             return res.status(400).json({ ok: false, error: "Amount is too small to pay out." });
         }
@@ -1477,6 +1632,26 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         const client = await pool.connect();
         try {
             await client.query("BEGIN");
+            // one withdrawal request at a time, so the bot-wide limits below can never be passed by two requests together
+            await client.query("SELECT pg_advisory_xact_lock(778800)");
+
+            const lim = await getPayoutLimits(client, S);
+            if (lim.hourly.full) {
+                await client.query("ROLLBACK");
+                return res.status(429).json({
+                    ok: false,
+                    error: "Too many withdrawals in this hour. Please try again a little later."
+                });
+            }
+            if (lim.budget.limit > 0 && lim.budget.used + tokenAmount > lim.budget.limit + 1e-12) {
+                await client.query("ROLLBACK");
+                return res.status(429).json({
+                    ok: false,
+                    error: lim.budget.full
+                        ? "Today's payout budget is finished. Please try again tomorrow."
+                        : "Not enough payout budget left today for this amount. Try a smaller amount or come back tomorrow."
+                });
+            }
 
             const u = await client.query(
                 `SELECT points, is_banned FROM mr_users WHERE telegram_id = $1 FOR UPDATE`,
@@ -1509,9 +1684,9 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
                 [telegramId, amount]
             );
             const ins = await client.query(
-                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address, fee, final_amount, token_amount)
-                 VALUES($1,$2,'BEP20',$3,$4,$5,$6) RETURNING id`,
-                [telegramId, amount, address, fee, finalAmount, tokenAmount]
+                `INSERT INTO mr_withdrawals(telegram_id, amount, method, address, fee, final_amount, token_amount, usd_amount)
+                 VALUES($1,$2,'BEP20',$3,$4,$5,$6,$7) RETURNING id`,
+                [telegramId, amount, address, fee, finalAmount, tokenAmount, usdAmount]
             );
             wid = ins.rows[0].id;
 
@@ -1813,10 +1988,11 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved' AND processed_at >= date_trunc('day', NOW())) AS paid_today,
                 (SELECT COUNT(*)::int FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_count,
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_amount,
-                (SELECT COUNT(*)::int FROM mr_referrals WHERE verified = TRUE) AS verified_refs
+                (SELECT COUNT(*)::int FROM mr_referrals WHERE verified = TRUE) AS verified_refs,
+                (SELECT COALESCE(SUM(token_amount),0) FROM mr_withdrawals WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS budget_used
         `);
         const x = r.rows[0];
-        for (const k of ["paid_total", "paid_today", "pending_amount"]) x[k] = Number(x[k]);
+        for (const k of ["paid_total", "paid_today", "pending_amount", "budget_used"]) x[k] = Number(x[k]);
         res.json({ ok: true, stats: x });
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
