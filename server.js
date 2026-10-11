@@ -461,11 +461,10 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ`);
             await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS penalty NUMERIC NOT NULL DEFAULT 0`);
             await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS last_check TIMESTAMPTZ`);
+            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS was_member BOOLEAN NOT NULL DEFAULT FALSE`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_spins (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, prize NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`CREATE INDEX IF NOT EXISTS mr_spins_user ON mr_spins(telegram_id, created_at)`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_banners (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, text TEXT DEFAULT '', url TEXT NOT NULL, expires_at TIMESTAMPTZ, enabled BOOLEAN NOT NULL DEFAULT TRUE, clicks INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-            await pool.query(`CREATE TABLE IF NOT EXISTS mr_offers (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT '', url TEXT NOT NULL, reward NUMERIC NOT NULL DEFAULT 0, badge TEXT DEFAULT '', enabled BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-            await pool.query(`CREATE TABLE IF NOT EXISTS mr_offer_events (txid TEXT PRIMARY KEY, offer_id BIGINT, telegram_id BIGINT NOT NULL, reward NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
                 VALUES ('spin_enabled','1'),('spin_max_extra','3'),('spin_scale','1'),
@@ -2776,7 +2775,8 @@ app.get("/api/tasks", authenticate, async (req, res) => {
         const r = await pool.query(
             `SELECT t.id, t.title, t.description, t.url, t.channel, t.reward, t.sponsored, t.max_users,
                     (c.completed_at IS NOT NULL) AS completed,
-                    (c.started_at IS NOT NULL) AS started
+                    (c.started_at IS NOT NULL) AS started,
+                    COALESCE(c.was_member, FALSE) AS was_member
              FROM mr_tasks t
              LEFT JOIN mr_task_claims c ON c.task_id = t.id AND c.telegram_id = $1
              WHERE t.enabled = TRUE
@@ -2799,15 +2799,20 @@ app.post("/api/tasks/:id/start", authenticate, async (req, res) => {
         if (!allJoinedOf(await checkAllChannels(telegramId))) {
             return res.status(403).json({ ok: false, error: "Join all required channels first." });
         }
-        const t = await pool.query(`SELECT id FROM mr_tasks WHERE id = $1 AND enabled = TRUE`, [req.params.id]);
+        const t = await pool.query(`SELECT id, channel FROM mr_tasks WHERE id = $1 AND enabled = TRUE`, [req.params.id]);
         if (!t.rows.length) return res.status(404).json({ ok: false, error: "Task not found." });
 
-        await pool.query(
-            `INSERT INTO mr_task_claims(task_id, telegram_id) VALUES($1,$2)
-             ON CONFLICT(task_id, telegram_id) DO NOTHING`,
-            [req.params.id, telegramId]
+        // a user who was already in the channel BEFORE starting the task gets no reward (only real new members are paid)
+        let wasMember = false;
+        if (t.rows[0].channel) wasMember = (await checkChannel(telegramId, t.rows[0].channel)).joined;
+
+        const ins = await pool.query(
+            `INSERT INTO mr_task_claims(task_id, telegram_id, was_member) VALUES($1,$2,$3)
+             ON CONFLICT(task_id, telegram_id) DO UPDATE SET task_id = EXCLUDED.task_id
+             RETURNING was_member`,
+            [req.params.id, telegramId, wasMember]
         );
-        res.json({ ok: true });
+        res.json({ ok: true, already_member: !!ins.rows[0].was_member });
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
@@ -2837,12 +2842,15 @@ app.post("/api/tasks/:id/claim", authenticate, async (req, res) => {
         }
 
         const cr = await pool.query(
-            `SELECT completed_at, EXTRACT(EPOCH FROM (NOW() - started_at)) AS secs
+            `SELECT completed_at, was_member, EXTRACT(EPOCH FROM (NOW() - started_at)) AS secs
              FROM mr_task_claims WHERE task_id = $1 AND telegram_id = $2`,
             [task.id, telegramId]
         );
         if (!cr.rows.length) return res.status(400).json({ ok: false, error: "Start the task first." });
         if (cr.rows[0].completed_at) return res.status(409).json({ ok: false, error: "Task already completed." });
+        if (cr.rows[0].was_member) {
+            return res.status(400).json({ ok: false, error: "You were already a member of this channel before starting this task, so it gives no reward." });
+        }
 
         if (task.channel) {
             const chk = await checkChannel(telegramId, task.channel);
@@ -2953,10 +2961,9 @@ app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, 
 
 /* ====================================================================
    GROWTH FEATURES: reminder bot, proof feed, Lucky Spin, banner slot,
-   sponsored / self-serve channel promotion, offerwall, promo-code post
+   sponsored / self-serve channel promotion, promo-code post
    ==================================================================== */
 
-const OFFER_SECRET = String(process.env.OFFER_SECRET || "");
 const CRON_SECRET = String(process.env.CRON_SECRET || "");
 const SPIN_PRIZES = [{ p: 0.5, w: 40 }, { p: 1, w: 30 }, { p: 2, w: 18 }, { p: 5, w: 9 }, { p: 10, w: 3 }];
 const DAY_START = `date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`;
@@ -3008,8 +3015,8 @@ async function runReminders() {
         const jobs = [];
         for (const u of b.rows) {
             let text = null;
-            if (Number(u.ads) >= maxAds) text = "ማስታወቂያዎችህ ተሞልተዋል፣ ተመልሰህ ና! 🎯\nነገ አዲስ ማስታወቂያዎች እና ነጥቦች ይጠብቁሃል።";
-            else if (!u.last_active || new Date(u.last_active) < new Date(dayStart)) text = "ዛሬ check-in አላደረግክም! ⏰\nገብተህ ማስታወቂያ ተመልከት፣ ነጥብህን አትጣ።";
+            if (Number(u.ads) >= maxAds) text = "You have watched all of today's ads! 🎯\nCome back tomorrow, new ads and points are waiting for you.";
+            else if (!u.last_active || new Date(u.last_active) < new Date(dayStart)) text = "You have not checked in today! ⏰\nOpen the app, watch an ad and keep earning points.";
             if (text) jobs.push(telegram("sendMessage", { chat_id: Number(u.telegram_id), text, reply_markup: markup }).then(() => sent++, () => {}));
         }
         await Promise.all(jobs);
@@ -3109,68 +3116,6 @@ app.post("/api/spin", authenticate, wrap(async (req, res) => {
 
 /* ---------------------- 4) (banner slot removed) ---------------------- */
 
-/* ---------------------- 5) OFFERWALL / CPA OFFERS ---------------------- */
-
-const offerUrl = (u, id) => String(u).split("{userid}").join(encodeURIComponent(id));
-
-app.get("/api/offers", authenticate, wrap(async (req, res) => {
-    await requireDatabase();
-    const id = String(req.telegramUser.id);
-    const r = await pool.query(`SELECT id, title, description, url, reward, badge FROM mr_offers WHERE enabled = TRUE ORDER BY reward DESC LIMIT 30`);
-    res.json({ ok: true, offers: r.rows.map(o => ({ ...o, reward: Number(o.reward), url: offerUrl(o.url, id) })) });
-}));
-
-// provider postback:  /api/offer-postback?secret=OFFER_SECRET&userid={userid}&txid={txid}&offer={offerId}&amount={points, optional}
-app.get("/api/offer-postback", wrap(async (req, res) => {
-    if (!OFFER_SECRET) return res.status(503).json({ ok: false, error: "OFFER_SECRET is not set." });
-    if (!safeSecretEqual(req.query.secret, OFFER_SECRET)) return res.status(403).json({ ok: false });
-    await requireDatabase();
-    const uid = String(req.query.userid || ""), txid = String(req.query.txid || "").slice(0, 120), offer = String(req.query.offer || "");
-    if (!isId(uid) || !txid) return res.status(400).json({ ok: false, error: "userid and txid are required." });
-    let reward = Number(req.query.amount);
-    if (!Number.isFinite(reward) || reward <= 0) {
-        const o = isId(offer) ? await pool.query(`SELECT reward FROM mr_offers WHERE id = $1`, [offer]) : { rows: [] };
-        reward = o.rows.length ? Number(o.rows[0].reward) : 0;
-    }
-    if (!(reward > 0) || reward > 100000) return res.status(400).json({ ok: false, error: "Invalid reward." });
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-        const u = await client.query(`SELECT 1 FROM mr_users WHERE telegram_id = $1 AND is_banned = FALSE`, [uid]);
-        const ins = u.rows.length ? await client.query(
-            `INSERT INTO mr_offer_events(txid, offer_id, telegram_id, reward) VALUES($1,$2,$3,$4) ON CONFLICT(txid) DO NOTHING RETURNING txid`,
-            [txid, isId(offer) ? offer : null, uid, reward]) : { rows: [] };
-        if (!ins.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: true }); }
-        await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [uid, reward]);
-        await client.query("COMMIT");
-    } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
-    finally { client.release(); }
-    notifyUser(uid, `🎉 Offer completed! +${reward} points added.`);
-    res.json({ ok: true });
-}));
-
-app.get("/api/admin/offers", authenticate, requireAdmin, wrap(async (req, res) => {
-    await requireDatabase();
-    const r = await pool.query(`SELECT o.id, o.title, o.url, o.reward, o.badge, (SELECT COUNT(*)::int FROM mr_offer_events e WHERE e.offer_id = o.id) AS done FROM mr_offers o ORDER BY o.id DESC LIMIT 50`);
-    res.json({ ok: true, offers: r.rows.map(o => ({ ...o, reward: Number(o.reward) })) });
-}));
-app.post("/api/admin/offers", authenticate, requireAdmin, wrap(async (req, res) => {
-    await requireDatabase();
-    const title = String(req.body?.title || "").trim().slice(0, 80), description = String(req.body?.description || "").trim().slice(0, 200);
-    const url = String(req.body?.url || "").trim(), badge = String(req.body?.badge || "").trim().slice(0, 20), reward = Number(req.body?.reward);
-    if (!title) return res.status(400).json({ ok: false, error: "Title is required." });
-    if (!/^https?:\/\/\S+$/i.test(url)) return res.status(400).json({ ok: false, error: "Link must start with http:// or https://" });
-    if (!Number.isFinite(reward) || reward <= 0 || reward > 100000) return res.status(400).json({ ok: false, error: "Reward must be greater than 0." });
-    await pool.query(`INSERT INTO mr_offers(title, description, url, reward, badge) VALUES($1,$2,$3,$4,$5)`, [title, description, url, reward, badge]);
-    res.json({ ok: true });
-}));
-app.post("/api/admin/offers/:id/delete", authenticate, requireAdmin, wrap(async (req, res) => {
-    if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
-    await requireDatabase();
-    await pool.query(`DELETE FROM mr_offers WHERE id = $1`, [req.params.id]);
-    res.json({ ok: true });
-}));
-
 /* ------- 6) SELF-SERVE CHANNEL PROMOTION (owners pay with points, a task is created automatically) ------- */
 
 let BOT_ID = null;
@@ -3225,28 +3170,28 @@ app.get("/api/promote/mine", authenticate, wrap(async (req, res) => {
 
 /* ------- 6b) CHANNEL LEFT -> POINTS TAKEN BACK (promoted channels only) ------- */
 
-// takes the task reward back from one claim (once). returns true if a penalty was applied
+// takes the task reward back from one claim (once) and re-opens the task, so the user can
+// complete it again (and earn the reward again) after he joins the channel again
 async function applyLeavePenalty(claimId) {
     const client = await pool.connect();
     let info = null;
     try {
         await client.query("BEGIN");
         const c = await client.query(
-            `UPDATE mr_task_claims c SET left_at = NOW()
-             FROM mr_tasks t
-             WHERE c.id = $1 AND c.left_at IS NULL AND c.completed_at IS NOT NULL AND t.id = c.task_id
-             RETURNING c.telegram_id, t.reward, t.channel`, [claimId]);
+            `SELECT c.telegram_id, t.reward, t.channel
+             FROM mr_task_claims c JOIN mr_tasks t ON t.id = c.task_id
+             WHERE c.id = $1 AND c.completed_at IS NOT NULL FOR UPDATE OF c`, [claimId]);
         if (!c.rows.length) { await client.query("ROLLBACK"); return false; }
         const { telegram_id, reward, channel } = c.rows[0];
         const u = await client.query(`SELECT points FROM mr_users WHERE telegram_id = $1 FOR UPDATE`, [telegram_id]);
         const take = u.rows.length ? Math.min(Number(reward), Math.max(0, Number(u.rows[0].points))) : 0;
         if (take > 0) await client.query(`UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1`, [telegram_id, take]);
-        await client.query(`UPDATE mr_task_claims SET penalty = $2 WHERE id = $1`, [claimId, take]);
+        await client.query(`DELETE FROM mr_task_claims WHERE id = $1`, [claimId]);   // task is open again
         await client.query("COMMIT");
-        info = { telegram_id, channel, take: Number(reward) };
+        info = { telegram_id, channel, take };
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
-    if (info) notifyUser(info.telegram_id, `⚠️ You left ${info.channel}. -${info.take} points were taken back. Join again is not rewarded twice.`);
+    if (info) notifyUser(info.telegram_id, `⚠️ You left ${info.channel}. -${info.take} points were taken back.\n\nIf you join ${info.channel} again, you can complete this task again and earn the reward.`);
     return true;
 }
 

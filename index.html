@@ -291,9 +291,6 @@ nav button.active svg{stroke:#8ec5ff}
       </div>
     </div>
 
-    <h2><span class="ib sm pink">🔥</span>Offerwall</h2>
-    <div id="offerList"></div>
-
     <h2><span class="ib sm blue">📣</span>Promote your channel</h2>
     <div class="card">
       <div class="muted" id="pmInfo">Get real members. Pay with your points, a task is created automatically.</div>
@@ -465,17 +462,6 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
         <button class="btn green" id="f_save" style="margin-top:14px">Save</button>
         <button class="btn dark" id="f_remind" style="margin-top:8px">Send reminders now</button>
-      </div>
-      <div class="card">
-        <b>Offerwall / CPA offers</b>
-        <div class="muted">Use {userid} in the link. Postback: /api/offer-postback?secret=OFFER_SECRET&amp;userid={userid}&amp;txid={txid}&amp;offer=ID</div>
-        <label>Title</label><input id="o_title" type="text" maxlength="80">
-        <label>Description</label><input id="o_desc" type="text" maxlength="200">
-        <label>Link</label><input id="o_url" type="text" placeholder="https://...?sub={userid}">
-        <label>Reward (points)</label><input id="o_rew" type="number" min="0" step="any">
-        <label>Badge (e.g. High pay)</label><input id="o_badge" type="text" maxlength="20" value="High pay">
-        <button class="btn" id="o_add" style="margin-top:12px">Add offer</button>
-        <div id="o_list" style="margin-top:10px"></div>
       </div>
       <div class="card">
         <b>Post a promo code to the channel</b>
@@ -1345,6 +1331,7 @@ async function loadTasks() {
       const started = t.completed ? false : (t.started || taskState[t.id]);
       let action;
       if (t.completed) action = statusBadge("approved").replace("Approved", "Done");
+      else if (t.was_member) action = '<span class="muted" style="text-align:right">Already joined<br>No reward</span>';
       else if (started) action = `<button class="btn green sm" data-claim="${esc(t.id)}" style="width:auto;padding:10px 18px">Claim</button>`;
       else action = `<button class="btn sm" data-start="${esc(t.id)}" style="width:auto;padding:10px 18px">Start</button>`;
       return `<div class="card ${t.completed ? "task-done" : ""}"><div class="line">
@@ -1357,9 +1344,10 @@ async function loadTasks() {
       const id = b.dataset.start, t = d.tasks.find(x => String(x.id) === id);
       b.disabled = true;
       try {
-        await api("/api/tasks/" + encodeURIComponent(id) + "/start", "POST");
+        const sr = await api("/api/tasks/" + encodeURIComponent(id) + "/start", "POST");
         taskState[id] = "started";
-        openLink(t.url);
+        if (sr && sr.already_member) toast("You were already a member of this channel, so this task gives no reward.", "err");
+        else openLink(t.url);
         loadTasks();
       } catch (e) { toast(e.message, "err"); b.disabled = false; }
     });
@@ -1405,13 +1393,13 @@ $("addTask").onclick = async () => {
 };
 
 /* =====================================================
-   GROWTH FEATURES (proof feed, spin, banner, offerwall, promotion, admin)
+   GROWTH FEATURES (proof feed, spin, promotion, admin)
 ===================================================== */
 const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFixed(4));
 let SP = null;
 
 async function loadHomeExtras() { loadProof(); loadSpin(); }
-async function loadEarnExtras() { loadOffers(); renderPromoQuote(); loadMyCampaigns(); }
+async function loadEarnExtras() { renderPromoQuote(); loadMyCampaigns(); }
 
 /* ---- proof feed: one payout at a time, fades in and out ---- */
 const PROOF_SHOW_MS = 2600, PROOF_FADE_MS = 700;
@@ -1543,17 +1531,6 @@ $("spinBtn").onclick = async () => {
   finally { spinBusy = false; autoIdle = 0; await loadSpin(); }
 };
 
-async function loadOffers() {
-  try {
-    const d = await api("/api/offers");
-    $("offerList").innerHTML = d.offers.length ? d.offers.map(o => `<div class="card"><div class="line">
-      <span class="ib pink">🔥</span>
-      <div class="x"><b>${esc(o.title)}${o.badge ? ' <span style="color:#f59e0b">· ' + esc(o.badge) + "</span>" : ""}</b><span>${esc(o.description || "")}</span><span style="display:block;color:#fbbf24;font-weight:700">+${fmt(o.reward)} points</span></div>
-      <button class="btn sm" data-off="${esc(o.id)}" style="width:auto;padding:10px 18px">Open</button></div></div>`).join("") : '<div class="empty">No offers right now.</div>';
-    $("offerList").querySelectorAll("[data-off]").forEach(b => b.onclick = () => openLink(d.offers.find(o => String(o.id) === b.dataset.off).url));
-  } catch (e) { $("offerList").innerHTML = ""; }
-}
-
 function renderPromoQuote() {
   const st = (ME && ME.settings) || {}, p = st.promo_price_per_join ?? 10, sh = st.promo_user_share ?? 25, mj = st.promo_min_joins ?? 20;
   const j = Math.floor(Number($("pm_joins").value) || 0);
@@ -1602,12 +1579,6 @@ async function loadMore() {
   const s = ME.settings || {};
   $("f_spin").value = s.spin_enabled ?? 1; $("f_spinf").value = s.spin_free ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
   $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1;
-  try {
-    const o = await api("/api/admin/offers");
-    $("o_list").innerHTML = o.offers.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>+${fmt(x.reward)} · ${x.done} done</span></div>
-      <button class="btn red sm" data-odel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
-    $("o_list").querySelectorAll("[data-odel]").forEach(el => el.onclick = async () => { try { await api("/api/admin/offers/" + encodeURIComponent(el.dataset.odel) + "/delete", "POST"); loadMore(); } catch (e) { toast(e.message, "err"); } });
-  } catch (e) { toast(e.message, "err"); }
 }
 $("f_save").onclick = async () => {
   try {
@@ -1621,12 +1592,6 @@ $("f_remind").onclick = async () => {
   try { const r = await api("/api/admin/reminders/run", "POST"); toast(r.off ? "Reminders are off." : "Sent " + r.sent + ", remaining " + r.remaining, "ok"); }
   catch (e) { toast(e.message, "err"); }
   $("f_remind").disabled = false;
-};
-$("o_add").onclick = async () => {
-  try {
-    await api("/api/admin/offers", "POST", { title: $("o_title").value, description: $("o_desc").value, url: $("o_url").value, reward: Number($("o_rew").value), badge: $("o_badge").value });
-    ["o_title", "o_desc", "o_url", "o_rew"].forEach(i => $(i).value = ""); toast("Offer added.", "ok"); loadMore();
-  } catch (e) { toast(e.message, "err"); }
 };
 $("pc_post").onclick = async () => {
   try { await api("/api/admin/promos/" + encodeURIComponent($("pc_code").value.trim().toUpperCase()) + "/post", "POST"); toast("Posted to the channel.", "ok"); }
