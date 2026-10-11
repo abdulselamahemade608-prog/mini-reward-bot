@@ -103,7 +103,7 @@ async function getPayoutLimits(db, st) {
             (SELECT COUNT(*)::int FROM mr_withdrawals
               WHERE status <> 'rejected' AND created_at >= NOW() - INTERVAL '1 hour') AS h,
             (SELECT COALESCE(SUM(usd_amount),0) FROM mr_withdrawals
-              WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS d`
+              WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS d`
     );
     const hourlyUsed = Number(r.rows[0].h);
     const budgetUsed = Number(r.rows[0].d);
@@ -127,6 +127,8 @@ const isId = v => /^\d+$/.test(String(v));
 
 const WITHDRAW_TZ = String(process.env.WITHDRAW_TZ || "Africa/Addis_Ababa");
 const WITHDRAW_TZ_LABEL = String(process.env.WITHDRAW_TZ_LABEL || "EAT");
+// every "today" (ads, withdrawals, budget) starts at midnight in this time zone
+const DAY_TZ = /^[A-Za-z_\/+-]+$/.test(WITHDRAW_TZ) ? WITHDRAW_TZ : "Africa/Addis_Ababa";
 function fmtServerDate(ms) {
     try {
         return new Date(ms).toLocaleString("en-GB", {
@@ -135,6 +137,13 @@ function fmtServerDate(ms) {
         }) + " " + WITHDRAW_TZ_LABEL;
     } catch (e) {
         return new Date(ms).toISOString();
+    }
+}
+function fmtServerDay(ms) {
+    try {
+        return new Date(ms).toLocaleDateString("en-GB", { timeZone: WITHDRAW_TZ, day: "numeric", month: "short", year: "numeric" });
+    } catch (e) {
+        return new Date(ms).toISOString().slice(0, 10);
     }
 }
 function fmtWait(ms) {
@@ -150,9 +159,9 @@ function fmtWait(ms) {
 //  - only ONE withdrawal per account per day (rejected ones do not count)
 //  - plus the optional extra wait (hours) the admin sets in Settings
 async function nextWithdrawAt(db, telegramId, cooldownHours) {
-    const hrs = Number(cooldownHours) || 0;
+    const hrs = 0;   // no hourly wait any more - only ONE withdrawal per day
     const r = await db.query(
-        `SELECT MAX(created_at) AS t, date_trunc('day', NOW()) AS d0
+        `SELECT MAX(created_at) AS t, date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}' AS d0
          FROM mr_withdrawals WHERE telegram_id = $1 AND status <> 'rejected'`,
         [telegramId]
     );
@@ -171,7 +180,7 @@ async function getWithdrawRequirements(db, telegramId, maxAds) {
     const r = await db.query(
         `SELECT
             (SELECT COUNT(*)::int FROM mr_ad_rewards
-              WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW())) AS ads,
+              WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS ads,
             (SELECT COUNT(*)::int FROM mr_tasks t
               WHERE t.enabled = TRUE AND NOT EXISTS (
                 SELECT 1 FROM mr_task_claims c
@@ -185,13 +194,12 @@ async function getWithdrawRequirements(db, telegramId, maxAds) {
 async function alertBudgetFull(used, limit) {
     try {
         if (!ADMIN_ID) return;
-        const day = Math.floor(Date.now() / 86400000);
         const claim = await pool.query(
-            `INSERT INTO mr_app_settings(key, value) VALUES('budget_alert_day', $1)
+            `INSERT INTO mr_app_settings(key, value)
+             VALUES('budget_alert_day', to_char(NOW() AT TIME ZONE '${DAY_TZ}', 'YYYY-MM-DD'))
              ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
              WHERE mr_app_settings.value <> EXCLUDED.value
-             RETURNING key`,
-            [String(day)]
+             RETURNING key`
         );
         if (!claim.rows.length) return;      // already told the admin today
         await telegram("sendMessage", {
@@ -814,7 +822,7 @@ app.get("/api/me", authenticate, async (req, res) => {
 
         const todayRes = await pool.query(
             `SELECT COUNT(*)::int AS c FROM mr_ad_rewards
-             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW())`,
+             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`,
             [telegramId]
         );
 
@@ -908,6 +916,19 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
             return res.status(403).json({ ok: false, error: "Your account is banned." });
         }
 
+        // quick check first: is there a confirmed (unused) ad credit? If not, answer at once - no slow checks
+        if (strict) {
+            const has = await pool.query(
+                `SELECT 1 FROM mr_ad_credits
+                 WHERE telegram_id = $1 AND provider = $2 AND used = FALSE AND created_at > NOW() - INTERVAL '15 minutes'
+                 LIMIT 1`,
+                [telegramId, provider]
+            );
+            if (!has.rows.length) {
+                return res.status(409).json({ ok: false, pending: true, error: "Waiting for ad confirmation..." });
+            }
+        }
+
         const channels = await checkAllChannels(telegramId);
         if (!allJoinedOf(channels)) {
             return res.status(403).json({ ok: false, error: "Join all required channels first." });
@@ -930,7 +951,7 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
 
         const todayResult = await pool.query(
             `SELECT COUNT(*)::int AS count FROM mr_ad_rewards
-             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW())`,
+             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`,
             [telegramId]
         );
         if (Number(todayResult.rows[0].count) >= maxAds) {
@@ -1619,7 +1640,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         if (closedUntil > Date.now()) {
             return res.status(403).json({
                 ok: false,
-                error: "Withdraw requests are closed for today. They will open on " + fmtServerDate(closedUntil) + "."
+                error: "Withdraw requests are closed for today. They will open on " + fmtServerDay(closedUntil) + "."
             });
         }
 
@@ -1658,7 +1679,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             const used = await pool.query(
                 `SELECT COALESCE(SUM(amount),0) AS s FROM mr_withdrawals
                  WHERE telegram_id = $1 AND status <> 'rejected'
-                   AND created_at >= date_trunc('day', NOW())`,
+                   AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`,
                 [telegramId]
             );
             const usedToday = Number(used.rows[0].s);
@@ -2079,16 +2100,16 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
         const r = await pool.query(`
             SELECT
                 (SELECT COUNT(*)::int FROM mr_users) AS total_users,
-                (SELECT COUNT(*)::int FROM mr_users WHERE created_at >= date_trunc('day', NOW())) AS new_today,
+                (SELECT COUNT(*)::int FROM mr_users WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS new_today,
                 (SELECT COUNT(*)::int FROM mr_users WHERE is_banned = TRUE) AS banned,
-                (SELECT COUNT(*)::int FROM mr_ad_rewards WHERE created_at >= date_trunc('day', NOW())) AS ads_today,
+                (SELECT COUNT(*)::int FROM mr_ad_rewards WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS ads_today,
                 (SELECT COUNT(*)::int FROM mr_ad_rewards) AS ads_total,
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved') AS paid_total,
-                (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved' AND processed_at >= date_trunc('day', NOW())) AS paid_today,
+                (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status = 'approved' AND processed_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS paid_today,
                 (SELECT COUNT(*)::int FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_count,
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_amount,
                 (SELECT COUNT(*)::int FROM mr_referrals WHERE verified = TRUE) AS verified_refs,
-                (SELECT COALESCE(SUM(usd_amount),0) FROM mr_withdrawals WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS budget_used
+                (SELECT COALESCE(SUM(usd_amount),0) FROM mr_withdrawals WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS budget_used
         `);
         const x = r.rows[0];
         for (const k of ["paid_total", "paid_today", "pending_amount", "budget_used"]) x[k] = Number(x[k]);
