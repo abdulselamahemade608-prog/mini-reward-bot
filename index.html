@@ -81,7 +81,27 @@ h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
 .balance .big{font-size:44px;font-weight:800;margin:4px 0 16px;letter-spacing:-1px}
 .bnbline{margin:-10px 0 16px;font-size:14px;font-weight:700}
 .bnbline .sub{font-size:12px;font-weight:500;opacity:.8;margin-top:3px}
-.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fbbf24;border-radius:14px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.5}
+.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fbbf24;border-radius:14px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.6;white-space:pre-line}
+/* withdraw receipt card */
+#modal .sheet.rcpt{padding:0;overflow:hidden}
+.rc-top{padding:24px 18px 20px;text-align:center;background:linear-gradient(135deg,#16a34a 0%,#0d9488 55%,#0ea5e9 100%);position:relative}
+.rc-top::after{content:"";position:absolute;top:0;bottom:0;width:70px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.25),transparent);animation:shine 3.5s infinite}
+.rc-ic{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;animation:pop .55s both;box-shadow:0 0 0 8px rgba(255,255,255,.12)}
+.rc-ic svg{width:32px;height:32px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.rc-t{font-size:19px;font-weight:800;color:#fff}
+.rc-s{font-size:13px;color:rgba(255,255,255,.9);margin-top:4px}
+.rc-amt{text-align:center;padding:20px 16px 8px}
+.rc-amt small{display:block;color:var(--muted);font-size:12px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:4px}
+.rc-amt b{font-size:36px;font-weight:800;color:#4ade80;letter-spacing:-.5px}
+.rc-amt i{font-size:15px;font-style:normal;color:var(--muted);margin-left:4px;font-weight:700}
+.rc-rows{margin:12px 18px 0;border-top:2px dashed #2b3b6b;padding-top:6px}
+.rc-rows div{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.rc-rows div:last-child{border-bottom:0}
+.rc-rows span{color:var(--muted);flex:none}
+.rc-rows b{text-align:right;word-break:break-word;max-width:64%}
+.rc-rows .pend{background:rgba(245,158,11,.18);color:#fbbf24;padding:3px 10px;border-radius:20px;font-size:12px}
+.rc-foot{padding:16px 18px calc(18px + env(safe-area-inset-bottom))}
+@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
 .btn{border:0;border-radius:16px;padding:15px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
@@ -400,9 +420,8 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
         <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
         <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
-        <label>Max withdrawals per hour, all users together (0 = no limit)</label><input id="a_hr" type="number" min="0" step="1">
-        <label>Daily withdraw bot budget in BNB, all users together (0 = no limit)</label><input id="a_bud" type="number" min="0" step="any">
-        <label>Wait between withdraw requests per account, in hours (0 = no wait, 24 = 1 day)</label><input id="a_cd" type="number" min="0" step="any">
+                <label>Daily withdraw bot budget in USDT, all users together (0 = no limit). The bot messages you when it is finished.</label><input id="a_bud" type="number" min="0" step="any">
+        <label>Extra wait between withdraw requests per account, in hours (0 = none). Each account can already withdraw only once per day.</label><input id="a_cd" type="number" min="0" step="any">
         <label>Withdraw closed until (leave empty = open)</label>
         <div class="row2" style="align-items:stretch">
           <input id="a_closed" type="datetime-local">
@@ -568,24 +587,25 @@ function bnbPerPoint() {
   return price > 0 ? rate / price : 0;
 }
 function renderBnb() {
-  const per = bnbPerPoint(), price = bnbPrice();
-  if (!per) {
-    $("hBnbBal").textContent = "BNB price loading...";
-    $("hBnbRate").textContent = "";
-    return;
-  }
-  $("hBnbBal").textContent = "\u2248 " + fmtCrypto(ME.user.points * per) + " " + sym();
-  $("hBnbRate").textContent = "1 " + sym() + " = " + fmt(Math.round(1 / per)) + " points ($" + price.toFixed(2) + ")" +
-    " \u00B7 1 point = " + fmtCrypto(per) + " " + sym();
+  const rate = Number(((ME && ME.settings) || {}).point_value_usd ?? 0.01);
+  if (!(rate > 0)) { $("hBnbBal").innerHTML = "&nbsp;"; $("hBnbRate").textContent = ""; return; }
+  $("hBnbBal").textContent = "\u2248 $" + (ME.user.points * rate).toFixed(2) + " " + sym();
+  $("hBnbRate").textContent = "1 " + sym() + " = " + fmt(Math.round(1 / rate)) + " points \u00B7 1 point = $" + rate;
 }
 // text shown when withdrawing is closed by the admin or the user must wait
 function withdrawNoticeText() {
   const st = (ME && ME.settings) || {};
   const closed = Number(st.withdraw_closed_until || 0) * 1000;
   if (closed > Date.now()) return "\u26D4 Withdraw requests are closed for today. They open on " + fmtDate(closed) + ".";
+  const parts = [];
   const next = Number((ME && ME.withdraw_next_at) || 0);
-  if (next > Date.now()) return "\u23F3 You can send your next withdraw request on " + fmtDate(next) + ".";
-  return "";
+  if (next > Date.now()) parts.push("\u23F3 Only one withdraw request per day. You can send the next one on " + fmtDate(next) + ".");
+  const req = ME && ME.withdraw_req;
+  if (req) {
+    if (req.maxAds > 0 && req.adsToday < req.maxAds) parts.push("\u{1F4FA} Watch all of today's ads first: " + req.adsToday + " / " + req.maxAds + " done.");
+    if (req.tasksLeft > 0) parts.push("\u{1F4DD} Complete all tasks first: " + req.tasksLeft + " left.");
+  }
+  return parts.join("\n");
 }
 function renderNotice() {
   const t = withdrawNoticeText(), el = $("wNotice");
@@ -600,11 +620,6 @@ function renderLimits() {
     parts.push(L.budget.full
       ? "\u26A0\uFE0F Today's payout budget is finished. Try again tomorrow."
       : "Today's payout budget left: " + fmtCrypto(L.budget.left) + " of " + fmtCrypto(L.budget.limit) + " " + sym());
-  }
-  if (L.hourly && L.hourly.limit > 0) {
-    parts.push(L.hourly.full
-      ? "\u26A0\uFE0F Hourly withdrawal limit reached. Try again a little later."
-      : "Withdrawals this hour: " + L.hourly.used + " / " + L.hourly.limit);
   }
   el.innerHTML = parts.map(x => "<div>" + esc(x) + "</div>").join("");
 }
@@ -831,18 +846,37 @@ function updateFee() {
   const fee = Math.round(amt * pct) / 100;
   const fin = amt - fee;
   $("wFee").textContent = "Service fee " + pct + "%" +
-    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " USD" +
+    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " " + sym() +
       (bnbPrice() > 0 ? " ≈ " + fmtCrypto(fin * rate / bnbPrice()) + " " + sym() : "") : "");
 }
 $("wAmt").addEventListener("input", updateFee);
 
-function showReceipt(text) {
+function showReceipt(d) {
   const modal = $("modal");
-  modal.innerHTML = `<div class="sheet">
-    <div class="line" style="margin-bottom:12px"><span class="ib green">${svg("check")}</span>
-    <div class="x"><b style="font-size:17px">Request sent</b><span>Waiting for admin approval. You will get a message when it is paid.</span></div></div>
-    <pre class="receipt">${esc(text)}</pre>
-    <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
+  const r = d && d.receipt_data;
+  const usd = n => { n = Number(n || 0); return "$" + (n >= 1 ? n.toFixed(2) : n.toFixed(4)); };
+  const feeTxt = n => { n = Number(n || 0); return "-$" + (n >= 0.01 ? n.toFixed(2) : n.toFixed(4)); };
+  if (!r) {
+    modal.innerHTML = `<div class="sheet"><pre class="receipt">${esc((d && d.receipt) || "Your Withdraw request received")}</pre>
+      <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
+  } else {
+    modal.innerHTML = `<div class="sheet rcpt">
+      <div class="rc-top">
+        <div class="rc-ic">${svg("check")}</div>
+        <div class="rc-t">Your Withdraw request received</div>
+        <div class="rc-s">Waiting for admin approval</div>
+      </div>
+      <div class="rc-amt"><small>After fee amount</small><b>${usd(r.final_usd)}</b><i>${esc(r.symbol)}</i></div>
+      <div class="rc-rows">
+        <div><span>User account</span><b>${esc(r.name)}</b></div>
+        <div><span>Amount</span><b>${usd(r.requested_usd)} ${esc(r.symbol)}</b></div>
+        <div><span>Service fee</span><b>${feeTxt(r.fee_usd)}</b></div>
+        <div><span>Gateway</span><b>${esc(r.gateway)}</b></div>
+        <div><span>Request</span><b>#${esc(r.id)}</b></div>
+        <div><span>Status</span><b class="pend">Pending</b></div>
+      </div>
+      <div class="rc-foot"><button class="btn green" id="mReceiptOk">OK</button></div></div>`;
+  }
   modal.classList.remove("hidden");
   $("mReceiptOk").onclick = () => modal.classList.add("hidden");
   modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
@@ -855,13 +889,13 @@ $("wBtn").onclick = async () => {
   if (!ADDR_RE.test(addr)) return toast("Enter a valid BEP20 address (0x + 40 characters).", "err");
   if (!Number.isFinite(amount) || amount <= 0) return toast("Enter a valid amount.", "err");
   const blocked = withdrawNoticeText();
-  if (blocked) return toast(blocked.replace(/^\S+\s/, ""), "err");
+  if (blocked) return toast(blocked, "err");
 
   const btn = $("wBtn"); btn.disabled = true;
   try {
     const d = await api("/api/withdraw", "POST", { amount, address: addr });
     $("wAmt").value = ""; updateFee();
-    showReceipt(d.receipt);
+    showReceipt(d);
     await refreshMe(); loadHistory();
   } catch (e) { toast(e.message, "err"); }
   btn.disabled = false;
@@ -908,7 +942,7 @@ function admSeg(name) {
     $("a_auto").value = s.auto_ad_seconds ?? 0; $("a_pv").value = s.point_value_usd ?? 0.01;
     $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
     $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
-    $("a_hr").value = s.withdraw_hourly_limit ?? 0; $("a_bud").value = s.daily_bot_budget_bnb ?? 0;
+    $("a_bud").value = s.daily_bot_budget ?? 0;
     $("a_cd").value = s.withdraw_cooldown_hours ?? 0;
     $("a_closed").value = (s.withdraw_closed_until > Date.now() / 1000) ? toLocalInput(s.withdraw_closed_until) : "";
   }
@@ -1006,7 +1040,7 @@ $("saveSettings").onclick = async () => {
       max_ads_per_day: $("a_max").value, auto_ad_seconds: $("a_auto").value,
       min_withdraw: $("a_min").value, point_value_usd: $("a_pv").value, verify_ads: $("a_vads").value,
       daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value,
-      withdraw_hourly_limit: $("a_hr").value, daily_bot_budget_bnb: $("a_bud").value,
+      daily_bot_budget: $("a_bud").value,
       withdraw_cooldown_hours: $("a_cd").value, withdraw_closed_until: fromLocalInput($("a_closed").value)
     });
     toast("Settings saved.", "ok"); await refreshMe();
