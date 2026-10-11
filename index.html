@@ -79,6 +79,9 @@ h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
 .balance::after{content:"";position:absolute;top:0;bottom:0;width:60px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);animation:shine 4s infinite}
 .balance small{opacity:.85;font-size:13px;letter-spacing:.5px}
 .balance .big{font-size:44px;font-weight:800;margin:4px 0 16px;letter-spacing:-1px}
+.bnbline{margin:-10px 0 16px;font-size:14px;font-weight:700}
+.bnbline .sub{font-size:12px;font-weight:500;opacity:.8;margin-top:3px}
+.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fbbf24;border-radius:14px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.5}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
 .btn{border:0;border-radius:16px;padding:15px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
@@ -198,6 +201,7 @@ nav button.active svg{stroke:#8ec5ff}
     <div class="balance">
       <small>TOTAL BALANCE</small>
       <div class="big" id="hPoints">0</div>
+      <div class="bnbline"><div id="hBnbBal">&nbsp;</div><div class="sub" id="hBnbRate"></div></div>
       <div class="row2">
         <button class="btn glass" id="hWithdraw"></button>
         <button class="btn glass" id="hInvite"></button>
@@ -292,6 +296,8 @@ nav button.active svg{stroke:#8ec5ff}
         <div class="muted" id="wMin">Min -</div>
       </div>
       <div class="muted" id="wRate" style="margin-bottom:4px"></div>
+      <div class="notice hidden" id="wNotice"></div>
+      <div class="muted" id="wLimits" style="margin-bottom:4px"></div>
       <label>BEP20 wallet address</label>
       <input id="wAddr" type="text" placeholder="0x..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="42">
       <div class="muted" style="margin-top:6px">BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.</div>
@@ -394,6 +400,14 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
         <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
         <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
+        <label>Max withdrawals per hour, all users together (0 = no limit)</label><input id="a_hr" type="number" min="0" step="1">
+        <label>Daily withdraw bot budget in BNB, all users together (0 = no limit)</label><input id="a_bud" type="number" min="0" step="any">
+        <label>Wait between withdraw requests per account, in hours (0 = no wait, 24 = 1 day)</label><input id="a_cd" type="number" min="0" step="any">
+        <label>Withdraw closed until (leave empty = open)</label>
+        <div class="row2" style="align-items:stretch">
+          <input id="a_closed" type="datetime-local">
+          <button class="btn dark sm" id="a_open" type="button" style="flex:none;width:auto;padding:0 16px">Open now</button>
+        </div>
         <label>Bonus: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
         <label>Bonus: 10 verified friends</label><input id="a_m10" type="number" step="any" min="0">
         <label>Bonus: 25 verified friends</label><input id="a_m25" type="number" step="any" min="0">
@@ -546,6 +560,55 @@ const fmtDate = d => d ? new Date(d).toLocaleString([], { month: "short", day: "
 const sym = () => (ME && ME.payout && ME.payout.symbol) || "USDT";
 const explorer = () => (ME && ME.payout && ME.payout.explorer) || "https://bscscan.com/tx/";
 
+/* ---------------- BNB value + payout limits ---------------- */
+const bnbPrice = () => Number((ME && ME.payout && ME.payout.bnb_price) || 0);
+// BNB value of one point = (USD value of a point) / (BNB price)
+function bnbPerPoint() {
+  const price = bnbPrice(), rate = Number(((ME && ME.settings) || {}).point_value_usd ?? 0.01);
+  return price > 0 ? rate / price : 0;
+}
+function renderBnb() {
+  const per = bnbPerPoint(), price = bnbPrice();
+  if (!per) {
+    $("hBnbBal").textContent = "BNB price loading...";
+    $("hBnbRate").textContent = "";
+    return;
+  }
+  $("hBnbBal").textContent = "\u2248 " + fmtCrypto(ME.user.points * per) + " " + sym();
+  $("hBnbRate").textContent = "1 " + sym() + " = " + fmt(Math.round(1 / per)) + " points ($" + price.toFixed(2) + ")" +
+    " \u00B7 1 point = " + fmtCrypto(per) + " " + sym();
+}
+// text shown when withdrawing is closed by the admin or the user must wait
+function withdrawNoticeText() {
+  const st = (ME && ME.settings) || {};
+  const closed = Number(st.withdraw_closed_until || 0) * 1000;
+  if (closed > Date.now()) return "\u26D4 Withdraw requests are closed for today. They open on " + fmtDate(closed) + ".";
+  const next = Number((ME && ME.withdraw_next_at) || 0);
+  if (next > Date.now()) return "\u23F3 You can send your next withdraw request on " + fmtDate(next) + ".";
+  return "";
+}
+function renderNotice() {
+  const t = withdrawNoticeText(), el = $("wNotice");
+  el.textContent = t;
+  el.classList.toggle("hidden", !t);
+}
+function renderLimits() {
+  const L = ME && ME.payout && ME.payout.limits, el = $("wLimits");
+  if (!L) { el.textContent = ""; return; }
+  const parts = [];
+  if (L.budget && L.budget.limit > 0) {
+    parts.push(L.budget.full
+      ? "\u26A0\uFE0F Today's payout budget is finished. Try again tomorrow."
+      : "Today's payout budget left: " + fmtCrypto(L.budget.left) + " of " + fmtCrypto(L.budget.limit) + " " + sym());
+  }
+  if (L.hourly && L.hourly.limit > 0) {
+    parts.push(L.hourly.full
+      ? "\u26A0\uFE0F Hourly withdrawal limit reached. Try again a little later."
+      : "Withdrawals this hour: " + L.hourly.used + " / " + L.hourly.limit);
+  }
+  el.innerHTML = parts.map(x => "<div>" + esc(x) + "</div>").join("");
+}
+
 /* ---------------- render ---------------- */
 function render() {
   const u = ME.user, st = ME.settings || {};
@@ -572,6 +635,10 @@ function render() {
   updateFee();
   $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
   $("wRate").textContent = "1 point = " + (st.point_value_usd ?? 0.01) + " USD · paid in " + sym() + " (BEP20)";
+
+  renderBnb();
+  renderLimits();
+  renderNotice();
 
   $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?start=" + u.telegram_id : "Bot username is not configured";
 
@@ -764,7 +831,8 @@ function updateFee() {
   const fee = Math.round(amt * pct) / 100;
   const fin = amt - fee;
   $("wFee").textContent = "Service fee " + pct + "%" +
-    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " USD" : "");
+    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " USD" +
+      (bnbPrice() > 0 ? " ≈ " + fmtCrypto(fin * rate / bnbPrice()) + " " + sym() : "") : "");
 }
 $("wAmt").addEventListener("input", updateFee);
 
@@ -786,6 +854,8 @@ $("wBtn").onclick = async () => {
 
   if (!ADDR_RE.test(addr)) return toast("Enter a valid BEP20 address (0x + 40 characters).", "err");
   if (!Number.isFinite(amount) || amount <= 0) return toast("Enter a valid amount.", "err");
+  const blocked = withdrawNoticeText();
+  if (blocked) return toast(blocked.replace(/^\S+\s/, ""), "err");
 
   const btn = $("wBtn"); btn.disabled = true;
   try {
@@ -838,6 +908,9 @@ function admSeg(name) {
     $("a_auto").value = s.auto_ad_seconds ?? 0; $("a_pv").value = s.point_value_usd ?? 0.01;
     $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
     $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
+    $("a_hr").value = s.withdraw_hourly_limit ?? 0; $("a_bud").value = s.daily_bot_budget_bnb ?? 0;
+    $("a_cd").value = s.withdraw_cooldown_hours ?? 0;
+    $("a_closed").value = (s.withdraw_closed_until > Date.now() / 1000) ? toLocalInput(s.withdraw_closed_until) : "";
   }
 }
 $("segStats").onclick = () => admSeg("stats");
@@ -914,13 +987,27 @@ async function loadAdmin() {
   } catch (e) { $("admList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
 }
 
+const toLocalInput = sec => {
+  if (!sec) return "";
+  const d = new Date(sec * 1000), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+};
+const fromLocalInput = v => {
+  if (!v) return 0;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
+};
+$("a_open").onclick = () => { $("a_closed").value = ""; toast("Tap Save settings to open withdrawals."); };
+
 $("saveSettings").onclick = async () => {
   try {
     await api("/api/admin/settings", "POST", {
       ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
       max_ads_per_day: $("a_max").value, auto_ad_seconds: $("a_auto").value,
       min_withdraw: $("a_min").value, point_value_usd: $("a_pv").value, verify_ads: $("a_vads").value,
-      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value
+      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value,
+      withdraw_hourly_limit: $("a_hr").value, daily_bot_budget_bnb: $("a_bud").value,
+      withdraw_cooldown_hours: $("a_cd").value, withdraw_closed_until: fromLocalInput($("a_closed").value)
     });
     toast("Settings saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
@@ -971,6 +1058,7 @@ async function loadStats() {
       tile("wallet", "green", fmt(d.paid_total), "Total paid (pts)") +
       tile("wallet", "teal", fmt(d.paid_today), "Paid today (pts)") +
       tile("clock", "orange", fmt(d.pending_count), "Pending") +
+      tile("coin", "teal", fmtCrypto(d.budget_used || 0) + " " + sym(), "Budget used today") +
       tile("shield", "redg", fmt(d.banned), "Banned") +
       tile("users", "blue", fmt(d.verified_refs), "Verified invites");
   } catch (e) { $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(e.message) + "</div>"; }
