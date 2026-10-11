@@ -285,6 +285,31 @@ async function ensureDatabase() {
                 );
             `);
             await pool.query(`
+                CREATE TABLE IF NOT EXISTS fraud_users (
+                    telegram_id BIGINT PRIMARY KEY,
+                    username TEXT NOT NULL DEFAULT '',
+                    first_name TEXT NOT NULL DEFAULT '',
+                    ip_hash TEXT NOT NULL DEFAULT '',
+                    device_hash TEXT NOT NULL DEFAULT '',
+                    vpn_detected BOOLEAN NOT NULL DEFAULT FALSE,
+                    proxy_detected BOOLEAN NOT NULL DEFAULT FALSE,
+                    risk_score INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    ban_reason TEXT NOT NULL DEFAULT '',
+                    verification_message_sent BOOLEAN NOT NULL DEFAULT FALSE,
+                    ban_message_sent BOOLEAN NOT NULL DEFAULT FALSE,
+                    admin_exempt BOOLEAN NOT NULL DEFAULT FALSE,
+                    checked_at TIMESTAMPTZ,
+                    first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    request_count INTEGER NOT NULL DEFAULT 0
+                );
+            `);
+            await pool.query(`ALTER TABLE fraud_users ADD COLUMN IF NOT EXISTS admin_exempt BOOLEAN NOT NULL DEFAULT FALSE`);
+            await pool.query(`ALTER TABLE fraud_users ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS fraud_users_device_idx ON fraud_users(device_hash)`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS fraud_users_ip_idx ON fraud_users(ip_hash)`);
+            await pool.query(`
                 CREATE TABLE IF NOT EXISTS mr_referrals (
                     id BIGSERIAL PRIMARY KEY,
                     inviter_id BIGINT NOT NULL,
@@ -608,6 +633,312 @@ async function notifyUser(telegramId, text, extra = {}) {
     }
 }
 
+/* ================= SECURITY: VPN / MULTI-ACCOUNT / BAN / UNBAN ================= */
+
+const SECURITY_RECHECK_MS = 10 * 60 * 1000;   // a verified user is fully re-checked at most every 10 minutes
+
+const sha256 = v => crypto.createHash("sha256").update(String(v || "")).digest("hex");
+
+function getClientIP(req) {
+    const fwd = req.headers["x-forwarded-for"];
+    if (fwd) return String(Array.isArray(fwd) ? fwd[0] : fwd).split(",")[0].trim();
+    return String(req.headers["x-real-ip"] || req.socket?.remoteAddress || "");
+}
+
+// sends a Telegram message and tells us if it really arrived
+async function trySend(chatId, text) {
+    try {
+        await telegram("sendMessage", { chat_id: Number(chatId), text, disable_web_page_preview: true });
+        return true;
+    } catch (e) {
+        console.error("trySend", e.message);
+        return false;
+    }
+}
+
+function banTypeOf(reason) {
+    const r = String(reason || "").toLowerCase();
+    if (r.startsWith("admin")) return "other";
+    if (/\b(vpn|proxy|tor)\b/.test(r)) return "vpn";
+    if (r.includes("multiple") || r.includes("multi account")) return "multi";
+    return "other";
+}
+
+const banHead = type =>
+    type === "vpn" ? "VPN/Proxy detected." : type === "multi" ? "Multiple accounts detected." : "";
+
+const banDm = type =>
+    "\u{1F6AB} " + (banHead(type) ? banHead(type) + "\n\n" : "") + "Your account has been permanently banned from Adewa.";
+
+const banApiText = type =>
+    (banHead(type) ? banHead(type) + " " : "") + "Your account has been permanently banned.";
+
+async function detectVPNProxy(ip) {
+    const result = { checked: false, vpn: false, proxy: false, tor: false, detected: false };
+    const clean = String(ip || "").replace(/^::ffff:/, "").trim();
+    if (
+        !clean || clean === "127.0.0.1" || clean === "::1" ||
+        clean.startsWith("10.") || clean.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(clean)
+    ) return result;
+
+    try {
+        const r = await fetch(`https://ipwho.is/${encodeURIComponent(clean)}`, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(5000)
+        });
+        if (!r.ok) return result;
+        const data = await r.json();
+        if (!data || data.success === false) return result;
+
+        result.checked = true;
+        const s = data.security || {};
+        result.vpn = s.vpn === true;
+        result.proxy = s.proxy === true;
+        result.tor = s.tor === true;
+        result.detected = result.vpn || result.proxy || result.tor;
+    } catch (e) {
+        console.error("VPN check", e.message);   // if the check service is down, the user is allowed in
+    }
+    return result;
+}
+
+// Only accounts that were seen EARLIER than this user count, so the first account is never
+// banned because of a later one. An empty device/ip is never compared.
+async function detectMultiAccount(id, ipHash, deviceHash, firstSeen) {
+    const since = firstSeen ? new Date(firstSeen) : new Date();
+
+    if (deviceHash) {
+        const d = await pool.query(
+            `SELECT 1 FROM fraud_users
+             WHERE device_hash = $1 AND telegram_id <> $2 AND first_seen < $3 LIMIT 1`,
+            [deviceHash, id, since]
+        );
+        if (d.rows.length) {
+            return { detected: true, reason: "Multiple Telegram accounts detected on the same device." };
+        }
+    }
+
+    if (ipHash && deviceHash) {
+        const i = await pool.query(
+            `SELECT 1 FROM fraud_users
+             WHERE ip_hash = $1 AND telegram_id <> $2 AND status = 'verified' AND first_seen < $3
+               AND device_hash <> '' AND device_hash <> $4 LIMIT 1`,
+            [ipHash, id, since, deviceHash]
+        );
+        if (i.rows.length) {
+            return { detected: true, reason: "Multiple Telegram accounts detected from the same IP address." };
+        }
+    }
+
+    return { detected: false, reason: "" };
+}
+
+async function saveFraud(tgUser, f) {
+    await pool.query(
+        `INSERT INTO fraud_users (
+            telegram_id, username, first_name, ip_hash, device_hash,
+            vpn_detected, proxy_detected, risk_score, status, ban_reason,
+            checked_at, last_seen, request_count
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW(),1)
+         ON CONFLICT (telegram_id) DO UPDATE SET
+            username = EXCLUDED.username, first_name = EXCLUDED.first_name,
+            ip_hash = EXCLUDED.ip_hash, device_hash = EXCLUDED.device_hash,
+            vpn_detected = EXCLUDED.vpn_detected, proxy_detected = EXCLUDED.proxy_detected,
+            risk_score = EXCLUDED.risk_score, status = EXCLUDED.status, ban_reason = EXCLUDED.ban_reason,
+            checked_at = NOW(), last_seen = NOW(),
+            request_count = fraud_users.request_count + 1`,
+        [
+            String(tgUser.id), tgUser.username || "", tgUser.first_name || "",
+            f.ipHash, f.deviceHash, !!f.vpn, !!f.proxy, f.risk, f.status, f.reason
+        ]
+    );
+}
+
+// Admin ban / unban in the fraud table (used by the /ban /unban commands AND the in-app admin panel).
+// An admin unban sets admin_exempt, so the automatic VPN / multi-account checks never re-ban that user.
+async function setFraudBan(id, banned, reason) {
+    if (banned) {
+        await pool.query(
+            `INSERT INTO fraud_users (telegram_id, status, ban_reason, risk_score, admin_exempt, ban_message_sent)
+             VALUES ($1,'banned',$2,100,FALSE,FALSE)
+             ON CONFLICT (telegram_id) DO UPDATE SET
+                status = 'banned', ban_reason = $2, risk_score = 100,
+                admin_exempt = FALSE, ban_message_sent = FALSE, last_seen = NOW()`,
+            [String(id), reason || "Admin ban"]
+        );
+    } else {
+        await pool.query(
+            `INSERT INTO fraud_users (telegram_id, status, ban_reason, risk_score, admin_exempt, ban_message_sent)
+             VALUES ($1,'verified','',0,TRUE,FALSE)
+             ON CONFLICT (telegram_id) DO UPDATE SET
+                status = 'verified', ban_reason = '', vpn_detected = FALSE, proxy_detected = FALSE,
+                risk_score = 0, admin_exempt = TRUE, ban_message_sent = FALSE, last_seen = NOW()`,
+            [String(id)]
+        );
+    }
+}
+
+async function getBanState(id) {
+    const f = await pool.query(`SELECT status, ban_reason FROM fraud_users WHERE telegram_id = $1`, [String(id)]);
+    if (f.rows[0]?.status === "banned") return { banned: true, reason: f.rows[0].ban_reason || "" };
+    const m = await pool.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1`, [String(id)]);
+    if (m.rows[0]?.is_banned) return { banned: true, reason: "" };
+    return { banned: false, reason: "" };
+}
+
+// Runs on every /api/me. Returns { ok:true } or { ok:false, reason, message }.
+async function securityGate(req, tgUser) {
+    const id = String(tgUser.id);
+    if (ADMIN_ID && id === ADMIN_ID) return { ok: true };
+
+    const ip = getClientIP(req);
+    const ipHash = ip ? sha256(ip) : "";
+    const device = String(req.headers["x-device"] || "").trim().slice(0, 100);
+    const deviceHash = device ? sha256(device) : "";
+
+    const ex = await pool.query(`SELECT * FROM fraud_users WHERE telegram_id = $1`, [id]);
+    const row = ex.rows[0] || null;
+
+    // 1) already banned (by the checks or by the admin)
+    if (row && row.status === "banned") {
+        const type = banTypeOf(row.ban_reason);
+        await pool.query(`UPDATE mr_users SET is_banned = TRUE WHERE telegram_id = $1 AND is_banned = FALSE`, [id]);
+        if (!row.ban_message_sent) {
+            if (await trySend(id, banDm(type))) {
+                await pool.query(`UPDATE fraud_users SET ban_message_sent = TRUE WHERE telegram_id = $1`, [id]);
+            }
+        }
+        return { ok: false, reason: row.ban_reason, message: banApiText(type) };
+    }
+
+    // 2) cleared by the admin (/unban): automatic checks are skipped
+    if (row && row.admin_exempt) {
+        await pool.query(`UPDATE fraud_users SET last_seen = NOW() WHERE telegram_id = $1`, [id]);
+        return { ok: true };
+    }
+
+    // 3) verified a moment ago from the same ip + device: no need to ask the outside service again
+    const fresh =
+        row && row.status === "verified" && row.checked_at &&
+        Date.now() - new Date(row.checked_at).getTime() < SECURITY_RECHECK_MS &&
+        row.ip_hash === ipHash && (!deviceHash || row.device_hash === deviceHash);
+    if (fresh) {
+        await pool.query(`UPDATE fraud_users SET last_seen = NOW() WHERE telegram_id = $1`, [id]);
+        return { ok: true };
+    }
+
+    // 4) full check
+    const net = await detectVPNProxy(ip);
+    const multi = net.detected
+        ? { detected: false, reason: "" }
+        : await detectMultiAccount(id, ipHash, deviceHash, row ? row.first_seen : null);
+
+    if (net.detected || multi.detected) {
+        const type = net.detected ? "vpn" : "multi";
+        const reason = net.detected
+            ? (net.vpn ? "VPN detected" : net.proxy ? "Proxy detected" : "Tor detected")
+            : multi.reason;
+
+        await saveFraud(tgUser, {
+            ipHash, deviceHash, vpn: net.vpn || net.tor, proxy: net.proxy,
+            risk: 100, status: "banned", reason
+        });
+        await pool.query(`UPDATE mr_users SET is_banned = TRUE, updated_at = NOW() WHERE telegram_id = $1`, [id]);
+
+        if (await trySend(id, banDm(type))) {
+            await pool.query(`UPDATE fraud_users SET ban_message_sent = TRUE WHERE telegram_id = $1`, [id]);
+        }
+        if (ADMIN_ID) {
+            const who = [tgUser.first_name, tgUser.username ? "@" + tgUser.username : ""].filter(Boolean).join(" ");
+            await trySend(ADMIN_ID, `\u{1F6AB} Auto-ban: ${who} (ID ${id})\nReason: ${reason}\n\nWrong? Send /unban ${id}`);
+        }
+        return { ok: false, reason, message: banApiText(type) };
+    }
+
+    await saveFraud(tgUser, {
+        ipHash, deviceHash, vpn: false, proxy: false, risk: 0, status: "verified", reason: ""
+    });
+
+    if (!row || !row.verification_message_sent) {
+        if (await trySend(id, "\u2705 Your verification is successfully.")) {
+            await pool.query(`UPDATE fraud_users SET verification_message_sent = TRUE WHERE telegram_id = $1`, [id]);
+        }
+    }
+    return { ok: true };
+}
+
+// /ban <id|@username> [reason]   and   /unban <id|@username>   (admin only, private chat with the bot)
+async function handleBanCommand(msg, cmd, args) {
+    if (!ADMIN_ID || String(msg.from.id) !== ADMIN_ID) return;   // everybody else: silently ignored
+
+    const reply = text => trySend(msg.chat.id, text);
+    await requireDatabase();
+
+    const parts = args.split(/\s+/).filter(Boolean);
+    const target = parts[0] || "";
+    const reason = parts.slice(1).join(" ").slice(0, 200);
+
+    if (!target) {
+        return reply(cmd === "ban"
+            ? "Usage:\n/ban <user_id or @username> [reason]\n\nExample:\n/ban 123456789 cheating"
+            : "Usage:\n/unban <user_id or @username>\n\nExample:\n/unban 123456789");
+    }
+
+    let id = null;
+    if (/^\d{4,15}$/.test(target)) {
+        id = target;
+    } else if (/^@?[A-Za-z0-9_]{3,32}$/.test(target)) {
+        const uname = target.replace(/^@/, "").toLowerCase();
+        let r = await pool.query(`SELECT telegram_id FROM mr_users WHERE LOWER(username) = $1 LIMIT 1`, [uname]);
+        if (!r.rows.length) r = await pool.query(`SELECT telegram_id FROM fraud_users WHERE LOWER(username) = $1 LIMIT 1`, [uname]);
+        if (r.rows.length) id = String(r.rows[0].telegram_id);
+    }
+    if (!id) return reply("User not found. Send the numeric Telegram ID, for example:\n/" + cmd + " 123456789");
+
+    if (cmd === "ban" && id === ADMIN_ID) return reply("You cannot ban the admin.");
+
+    const info = await pool.query(`SELECT username, first_name FROM mr_users WHERE telegram_id = $1`, [id]);
+    const u = info.rows[0];
+    const label = (u ? [u.first_name, u.username ? "@" + u.username : ""].filter(Boolean).join(" ") + " " : "") + `(ID ${id})`;
+    const was = await getBanState(id);
+
+    if (cmd === "ban") {
+        await setFraudBan(id, true, reason ? "Admin ban: " + reason : "Admin ban");
+        await pool.query(`UPDATE mr_users SET is_banned = TRUE, updated_at = NOW() WHERE telegram_id = $1`, [id]);
+        await pool.query(
+            `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+            [ADMIN_ID, "ban_user", id]
+        );
+        const sent = await trySend(id, banDm("other"));
+        if (sent) await pool.query(`UPDATE fraud_users SET ban_message_sent = TRUE WHERE telegram_id = $1`, [id]);
+
+        return reply(
+            `\u2705 Banned: ${label}` +
+            (was.banned ? "\n(was already banned)" : "") +
+            (reason ? `\nReason: ${reason}` : "") +
+            `\n${sent ? "The user was notified." : "The user could not be notified (never started the bot, or blocked it)."}` +
+            `\n\nTo undo: /unban ${id}`
+        );
+    }
+
+    // unban
+    if (!was.banned) return reply(`\u2139\uFE0F ${label} is not banned.`);
+
+    await setFraudBan(id, false);
+    await pool.query(`UPDATE mr_users SET is_banned = FALSE, updated_at = NOW() WHERE telegram_id = $1`, [id]);
+    await pool.query(
+        `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
+        [ADMIN_ID, "unban_user", id]
+    );
+    const sent = await trySend(id, "\u2705 Your account has been unbanned. You can open the app again.");
+
+    return reply(
+        `\u2705 Unbanned: ${label}` +
+        `\n${sent ? "The user was notified." : "The user could not be notified."}` +
+        `\n\nAutomatic VPN / multi-account checks are now skipped for this user.`
+    );
+}
+
 /* ============================== USER ============================== */
 
 async function createOrUpdateUser(tgUser, referralCode) {
@@ -778,6 +1109,11 @@ app.get("/api/me", authenticate, async (req, res) => {
         }
 
         const telegramId = String(req.telegramUser.id);
+
+        const gate = await securityGate(req, req.telegramUser);
+        if (!gate.ok) {
+            return res.status(403).json({ ok: false, status: "banned", reason: gate.reason, error: gate.message });
+        }
 
         await createOrUpdateUser(req.telegramUser, referral);
 
@@ -2157,6 +2493,7 @@ app.post("/api/admin/users/:id/ban", authenticate, requireAdmin, async (req, res
             [id, banned]
         );
         if (!r.rows.length) return res.status(404).json({ ok: false, error: "User not found." });
+        await setFraudBan(id, banned, "Admin ban");
         await pool.query(
             `INSERT INTO mr_admin_logs(admin_id, action, details) VALUES($1,$2,$3)`,
             [ADMIN_ID, banned ? "ban_user" : "unban_user", id]
@@ -2314,6 +2651,19 @@ app.post("/api/telegram-webhook", async (req, res) => {
         if (cb) await handleAdminCallback(cb);
 
         const msg = req.body?.message;
+
+        // admin commands: /ban <id|@username> [reason]  and  /unban <id|@username>
+        if (
+            msg && msg.chat?.type === "private" && msg.from && !msg.from.is_bot &&
+            typeof msg.text === "string"
+        ) {
+            const cm = /^\/(ban|unban)(@\w+)?(?:\s+([\s\S]*))?$/i.exec(msg.text.trim());
+            if (cm) {
+                await handleBanCommand(msg, cm[1].toLowerCase(), String(cm[3] || "").trim());
+                return res.json({ ok: true });
+            }
+        }
+
         if (
             msg && msg.chat?.type === "private" && msg.from && !msg.from.is_bot &&
             typeof msg.text === "string" && /^\/start(@\w+)?(\s|$)/.test(msg.text)
@@ -2321,6 +2671,16 @@ app.post("/api/telegram-webhook", async (req, res) => {
             const payload = (msg.text.split(/\s+/)[1] || "").trim();
 
             await requireDatabase();
+
+            // banned users get the ban message instead of the welcome
+            if (String(msg.from.id) !== ADMIN_ID) {
+                const ban = await getBanState(msg.from.id);
+                if (ban.banned) {
+                    await trySend(msg.chat.id, banDm(banTypeOf(ban.reason)));
+                    return res.json({ ok: true });
+                }
+            }
+
             await registerFromStart(msg.from, payload);
 
             const name = msg.from.first_name || "friend";
