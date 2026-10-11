@@ -421,10 +421,9 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
         <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
                 <label>Daily withdraw bot budget in USDT, all users together (0 = no limit). The bot messages you when it is finished.</label><input id="a_bud" type="number" min="0" step="any">
-        <label>Extra wait between withdraw requests per account, in hours (0 = none). Each account can already withdraw only once per day.</label><input id="a_cd" type="number" min="0" step="any">
-        <label>Withdraw closed until (leave empty = open)</label>
+        <label>Withdraw closed until this day (leave empty = open)</label>
         <div class="row2" style="align-items:stretch">
-          <input id="a_closed" type="datetime-local">
+          <input id="a_closed" type="date">
           <button class="btn dark sm" id="a_open" type="button" style="flex:none;width:auto;padding:0 16px">Open now</button>
         </div>
         <label>Bonus: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
@@ -575,6 +574,7 @@ function countUp(el, to) {
 }
 
 const nameOf = u => [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "User");
+const fmtDay = d => d ? new Date(d).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "";
 const fmtDate = d => d ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 const sym = () => (ME && ME.payout && ME.payout.symbol) || "USDT";
 const explorer = () => (ME && ME.payout && ME.payout.explorer) || "https://bscscan.com/tx/";
@@ -596,10 +596,10 @@ function renderBnb() {
 function withdrawNoticeText() {
   const st = (ME && ME.settings) || {};
   const closed = Number(st.withdraw_closed_until || 0) * 1000;
-  if (closed > Date.now()) return "\u26D4 Withdraw requests are closed for today. They open on " + fmtDate(closed) + ".";
+  if (closed > Date.now()) return "\u26D4 Withdraw requests are closed for today. They open on " + fmtDay(closed) + ".";
   const parts = [];
   const next = Number((ME && ME.withdraw_next_at) || 0);
-  if (next > Date.now()) parts.push("\u23F3 Only one withdraw request per day. You can send the next one on " + fmtDate(next) + ".");
+  if (next > Date.now()) parts.push("\u23F3 Only one withdraw request per day. You can send the next one on " + fmtDay(next) + ".");
   const req = ME && ME.withdraw_req;
   if (req) {
     if (req.maxAds > 0 && req.adsToday < req.maxAds) parts.push("\u{1F4FA} Watch all of today's ads first: " + req.adsToday + " / " + req.maxAds + " done.");
@@ -759,9 +759,9 @@ async function showProvider(p) {
 
 async function claimAdReward(provider) {
   let d = null;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 40; i++) {
     try { d = await api("/api/ad-reward", "POST", { rewardKey: newKey(), provider }); break; }
-    catch (e) { if (!e.pending || i === 9) throw e; await sleep(1500); }
+    catch (e) { if (!e.pending || i === 39) throw e; if (i === 2) toast("Confirming your ad..."); await sleep(600); }
   }
   toast("+" + fmt(d.reward) + " points", "ok");
   await refreshMe();
@@ -943,7 +943,6 @@ function admSeg(name) {
     $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
     $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
     $("a_bud").value = s.daily_bot_budget ?? 0;
-    $("a_cd").value = s.withdraw_cooldown_hours ?? 0;
     $("a_closed").value = (s.withdraw_closed_until > Date.now() / 1000) ? toLocalInput(s.withdraw_closed_until) : "";
   }
 }
@@ -1024,11 +1023,11 @@ async function loadAdmin() {
 const toLocalInput = sec => {
   if (!sec) return "";
   const d = new Date(sec * 1000), p = n => String(n).padStart(2, "0");
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 };
 const fromLocalInput = v => {
   if (!v) return 0;
-  const t = new Date(v).getTime();
+  const t = new Date(v + "T00:00:00").getTime();      // opens at 00:00 of that day
   return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
 };
 $("a_open").onclick = () => { $("a_closed").value = ""; toast("Tap Save settings to open withdrawals."); };
@@ -1041,7 +1040,7 @@ $("saveSettings").onclick = async () => {
       min_withdraw: $("a_min").value, point_value_usd: $("a_pv").value, verify_ads: $("a_vads").value,
       daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value,
       daily_bot_budget: $("a_bud").value,
-      withdraw_cooldown_hours: $("a_cd").value, withdraw_closed_until: fromLocalInput($("a_closed").value)
+      withdraw_closed_until: fromLocalInput($("a_closed").value)
     });
     toast("Settings saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
