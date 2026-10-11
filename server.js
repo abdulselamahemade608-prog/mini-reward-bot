@@ -37,8 +37,13 @@ const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 const BSC_RPC_URL = String(process.env.BSC_RPC_URL || "").trim();
 const PAYOUT_PRIVATE_KEY = String(process.env.PAYOUT_PRIVATE_KEY || "").trim();
 const BSC_CHAIN_ID = Number(process.env.BSC_CHAIN_ID || 56);
-const TOKEN_DECIMALS = 18; // native BNB has 18 decimals
-const TOKEN_SYMBOL = String(process.env.TOKEN_SYMBOL || "BNB");
+const TOKEN_DECIMALS = 18; // USDT on BNB Smart Chain (BEP20) has 18 decimals
+const TOKEN_SYMBOL = "USDT"; // the bot pays out USDT (BEP20)
+const USDT_CONTRACT = String(process.env.USDT_CONTRACT || "0x55d398326f99059fF775485246999027B3197955").trim();
+const ERC20_ABI = [
+    "function transfer(address to, uint256 amount) returns (bool)",
+    "function balanceOf(address owner) view returns (uint256)"
+];
 // BNB price in USD, used to convert points (point_value_usd) into BNB. Update it in Vercel env when the price changes.
 // Now only a LAST-RESORT fallback: the live price is fetched automatically (see getBnbPrice below).
 const BNB_PRICE_USD = Number(process.env.BNB_PRICE_USD || 0);
@@ -88,16 +93,16 @@ async function getBnbPrice() {
 
 /* ===================== PAYOUT LIMITS (bot-wide) ===================== */
 // withdraw_hourly_limit : max number of withdrawal requests the whole bot accepts per rolling hour (0 = off)
-// daily_bot_budget_bnb  : max BNB the bot pays out per day, all users together (0 = off)
+// daily_bot_budget      : max USDT the bot pays out per day, all users together (0 = off)
 // `db` can be the pool or a transaction client.
 async function getPayoutLimits(db, st) {
     const hourlyLimit = Number(st.withdraw_hourly_limit) || 0;
-    const budgetLimit = Number(st.daily_bot_budget_bnb) || 0;
+    const budgetLimit = Number(st.daily_bot_budget) || 0;
     const r = await db.query(
         `SELECT
             (SELECT COUNT(*)::int FROM mr_withdrawals
               WHERE status <> 'rejected' AND created_at >= NOW() - INTERVAL '1 hour') AS h,
-            (SELECT COALESCE(SUM(token_amount),0) FROM mr_withdrawals
+            (SELECT COALESCE(SUM(usd_amount),0) FROM mr_withdrawals
               WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS d`
     );
     const hourlyUsed = Number(r.rows[0].h);
@@ -141,16 +146,67 @@ function fmtWait(ms) {
     if (mi && !d) parts.push(mi + "m");
     return parts.join(" ") || "1m";
 }
-// when this user may send the next withdrawal request (ms, 0 = now). cooldownHours = 0 means no wait.
+// When may this user send the next withdrawal request? (ms, 0 = now)
+//  - only ONE withdrawal per account per day (rejected ones do not count)
+//  - plus the optional extra wait (hours) the admin sets in Settings
 async function nextWithdrawAt(db, telegramId, cooldownHours) {
     const hrs = Number(cooldownHours) || 0;
-    if (hrs <= 0) return 0;
     const r = await db.query(
-        `SELECT MAX(created_at) AS t FROM mr_withdrawals WHERE telegram_id = $1 AND status <> 'rejected'`,
+        `SELECT MAX(created_at) AS t, date_trunc('day', NOW()) AS d0
+         FROM mr_withdrawals WHERE telegram_id = $1 AND status <> 'rejected'`,
         [telegramId]
     );
     if (!r.rows[0] || !r.rows[0].t) return 0;
-    return new Date(r.rows[0].t).getTime() + hrs * 3600 * 1000;
+    const last = new Date(r.rows[0].t).getTime();
+    const dayStart = new Date(r.rows[0].d0).getTime();
+    let next = 0;
+    if (last >= dayStart) next = dayStart + 24 * 3600 * 1000;      // already withdrew today
+    if (hrs > 0) next = Math.max(next, last + hrs * 3600 * 1000);
+    return next;
+}
+
+// To withdraw, the user must have finished ALL of today's ads and ALL active tasks.
+async function getWithdrawRequirements(db, telegramId, maxAds) {
+    const max = Number.isFinite(Number(maxAds)) ? Number(maxAds) : 100;
+    const r = await db.query(
+        `SELECT
+            (SELECT COUNT(*)::int FROM mr_ad_rewards
+              WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW())) AS ads,
+            (SELECT COUNT(*)::int FROM mr_tasks t
+              WHERE t.enabled = TRUE AND NOT EXISTS (
+                SELECT 1 FROM mr_task_claims c
+                WHERE c.task_id = t.id AND c.telegram_id = $1 AND c.completed_at IS NOT NULL)) AS tasks`,
+        [telegramId]
+    );
+    return { adsToday: r.rows[0].ads, maxAds: max, tasksLeft: r.rows[0].tasks };
+}
+
+// Tells the admin (once per day) that the daily payout budget is finished.
+async function alertBudgetFull(used, limit) {
+    try {
+        if (!ADMIN_ID) return;
+        const day = Math.floor(Date.now() / 86400000);
+        const claim = await pool.query(
+            `INSERT INTO mr_app_settings(key, value) VALUES('budget_alert_day', $1)
+             ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+             WHERE mr_app_settings.value <> EXCLUDED.value
+             RETURNING key`,
+            [String(day)]
+        );
+        if (!claim.rows.length) return;      // already told the admin today
+        await telegram("sendMessage", {
+            chat_id: Number(ADMIN_ID),
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
+            text:
+                "\u26A0\uFE0F <b>Daily withdraw budget finished!</b>\n\n" +
+                `\u{1F4B5} <b>Budget:</b> $${Number(limit).toFixed(2)} USDT\n` +
+                `\u{1F4B8} <b>Used today:</b> $${Number(used).toFixed(2)} USDT\n\n` +
+                "New withdraw requests are blocked until tomorrow, or until you raise the budget in Settings."
+        });
+    } catch (e) {
+        console.error("alertBudgetFull", e.message);
+    }
 }
 
 /* ===================== PREMIUM EMOJI (custom emoji ids) ===================== */
@@ -763,19 +819,22 @@ app.get("/api/me", authenticate, async (req, res) => {
         );
 
         // live BNB price (cached 60s) + current payout limits, shown in the app
-        let bnbPrice = null;
-        try { bnbPrice = await getBnbPrice(); } catch (e) { bnbPrice = priceCache.value || null; }
+        const bnbPrice = null;   // payouts are USDT now, no BNB price needed
         let limits = null;
         try { limits = await getPayoutLimits(pool, settings); } catch (e) { console.error("limits", e.message); }
 
         let withdrawNextAt = 0;
         try { withdrawNextAt = await nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours); }
         catch (e) { console.error("withdrawNextAt", e.message); }
+        let withdrawReq = null;
+        try { withdrawReq = await getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day); }
+        catch (e) { console.error("withdrawReq", e.message); }
 
         res.json({
             ok: true,
             settings,
             withdraw_next_at: withdrawNextAt,
+            withdraw_req: withdrawReq,
             today_ads: todayRes.rows[0].c,
             user: {
                 telegram_id: user.telegram_id,
@@ -1160,20 +1219,34 @@ function getPayer() {
     return payer;
 }
 
-// Sends native BNB. A DB advisory lock makes sure two payouts never use the same nonce.
+// Sends USDT (BEP20 token transfer). The wallet also needs a little BNB for the gas fee.
+// A DB advisory lock makes sure two payouts never use the same nonce.
 // onSent(hash) is called right after the transaction is broadcast, so the hash is saved
 // in the database immediately (even if the serverless function is stopped afterwards).
 async function sendPayout(to, tokenAmount, onSent) {
     const { wallet, provider } = getPayer();
+    const token = new ethers.Contract(USDT_CONTRACT, ERC20_ABI, wallet);
     const lock = await pool.connect();
     try {
         await lock.query("SELECT pg_advisory_lock(778899)");
         const amt = ethers.parseUnits(tokenAmount.toFixed(8), TOKEN_DECIMALS);
-        const bal = await provider.getBalance(wallet.address);
+
+        const tokBal = await token.balanceOf(wallet.address);
+        if (tokBal < amt) throw new Error("Payout wallet has not enough " + TOKEN_SYMBOL + ".");
+
+        let gasLimit;
+        try {
+            gasLimit = ((await token.transfer.estimateGas(to, amt)) * 12n) / 10n;
+        } catch (e) {
+            throw new Error("Transfer would fail: " + (e.shortMessage || e.message));
+        }
         const feeData = await provider.getFeeData();
-        const gasCost = 21000n * (feeData.gasPrice || 0n);
-        if (bal < amt + gasCost) throw new Error("Payout wallet has not enough " + TOKEN_SYMBOL + ".");
-        const tx = await wallet.sendTransaction({ to, value: amt });
+        const bnbBal = await provider.getBalance(wallet.address);
+        if (bnbBal < gasLimit * (feeData.gasPrice || 0n)) {
+            throw new Error("Payout wallet has not enough BNB for the gas fee.");
+        }
+
+        const tx = await token.transfer(to, amt, { gasLimit });
         if (typeof onSent === "function") {
             try { await onSent(tx.hash); } catch (e) { console.error("onSent", e.message); }
         }
@@ -1193,120 +1266,106 @@ function maskAddr(v) {
 }
 
 /*
- * Builds the withdrawal message in Telegram HTML with premium (custom) emoji.
- * Use it with parse_mode: "HTML".
- *   - admin message, user notification and proof channel all use this one function
- *   - opts.maskAddress = true hides the middle of the address (proof channel)
- *   - status is plain text: "Pending", "Paid", "Rejected" ...
+ * MESSAGES (Telegram HTML, premium emoji with normal emoji as fallback)
+ *   - admin request      : buildAdminRequestHtml()
+ *   - success (user)     : buildSuccessHtml(w, name, { forUser: true })  -> has the App link
+ *   - success (proof)    : buildSuccessHtml(w, name, { mask: true })     -> no App link
  */
-function buildWithdrawalHtml(w, status, opts = {}) {
-    const amt = Number(w.amount);
+const fmtUsd = n => { n = Number(n || 0); return n >= 1 ? n.toFixed(2) : n.toFixed(4); };
+const fmtFeeUsd = n => { n = Number(n || 0); return n >= 0.01 ? n.toFixed(2) : n.toFixed(4); };
+
+// USD (= USDT) numbers of a withdrawal
+function usdOf(w) {
     const fee = Number(w.fee || 0);
-    const fin = Number(w.final_amount ?? amt - fee);
-    const pct = amt > 0 ? Math.round((fee / amt) * 100) : 0;
-    const tok = Number(w.token_amount || 0);
-    const tokTxt = tok.toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0");
-    const addr = opts.maskAddress ? maskAddr(w.address) : String(w.address);
+    const fin = Number(w.final_amount ?? Number(w.amount || 0) - fee);
+    const finalUsd = (w.usd_amount !== null && w.usd_amount !== undefined)
+        ? Number(w.usd_amount)
+        : Number(w.token_amount || 0);
+    const rate = fin > 0 ? finalUsd / fin : 0;      // USD value of one point
+    return { finalUsd, feeUsd: fee * rate, requestedUsd: Number(w.amount || 0) * rate };
+}
 
-    let t =
-        `${em(EMOJI_NOTI)} <b>New Withdrawal Request</b>\n\n` +
+const displayNameOf = u => [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "\u2014");
 
-        `${em(EMOJI_USER_ID)} <b>User ID:</b>\n` +
-        `<code>${esc(w.telegram_id)}</code>\n\n` +
-
-        `${em(EMOJI_ADDRESS)} <b>BEP20 Address:</b>\n` +
-        `<code>${esc(addr)}</code>\n\n` +
-
-        `${em(EMOJI_AMOUNT)} <b>Requested Amount:</b>\n` +
-        `<code>${amt.toFixed(2)} Points</code>\n\n` +
-
-        `${em(EMOJI_FEE, "\u{1F4B3}")} <b>${pct}% Service Fee:</b>\n` +
-        `<code>${fee.toFixed(2)} Points</code>\n\n` +
-
-        `${em(EMOJI_AMOUNT, "\u{1F4B3}")} <b>Final Amount:</b>\n` +
-        `<code>${fin.toFixed(2)} Points (${tokTxt} ${esc(TOKEN_SYMBOL)})</code>\n\n` +
-
-        `${em(EMOJI_STATUS)} <b>Status:</b> <i>${esc(status)}</i>`;
-
-    if (w.tx_hash) {
-        t += `\n\n\u{1F517} <a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
+async function getUserName(telegramId) {
+    try {
+        const r = await pool.query(
+            `SELECT username, first_name, last_name FROM mr_users WHERE telegram_id = $1`,
+            [telegramId]
+        );
+        if (r.rows.length) return displayNameOf(r.rows[0]);
+    } catch (e) {
+        console.error("getUserName", e.message);
     }
-    if (PROOF_HANDLE) {
-        t += `\n\n${em(EMOJI_PROOF)} <b>Proof :</b> ${esc(PROOF_HANDLE)}`;
-    }
+    return "\u2014";
+}
+
+const appLink = () => (BOT_USERNAME ? "https://t.me/" + BOT_USERNAME : "");
+
+function requestLines(w, name, opts = {}) {
+    const m = usdOf(w);
+    const addr = opts.mask ? maskAddr(w.address) : String(w.address);
+    const nameHtml = opts.link
+        ? `<a href="tg://user?id=${esc(w.telegram_id)}">${esc(name)}</a>`
+        : esc(name);
+    return (
+        `${em(EMOJI_USER_ID, "\u{1F464}")} <b>User:</b> ${nameHtml}\n` +
+        `${em(EMOJI_AMOUNT, "\u{1F4B5}")} <b>Amount:</b> $${fmtUsd(m.finalUsd)} ${TOKEN_SYMBOL} (after $${fmtFeeUsd(m.feeUsd)} fee)\n` +
+        `\u{1FA99} <b>Gateway:</b> ${TOKEN_SYMBOL} BEP20\n` +
+        `${em(EMOJI_ADDRESS, "\u{1F4E6}")} <b>Address:</b> <code>${esc(addr)}</code>`
+    );
+}
+
+// message the ADMIN gets for every withdraw request
+function buildAdminRequestHtml(w, status, name) {
+    let t = `${em(EMOJI_NOTI, "\u26A1")} <b>Withdrawal Request!</b>\n\n` + requestLines(w, name, { link: true });
+    if (BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "\u{1F680}")} <b>App:</b> @${esc(BOT_USERNAME)}`;
+    t += `\n\n-----------\n${em(EMOJI_STATUS, "\u{1F4B8}")} <b>Status:</b> <i>${esc(status)}</i>`;
+    if (w.tx_hash) t += `\n\n\u{1F517} <a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
     return t;
 }
 
-// kept for compatibility - same message, in HTML
-const withdrawalText = (w, status) => buildWithdrawalHtml(w, status);
+// "Withdrawal Successful!" - for the user (with App link) and for the proof channel (masked, no App link)
+function buildSuccessHtml(w, name, opts = {}) {
+    let t = `${em(EMOJI_NOTI, "\u26A1")} <b>Withdrawal Successful!</b>\n\n` + requestLines(w, name, { mask: !!opts.mask });
+    if (opts.forUser && BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "\u{1F680}")} <b>App:</b> ${esc(appLink())}`;
+    return t;
+}
 
-/*
- * Proof channel message (short "Withdrawal Successful" style):
- *
- *   ⚡ Withdrawal Successful!
- *   👤 User: name
- *   💵 Amount: $0.0200 USDT (after $0.01 fee)
- *   🪙 Network: BEP20
- *   📦 Address: 0x1234********abcd
- *   [ Check out ]  <- green button with premium emoji, opens the BscScan tx
- */
-function buildProofHtml(w, userLabel) {
-    const fee = Number(w.fee || 0);
-    const fin = Number(w.final_amount ?? Number(w.amount) - fee);
-    const tok = Number(w.token_amount || 0);
-
-    // real USD value that was paid = BNB sent * BNB price
-    const usdPaid = (w.usd_amount !== null && w.usd_amount !== undefined)
-        ? Number(w.usd_amount)
-        : tok * (priceCache.value || BNB_PRICE_USD || 0);
-    // USD value of one point for this withdrawal (so the fee can be shown in USD too)
-    const rate = fin > 0 ? usdPaid / fin : 0;
-    const feeUsd = fee * rate;
-
-    return (
-        `\u26A1 <b>Withdrawal Successful!</b>\n\n` +
-        `\u{1F464} <b>User:</b> ${esc(userLabel || "\u2014")}\n` +
-        `\u{1F4B5} <b>Amount:</b> $${usdPaid.toFixed(4)} USDT (after $${feeUsd.toFixed(2)} fee)\n` +
-        `\u{1FA99} <b>Network:</b> BEP20\n` +
-        `\u{1F4E6} <b>Address:</b> <code>${esc(maskAddr(w.address))}</code>`
-    );
+// sends a message with the green "Check out" button; if Telegram refuses the styled button, retries with a plain one
+async function sendWithCheckout(chatId, text, txHash) {
+    const url = EXPLORER_TX + txHash;
+    const base = { chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true };
+    try {
+        await telegram("sendMessage", {
+            ...base,
+            reply_markup: { inline_keyboard: [[{ text: "Check out", url, style: "success", icon_custom_emoji_id: EMOJI_ADDRESS }]] }
+        });
+    } catch (e) {
+        console.error("sendWithCheckout (styled)", e.message);
+        await telegram("sendMessage", {
+            ...base,
+            reply_markup: { inline_keyboard: [[{ text: "\u{1F517} Check out", url }]] }
+        });
+    }
 }
 
 async function postProof(w) {
     if (!PROOF_CHANNEL) return;
     try {
-        // show the user's name / @username instead of the numeric id
-        let userLabel = "\u2014";
-        try {
-            const u = await pool.query(
-                `SELECT username, first_name FROM mr_users WHERE telegram_id = $1`,
-                [w.telegram_id]
-            );
-            if (u.rows.length) {
-                userLabel = u.rows[0].username
-                    ? "@" + u.rows[0].username
-                    : (u.rows[0].first_name || "\u2014");
-            }
-        } catch (e) {
-            console.error("postProof user", e.message);
-        }
-
-        await telegram("sendMessage", {
-            chat_id: PROOF_CHANNEL,
-            text: buildProofHtml(w, userLabel),
-            parse_mode: "HTML",
-            disable_web_page_preview: true,
-            reply_markup: {
-                inline_keyboard: [[{
-                    text: "Check out",
-                    url: EXPLORER_TX + w.tx_hash,
-                    style: "success",                         // green button
-                    icon_custom_emoji_id: EMOJI_ADDRESS       // telebirr premium emoji
-                }]]
-            }
-        });
+        const name = await getUserName(w.telegram_id);
+        await sendWithCheckout(PROOF_CHANNEL, buildSuccessHtml(w, name, { mask: true }), w.tx_hash);
     } catch (e) {
         console.error("postProof", e.message);
+    }
+}
+
+async function notifyApproved(w) {
+    try {
+        const name = await getUserName(w.telegram_id);
+        await sendWithCheckout(Number(w.telegram_id), buildSuccessHtml(w, name, { forUser: true }), w.tx_hash);
+    } catch (e) {
+        console.error("notifyApproved", e.message);
     }
 }
 
@@ -1324,18 +1383,10 @@ async function getWithdrawal(id) {
     };
 }
 
-// Short message the USER gets when the admin approves:
-// "✅ Your withdrawal request for 0.10 bnb has been approved 💸"
-function approvedUserText(w) {
-    // 0.10 / 0.000027 style: at least 2 decimals, trailing zeros removed, never scientific notation
-    let amt = Number(w.token_amount || 0).toFixed(6).replace(/0+$/, "");
-    if (/\.\d?$/.test(amt)) amt = Number(amt).toFixed(2);
-    return `\u2705 Your withdrawal request for ${amt} ${TOKEN_SYMBOL.toLowerCase()} has been approved \u{1F4B8}`;
-}
-
 // Text of the admin message after the request is finished
-function adminDoneText(w, id, approve) {
-    return buildWithdrawalHtml(w, approve ? "Paid" : "Rejected") +
+async function adminDoneText(w, id, approve) {
+    const name = await getUserName(w.telegram_id);
+    return buildAdminRequestHtml(w, approve ? "Paid" : "Rejected", name) +
         `\n\nRequest #${esc(id)}\n\n\u2705 <b>Done</b>`;
 }
 
@@ -1349,7 +1400,7 @@ async function syncAdminMessage(id, approve) {
         await telegram("editMessageText", {
             chat_id: Number(ADMIN_ID),
             message_id: Number(w.admin_msg_id),
-            text: adminDoneText(w, id, approve),
+            text: await adminDoneText(w, id, approve),
             parse_mode: "HTML",
             disable_web_page_preview: true
         });
@@ -1378,14 +1429,14 @@ async function approveWithdrawal(id, adminId) {
     let txHash = row.tx_hash || null;
     if (!txHash) {
         try {
-            // the user is paid the fixed USD value, converted with the live price right now
-            if (row.usd_amount !== null && row.usd_amount !== undefined) {
-                const price = await getBnbPrice();
-                const fresh = Math.floor((Number(row.usd_amount) / price) * 1e8) / 1e8;
-                if (!(fresh > 0)) throw new Error("Amount is too small to pay out.");
-                await pool.query(`UPDATE mr_withdrawals SET token_amount = $2 WHERE id = $1`, [id, fresh]);
-                row.token_amount = fresh;
+            // USDT is 1:1 with USD: pay exactly the USD value saved with the request
+            if (row.usd_amount === null || row.usd_amount === undefined) {
+                throw new Error("This old request has no USDT value saved. Please reject it.");
             }
+            const fresh = Math.floor(Number(row.usd_amount) * 1e8) / 1e8;
+            if (!(fresh > 0)) throw new Error("Amount is too small to pay out.");
+            await pool.query(`UPDATE mr_withdrawals SET token_amount = $2 WHERE id = $1`, [id, fresh]);
+            row.token_amount = fresh;
             txHash = await sendPayout(row.address, Number(row.token_amount), async h => {
                 await pool.query(`UPDATE mr_withdrawals SET tx_hash = $2 WHERE id = $1`, [id, h]);
             });
@@ -1415,8 +1466,8 @@ async function approveWithdrawal(id, adminId) {
         tx_hash: txHash
     };
     await Promise.allSettled([
-        // user gets ONLY the short approval line
-        notifyUser(w.telegram_id, approvedUserText(w)),
+        // user gets the "Withdrawal Successful" message (with the App link)
+        notifyApproved(w),
         postProof(w)
     ]);
     return { ok: true, tx_hash: txHash };
@@ -1501,7 +1552,7 @@ async function handleAdminCallback(cb) {
         try {
             const w = await getWithdrawal(id);
             newText = w
-                ? adminDoneText(w, id, approve)
+                ? await adminDoneText(w, id, approve)
                 : `Request #${esc(id)}\n\n\u2705 <b>Done</b>`;
         } catch (e) {
             newText = `Request #${esc(id)}\n\n\u2705 <b>Done</b>`;
@@ -1558,7 +1609,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
 
         const sRes = await pool.query(
             `SELECT key, value FROM mr_app_settings
-             WHERE key IN ('min_withdraw','daily_withdraw_limit','withdraw_fee_percent','point_value_usd','withdraw_hourly_limit','daily_bot_budget_bnb','withdraw_cooldown_hours','withdraw_closed_until')`
+             WHERE key IN ('min_withdraw','daily_withdraw_limit','withdraw_fee_percent','point_value_usd','withdraw_hourly_limit','daily_bot_budget','withdraw_cooldown_hours','withdraw_closed_until','max_ads_per_day')`
         );
         const S = {};
         for (const r of sRes.rows) S[r.key] = Number(r.value);
@@ -1577,8 +1628,23 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         if (nextAt > Date.now()) {
             return res.status(429).json({
                 ok: false,
-                error: "You can send your next withdraw request in " + fmtWait(nextAt - Date.now()) +
-                       " (" + fmtServerDate(nextAt) + ")."
+                error: "Only one withdraw request per day for each account. You can send the next one in " +
+                       fmtWait(nextAt - Date.now()) + " (" + fmtServerDate(nextAt) + ")."
+            });
+        }
+
+        // must finish ALL of today's ads and ALL tasks first
+        const reqs = await getWithdrawRequirements(pool, telegramId, S.max_ads_per_day);
+        if (reqs.maxAds > 0 && reqs.adsToday < reqs.maxAds) {
+            return res.status(400).json({
+                ok: false,
+                error: `Watch all of today's ads first: ${reqs.adsToday} / ${reqs.maxAds} done.`
+            });
+        }
+        if (reqs.tasksLeft > 0) {
+            return res.status(400).json({
+                ok: false,
+                error: `Complete all tasks first: ${reqs.tasksLeft} task(s) left.`
             });
         }
 
@@ -1613,22 +1679,17 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         const fee = Math.round(amount * feePct) / 100;
         const finalAmount = Math.round((amount - fee) * 100) / 100;
 
-        // points -> USD (point_value_usd) -> BNB (live price)
+        // points -> USD (point_value_usd) = USDT
         const rate = Number.isFinite(S.point_value_usd) ? S.point_value_usd : 0.01;
         const usdAmount = Math.round(finalAmount * rate * 1e8) / 1e8;
-        let livePrice;
-        try {
-            livePrice = await getBnbPrice();
-        } catch (e) {
-            return res.status(503).json({ ok: false, error: e.message });
-        }
-        const tokenAmount = Math.floor((usdAmount / livePrice) * 1e8) / 1e8;
+        const tokenAmount = Math.floor(usdAmount * 1e8) / 1e8;      // USDT = USD
         if (!(tokenAmount > 0)) {
             return res.status(400).json({ ok: false, error: "Amount is too small to pay out." });
         }
 
         // 1) hold the points + create the request
         let wid;
+        let budgetInfo = null;
         const client = await pool.connect();
         try {
             await client.query("BEGIN");
@@ -1636,15 +1697,10 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             await client.query("SELECT pg_advisory_xact_lock(778800)");
 
             const lim = await getPayoutLimits(client, S);
-            if (lim.hourly.full) {
+            budgetInfo = lim.budget;
+            if (lim.budget.limit > 0 && lim.budget.used + usdAmount > lim.budget.limit + 1e-9) {
                 await client.query("ROLLBACK");
-                return res.status(429).json({
-                    ok: false,
-                    error: "Too many withdrawals in this hour. Please try again a little later."
-                });
-            }
-            if (lim.budget.limit > 0 && lim.budget.used + tokenAmount > lim.budget.limit + 1e-12) {
-                await client.query("ROLLBACK");
+                await alertBudgetFull(lim.budget.used, lim.budget.limit);
                 return res.status(429).json({
                     ok: false,
                     error: lim.budget.full
@@ -1698,25 +1754,55 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             client.release();
         }
 
+        if (budgetInfo && budgetInfo.limit > 0) {
+            const leftAfter = budgetInfo.limit - (budgetInfo.used + usdAmount);
+            const minPayUsd = Math.max(0, minWithdraw - Math.round(minWithdraw * feePct) / 100) * rate;
+            if (leftAfter <= 0.0001 || leftAfter < minPayUsd) {
+                await alertBudgetFull(budgetInfo.used + usdAmount, budgetInfo.limit);
+            }
+        }
+
         // 2) the admin approves or rejects; the payment is sent only after approval
+        const displayName = displayNameOf(req.telegramUser);
         const w = {
             id: wid, telegram_id: telegramId, amount, method: "BEP20", address,
-            fee, final_amount: finalAmount, token_amount: tokenAmount
+            fee, final_amount: finalAmount, token_amount: tokenAmount, usd_amount: usdAmount
         };
+        const money = usdOf(w);
 
         if (ADMIN_ID) {
             const sent = await telegram("sendMessage", {
                 chat_id: Number(ADMIN_ID),
-                text: buildWithdrawalHtml(w, "Pending") + `\n\nRequest #${esc(wid)}`,
+                text: buildAdminRequestHtml(w, "Pending", displayName) + `\n\nRequest #${esc(wid)}`,
                 parse_mode: "HTML",
                 disable_web_page_preview: true,
                 reply_markup: {
-                    inline_keyboard: [[
-                        { text: "\u2705 Approve", callback_data: `wd:approve:${wid}` },
-                        { text: "\u274C Reject", callback_data: `wd:reject:${wid}` }
-                    ]]
+                    inline_keyboard: [
+                        [
+                            { text: "\u2705 Approve", callback_data: `wd:approve:${wid}`, style: "success" },
+                            { text: "\u274C Reject", callback_data: `wd:reject:${wid}`, style: "danger" }
+                        ],
+                        [
+                            { text: "\u{1F4F1} Open App", web_app: { url: APP_URL }, style: "primary" }
+                        ]
+                    ]
                 }
-            }).catch(e => { console.error("notify admin", e.message); return null; });
+            }).catch(async e => {
+                console.error("notify admin (styled)", e.message);
+                // fallback: same message with plain buttons, so the admin never misses a request
+                return telegram("sendMessage", {
+                    chat_id: Number(ADMIN_ID),
+                    text: buildAdminRequestHtml(w, "Pending", displayName) + `\n\nRequest #${esc(wid)}`,
+                    parse_mode: "HTML",
+                    disable_web_page_preview: true,
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: "\u2705 Approve", callback_data: `wd:approve:${wid}` },
+                            { text: "\u274C Reject", callback_data: `wd:reject:${wid}` }
+                        ]]
+                    }
+                }).catch(e2 => { console.error("notify admin", e2.message); return null; });
+            });
             if (sent && sent.message_id) {
                 await pool.query(`UPDATE mr_withdrawals SET admin_msg_id = $2 WHERE id = $1`, [wid, sent.message_id])
                     .catch(e => console.error("save admin_msg_id", e.message));
@@ -1729,8 +1815,21 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             pending: true,
             id: wid,
             points: Number(after.rows[0].points),
-            // the mini app shows plain text, so remove the HTML tags here
-            receipt: stripTags(buildWithdrawalHtml(w, "Pending approval"))
+            // plain text version (the app shows a styled card using receipt_data)
+            receipt:
+                "Your Withdraw request received\n\n" +
+                `User account: ${displayName}\n` +
+                `Amount: $${fmtUsd(money.requestedUsd)} ${TOKEN_SYMBOL}\n` +
+                `After fee amount: $${fmtUsd(money.finalUsd)} ${TOKEN_SYMBOL}`,
+            receipt_data: {
+                id: wid,
+                name: displayName,
+                requested_usd: money.requestedUsd,
+                fee_usd: money.feeUsd,
+                final_usd: money.finalUsd,
+                symbol: TOKEN_SYMBOL,
+                gateway: TOKEN_SYMBOL + " BEP20"
+            }
         });
     } catch (error) {
         console.error("/api/withdraw", error);
@@ -1989,7 +2088,7 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
                 (SELECT COUNT(*)::int FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_count,
                 (SELECT COALESCE(SUM(amount),0) FROM mr_withdrawals WHERE status IN ('pending','processing')) AS pending_amount,
                 (SELECT COUNT(*)::int FROM mr_referrals WHERE verified = TRUE) AS verified_refs,
-                (SELECT COALESCE(SUM(token_amount),0) FROM mr_withdrawals WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS budget_used
+                (SELECT COALESCE(SUM(usd_amount),0) FROM mr_withdrawals WHERE status <> 'rejected' AND created_at >= date_trunc('day', NOW())) AS budget_used
         `);
         const x = r.rows[0];
         for (const k of ["paid_total", "paid_today", "pending_amount", "budget_used"]) x[k] = Number(x[k]);
