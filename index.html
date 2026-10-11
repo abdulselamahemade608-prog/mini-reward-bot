@@ -53,6 +53,13 @@ svg{display:block}
 .bar{width:160px;height:5px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;animation:fadeUp .8s .8s both}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899);animation:load 1.8s .6s ease-out forwards}
 @keyframes spin{to{transform:rotate(360deg)}}
+.proof-slot{opacity:0;transition:opacity .7s ease}
+.proof-slot.show{opacity:1}
+.proof-det{margin-top:10px;line-height:1.75;word-break:break-all}
+.wheel-wrap{position:relative;width:210px;height:222px;margin:14px auto 0}
+.wheel-ptr{position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid #fbbf24;z-index:2;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+#wheelSvg{position:absolute;left:5px;top:17px;width:200px;height:200px;will-change:transform;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.pm-support{margin-top:12px;padding:12px;border-radius:14px;border:1px solid #f59e0b;background:rgba(245,158,11,.08)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes load{to{width:100%}}
@@ -218,8 +225,6 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="pill"><span class="ib sm orange" id="hRankIc"></span><span id="hRank">#-</span></div>
     </div>
 
-    <div id="bannerBox"></div>
-
     <div class="balance">
       <small>TOTAL BALANCE</small>
       <div class="big" id="hPoints">0</div>
@@ -249,7 +254,11 @@ nav button.active svg{stroke:#8ec5ff}
         <span class="ib pink">🎡</span>
         <div class="x"><b>Lucky Spin</b><span id="spinSub">1 free spin every day</span></div>
       </div>
-      <div id="spinRes" class="muted" style="margin-top:10px;font-weight:700"></div>
+      <div class="wheel-wrap" id="wheelWrap">
+        <div class="wheel-ptr"></div>
+        <svg id="wheelSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div id="spinRes" class="muted" style="margin-top:10px;font-weight:700;text-align:center"></div>
       <button class="btn" id="spinBtn" style="margin-top:12px">Spin</button>
     </div>
 
@@ -291,6 +300,11 @@ nav button.active svg{stroke:#8ec5ff}
       <label>Channel (bot must be admin)</label><input id="pm_chan" type="text" placeholder="@yourchannel">
       <label>Number of joins</label><input id="pm_joins" type="number" min="1" step="1" placeholder="100">
       <div class="muted" id="pmQuote" style="margin-top:8px"></div>
+      <div class="pm-support hidden" id="pmSupport">
+        <div style="font-weight:700">You have no points yet.</div>
+        <div class="muted" style="margin-top:4px">You need points to start a campaign. Please talk to Support and they will help you.</div>
+        <button class="btn dark sm" id="pmSupportBtn" type="button" style="margin-top:10px;width:auto;padding:10px 18px">Contact Support</button>
+      </div>
       <button class="btn green" id="pmBtn" style="margin-top:12px">Start campaign</button>
       <div id="pmMine" style="margin-top:10px"></div>
     </div>
@@ -442,7 +456,8 @@ nav button.active svg{stroke:#8ec5ff}
       <div class="card">
         <b>Growth settings</b>
         <label>Lucky Spin on (1/0)</label><input id="f_spin" type="number" min="0" step="1">
-        <label>Max extra spins per day (unlocked by ads)</label><input id="f_spinx" type="number" min="0" step="1">
+        <label>Free spins per day (first spins, no ad needed)</label><input id="f_spinf" type="number" min="0" step="1">
+        <label>Extra spins per day (each one unlocked by watching an ad)</label><input id="f_spinx" type="number" min="0" step="1">
         <label>Spin prize multiplier (x)</label><input id="f_spins" type="number" min="0" step="any">
         <label>Channel promotion: price per join (points)</label><input id="f_price" type="number" min="0" step="any">
         <label>Share paid to the user per join (%)</label><input id="f_share" type="number" min="0" max="100" step="any">
@@ -450,15 +465,6 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
         <button class="btn green" id="f_save" style="margin-top:14px">Save</button>
         <button class="btn dark" id="f_remind" style="margin-top:8px">Send reminders now</button>
-      </div>
-      <div class="card">
-        <b>Banner / featured slot</b>
-        <label>Title</label><input id="b_title" type="text" maxlength="80">
-        <label>Text (optional)</label><input id="b_text" type="text" maxlength="160">
-        <label>Link</label><input id="b_url" type="text" placeholder="https://...">
-        <label>Days (0 = no end)</label><input id="b_days" type="number" min="0" step="1" value="7">
-        <button class="btn" id="b_add" style="margin-top:12px">Add banner</button>
-        <div id="b_list" style="margin-top:10px"></div>
       </div>
       <div class="card">
         <b>Offerwall / CPA offers</b>
@@ -600,8 +606,8 @@ const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invit
 document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
 
 /* ---------------- state / helpers ---------------- */
-let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null;
-let watching = false, autoBusy = false;
+let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null, interCtrlId = "";
+let watching = false, autoBusy = false, spinBusy = false, autoIdle = 0;
 let admStatus = "pending", currentTab = "home";
 const SUPPORT_BOT = "Adewa_eran_support_bot";
 const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -810,9 +816,12 @@ function getCtrl() {
   return adController;
 }
 function getInter() {
-  if (interCtrl) return interCtrl;
-  if (!ADSGRAM_INTERSTITIAL_ID || !window.Adsgram) return null;
-  try { interCtrl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_ID }); } catch (e) { return null; }
+  // surprise ads: use the interstitial block when one is set, otherwise the normal Adsgram block (so Adsgram shows too)
+  const id = String((ME && ME.adsgram && ME.adsgram.interBlockId) || ADSGRAM_INTERSTITIAL_ID || "");
+  if (!id) return getCtrl();
+  if (interCtrl && interCtrlId === id) return interCtrl;
+  if (!window.Adsgram) return null;
+  try { interCtrl = window.Adsgram.init({ blockId: id }); interCtrlId = id; } catch (e) { return null; }
   return interCtrl;
 }
 const monetagFn = () => { const f = window["show_" + MONETAG_ZONE]; return typeof f === "function" ? f : null; };
@@ -867,18 +876,29 @@ async function watchAd() {
     toast((e && (e.description || e.message)) || "Ad error", "err");
   } finally {
     setWatchBusy(false);
+    autoIdle = 0;
   }
 }
 $("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
 
-/* ---------------- surprise ads (admin sets the seconds) ---------------- */
+/* ---------------- surprise ads (admin sets the seconds) ----------------
+   The user stays N seconds in the app -> ONE ad. The next N seconds are counted
+   only AFTER that ad was closed, then the next ad comes. */
 let autoTimer = null, autoSec = 0;
 function scheduleAuto() {
   const s = Number(((ME && ME.settings) || {}).auto_ad_seconds || 0);
   if (s === autoSec) return;
-  autoSec = s;
+  autoSec = s; autoIdle = 0;
   clearInterval(autoTimer); autoTimer = null;
-  if (s >= 10) autoTimer = setInterval(showAutoAd, s * 1000);
+  if (s >= 10) autoTimer = setInterval(autoTick, 1000);
+}
+function autoTick() {
+  // time only counts while the user is really in the app and nothing else is going on
+  if (document.hidden || autoBusy || watching || spinBusy) return;
+  if (!ME || !ME.allJoined) return;
+  if (!$("modal").classList.contains("hidden")) return;
+  autoIdle++;
+  if (autoIdle >= autoSec) { autoIdle = 0; showAutoAd(); }
 }
 async function showAutoAd() {
   if (autoBusy || watching || document.hidden) return;
@@ -898,10 +918,10 @@ async function showAutoAd() {
       }
       if (r !== "noad") { setTurn("autoTurn", other(p)); break; }
     }
-  } finally { autoBusy = false; }
+  } finally { autoBusy = false; autoIdle = 0; }   // the next countdown starts when this ad is closed
 }
 // pick up changes made by the admin
-setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy) refreshMe().catch(() => {}); }, 60000);
+setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy && !spinBusy) refreshMe().catch(() => {}); }, 60000);
 
 /* ---------------- invite ---------------- */
 $("shareBtn").onclick = () => {
@@ -1390,52 +1410,137 @@ $("addTask").onclick = async () => {
 const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFixed(4));
 let SP = null;
 
-async function loadHomeExtras() { loadBanner(); loadProof(); loadSpin(); }
+async function loadHomeExtras() { loadProof(); loadSpin(); }
 async function loadEarnExtras() { loadOffers(); renderPromoQuote(); loadMyCampaigns(); }
 
-async function loadBanner() {
-  try {
-    const d = await api("/api/banners");
-    $("bannerBox").innerHTML = d.banners.map(b => `<div class="card" data-bn="${esc(b.id)}" style="margin-top:12px;border-color:#f59e0b;cursor:pointer">
-      <div class="line"><span class="ib orange">⭐</span><div class="x"><b>${esc(b.title)}</b><span>${esc(b.text || "")}</span></div><span class="muted">Sponsored</span></div></div>`).join("");
-    $("bannerBox").querySelectorAll("[data-bn]").forEach(el => el.onclick = () => {
-      const b = d.banners.find(x => String(x.id) === el.dataset.bn);
-      api("/api/banners/" + encodeURIComponent(b.id) + "/click", "POST").catch(() => {});
-      openLink(b.url);
-    });
-  } catch (e) { $("bannerBox").innerHTML = ""; }
+/* ---- proof feed: one payout at a time, fades in and out ---- */
+const PROOF_SHOW_MS = 2600, PROOF_FADE_MS = 700;
+let proofFeed = [], proofIdx = 0, proofTimer = null;
+function proofCard(p) {
+  const rows = [];
+  if (p.points !== null && p.points !== undefined) rows.push("Withdrawn: <b>" + fmt(p.points) + " pts</b>");
+  if (p.fee) rows.push("Fee: " + fmt(p.fee) + " pts");
+  if (p.final !== null && p.final !== undefined) rows.push("Received: <b>" + fmt(p.final) + " pts</b>");
+  if (p.wallet) rows.push("Wallet: " + esc(p.wallet));
+  if (p.tx) rows.push("TX: " + esc(p.tx));
+  return `<div class="card" style="padding:14px"><div class="line">
+    <span class="ib sm green">✅</span>
+    <div class="x"><b>${esc(p.name)} · Withdraw paid</b><span>${esc(p.method || "")}${p.at ? " · " + new Date(p.at).toLocaleString() : ""}</span></div>
+    <b>${money(p.usd)}</b></div>
+    ${rows.length ? '<div class="muted proof-det">' + rows.join("<br>") + "</div>" : ""}</div>`;
 }
-
+function proofStep() {
+  clearTimeout(proofTimer);
+  const slot = $("proofSlot");
+  if (!slot || !proofFeed.length) return;
+  if (currentTab !== "home" || document.hidden) { proofTimer = setTimeout(proofStep, 1000); return; }
+  slot.classList.remove("show");
+  slot.innerHTML = proofCard(proofFeed[proofIdx % proofFeed.length]);
+  proofIdx++;
+  void slot.offsetWidth;                       // restart the fade-in
+  slot.classList.add("show");
+  proofTimer = setTimeout(() => {
+    slot.classList.remove("show");             // fade out (opacity 0) ...
+    proofTimer = setTimeout(proofStep, PROOF_FADE_MS);   // ... then the next payout comes in
+  }, PROOF_SHOW_MS);
+}
 async function loadProof() {
   try {
     const d = await api("/api/proof-feed");
-    $("proofList").innerHTML = d.feed.length ? d.feed.map(p => `<div class="card" style="padding:12px"><div class="line">
-      <span class="ib sm green">✅</span><div class="x"><b>${esc(p.name)}</b><span>${esc(p.method || "")} · ${p.at ? new Date(p.at).toLocaleDateString() : ""}</span></div><b>${money(p.usd)}</b></div></div>`).join("")
-      : '<div class="empty">No payouts yet.</div>';
-  } catch (e) { $("proofList").innerHTML = ""; }
+    clearTimeout(proofTimer);
+    proofFeed = d.feed || [];
+    proofIdx = 0;
+    if (!proofFeed.length) { $("proofList").innerHTML = '<div class="empty">No payouts yet.</div>'; return; }
+    $("proofList").innerHTML = '<div id="proofSlot" class="proof-slot"></div>';
+    proofStep();
+  } catch (e) { clearTimeout(proofTimer); $("proofList").innerHTML = ""; }
+}
+
+/* ---- Lucky Spin with a real wheel ---- */
+const WHEEL_COLORS = ["#7c3aed", "#2563eb", "#059669", "#d97706", "#db2777", "#0891b2", "#dc2626", "#65a30d"];
+let wheelAngle = 0, wheelKey = "";
+function buildWheel() {
+  if (!SP || !SP.prizes || !SP.prizes.length) return;
+  const key = SP.prizes.join(",");
+  if (key === wheelKey) return;
+  wheelKey = key;
+  const n = SP.prizes.length, seg = 360 / n, C = 100, R = 96;
+  const pt = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
+  let h = "";
+  SP.prizes.forEach((p, i) => {
+    const [x0, y0] = pt(i * seg, R), [x1, y1] = pt((i + 1) * seg, R), mid = i * seg + seg / 2;
+    h += `<path d="M${C} ${C} L${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${WHEEL_COLORS[i % WHEEL_COLORS.length]}" stroke="#fff" stroke-width="2"/>`;
+    h += `<g transform="rotate(${mid} ${C} ${C})"><text x="${C}" y="${C - 58}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width=".6">+${fmt(p)}</text></g>`;
+  });
+  h += `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#fbbf24" stroke-width="4"/><circle cx="${C}" cy="${C}" r="13" fill="#fff" stroke="#fbbf24" stroke-width="4"/>`;
+  $("wheelSvg").innerHTML = h;
+  setWheel(wheelAngle);
+}
+function setWheel(a) { wheelAngle = a; $("wheelSvg").style.transform = "rotate(" + a + "deg)"; }
+// spins freely while the server answers, then slows down and stops on the prize segment
+async function spinWheelTo(resultPromise) {
+  let idx = null, speed = 0, last = performance.now();
+  const t0 = last;
+  resultPromise.then(r => { idx = r; }, () => { idx = -1; });
+  await new Promise(res => {
+    const f = now => {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      speed = Math.min(900, speed + 1300 * dt);
+      setWheel(wheelAngle + speed * dt);
+      if (idx !== null && now - t0 > 1500) res(); else requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  if (idx < 0) return false;
+  const n = SP.prizes.length, seg = 360 / n;
+  const mod = ((wheelAngle % 360) + 360) % 360;
+  const want = (((360 - (idx * seg + seg / 2)) % 360) + 360) % 360;
+  const from = wheelAngle, target = from + 360 * 4 + ((want - mod + 360) % 360), dur = 3800, ts = performance.now();
+  await new Promise(res => {
+    const f = now => {
+      const p = Math.min(1, (now - ts) / dur), e = 1 - Math.pow(1 - p, 3);
+      setWheel(from + (target - from) * e);
+      if (p < 1) requestAnimationFrame(f); else res();
+    };
+    requestAnimationFrame(f);
+  });
+  return true;
 }
 
 function renderSpin() {
   if (!SP) return;
   $("spinCard").classList.toggle("hidden", !SP.enabled);
-  $("spinSub").textContent = SP.free ? "Your free spin is ready!" : (SP.available > 0 ? SP.available + " extra spin(s) ready" : (SP.extra_left > 0 ? "Watch an ad for an extra spin (" + SP.extra_left + " left today)" : "Come back tomorrow"));
+  buildWheel();
+  let sub;
+  if (SP.free > 0) sub = SP.free + " free spin" + (SP.free > 1 ? "s" : "") + " ready!" + (SP.max_extra > 0 ? " (+" + SP.extra_left + " extra with ads)" : "");
+  else if (SP.available > 0) sub = SP.available + " extra spin(s) ready";
+  else if (SP.extra_left > 0) sub = "Watch an ad for an extra spin (" + SP.extra_left + " left today)";
+  else sub = "Come back tomorrow";
+  $("spinSub").textContent = sub;
   $("spinBtn").textContent = SP.available > 0 ? "Spin now" : (SP.extra_left > 0 ? "Watch ad for extra spin" : "No spins left");
-  $("spinBtn").disabled = SP.available <= 0 && SP.extra_left <= 0;
+  $("spinBtn").disabled = spinBusy || (SP.available <= 0 && SP.extra_left <= 0);
 }
 async function loadSpin() { try { SP = await api("/api/spin"); renderSpin(); } catch (e) {} }
 $("spinBtn").onclick = async () => {
-  if (watching || !SP) return;
+  if (watching || spinBusy || !SP) return;
+  spinBusy = true;
   $("spinBtn").disabled = true;
   try {
-    if (SP.available <= 0) { await watchAd(); await loadSpin(); if (SP.available <= 0) return; }
+    if (SP.available <= 0) {                       // no spin left: an ad unlocks one extra spin
+      spinBusy = false; await watchAd(); spinBusy = true;
+      await loadSpin();
+      if (SP.available <= 0) return;
+    }
     $("spinRes").textContent = "🎡 Spinning...";
-    await sleep(1200);
-    const r = await api("/api/spin", "POST");
+    const call = api("/api/spin", "POST");
+    let r = null;
+    const ok = await spinWheelTo(call.then(x => { r = x; return x.index || 0; }));
+    if (!ok || !r) { $("spinRes").textContent = ""; await call; return; }
     $("spinRes").textContent = "🎉 You won +" + fmt(r.prize) + " points!";
     toast("+" + fmt(r.prize) + " points", "ok");
     await refreshMe();
   } catch (e) { $("spinRes").textContent = ""; toast(e.message, "err"); }
-  finally { await loadSpin(); }
+  finally { spinBusy = false; autoIdle = 0; await loadSpin(); }
 };
 
 async function loadOffers() {
@@ -1454,10 +1559,18 @@ function renderPromoQuote() {
   const j = Math.floor(Number($("pm_joins").value) || 0);
   $("pmInfo").textContent = "Pay " + fmt(p) + " points per join (min " + mj + " joins). Members earn " + fmt(p * sh / 100) + " points each.";
   $("pmQuote").textContent = j > 0 ? "Total cost: " + fmt(j * p) + " points" : "";
+  // nobody with 0 points can pay for a campaign -> send him to Support
+  const pts = Number(ME && ME.user && ME.user.points) || 0;
+  $("pmSupport").classList.toggle("hidden", pts > 0);
 }
+$("pmSupportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
 $("pm_joins").oninput = renderPromoQuote;
 $("pmBtn").onclick = async () => {
   const joins = Math.floor(Number($("pm_joins").value) || 0), chan = $("pm_chan").value.trim();
+  if ((Number(ME && ME.user && ME.user.points) || 0) <= 0) {
+    $("pmSupport").classList.remove("hidden");
+    return toast("You have no points. Please contact Support.", "err");
+  }
   if (!(await confirmBox("Start the campaign for " + chan + " (" + joins + " joins)?"))) return;
   $("pmBtn").disabled = true;
   try {
@@ -1487,13 +1600,9 @@ $("segMore").onclick = () => admSeg("more");
 
 async function loadMore() {
   const s = ME.settings || {};
-  $("f_spin").value = s.spin_enabled ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
+  $("f_spin").value = s.spin_enabled ?? 1; $("f_spinf").value = s.spin_free ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
   $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1;
   try {
-    const b = await api("/api/admin/banners");
-    $("b_list").innerHTML = b.banners.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>${x.live ? "Live" : "Ended"} · ${x.clicks} clicks</span></div>
-      <button class="btn red sm" data-bdel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
-    $("b_list").querySelectorAll("[data-bdel]").forEach(el => el.onclick = async () => { try { await api("/api/admin/banners/" + encodeURIComponent(el.dataset.bdel) + "/delete", "POST"); loadMore(); } catch (e) { toast(e.message, "err"); } });
     const o = await api("/api/admin/offers");
     $("o_list").innerHTML = o.offers.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>+${fmt(x.reward)} · ${x.done} done</span></div>
       <button class="btn red sm" data-odel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
@@ -1502,7 +1611,7 @@ async function loadMore() {
 }
 $("f_save").onclick = async () => {
   try {
-    await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
+    await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_free: $("f_spinf").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
       promo_price_per_join: $("f_price").value, promo_user_share: $("f_share").value, promo_min_joins: $("f_minj").value, remind_enabled: $("f_rem").value });
     toast("Saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
@@ -1512,12 +1621,6 @@ $("f_remind").onclick = async () => {
   try { const r = await api("/api/admin/reminders/run", "POST"); toast(r.off ? "Reminders are off." : "Sent " + r.sent + ", remaining " + r.remaining, "ok"); }
   catch (e) { toast(e.message, "err"); }
   $("f_remind").disabled = false;
-};
-$("b_add").onclick = async () => {
-  try {
-    await api("/api/admin/banners", "POST", { title: $("b_title").value, text: $("b_text").value, url: $("b_url").value, days: Number($("b_days").value) });
-    ["b_title", "b_text", "b_url"].forEach(i => $(i).value = ""); toast("Banner added.", "ok"); loadMore();
-  } catch (e) { toast(e.message, "err"); }
 };
 $("o_add").onclick = async () => {
   try {

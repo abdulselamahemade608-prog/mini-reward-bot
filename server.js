@@ -31,6 +31,8 @@ const APP_BUTTON_TEXT = process.env.APP_BUTTON_TEXT || "Adewa Eran";
 const ADMIN_ID = String(process.env.ADMIN_ID || "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
+// optional Adsgram "int-..." (interstitial) block used for surprise ads; when empty the rewarded block is used
+const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
 const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
 /* ---- BNB auto payment (native BNB on BNB Smart Chain) ---- */
@@ -456,6 +458,9 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS max_users INTEGER NOT NULL DEFAULT 0`);
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS sponsored BOOLEAN NOT NULL DEFAULT FALSE`);
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS sponsor_owner BIGINT`);
+            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ`);
+            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS penalty NUMERIC NOT NULL DEFAULT 0`);
+            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS last_check TIMESTAMPTZ`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_spins (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, prize NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`CREATE INDEX IF NOT EXISTS mr_spins_user ON mr_spins(telegram_id, created_at)`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_banners (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, text TEXT DEFAULT '', url TEXT NOT NULL, expires_at TIMESTAMPTZ, enabled BOOLEAN NOT NULL DEFAULT TRUE, clicks INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -1135,6 +1140,10 @@ app.get("/api/me", authenticate, async (req, res) => {
         await createOrUpdateUser(req.telegramUser, referral);
         pool.query(`UPDATE mr_users SET last_active = NOW() WHERE telegram_id = $1`, [telegramId]).catch(() => {});
 
+        // if this user left a channel he promoted-joined, take the reward back (checked at most every 5 minutes per user)
+        try { await penalizeLeavers(telegramId, 8, 5 * 60 * 1000); }
+        catch (e) { console.error("penalizeLeavers", e.message); }
+
         try {
             await processReferral(telegramId);
         } catch (e) {
@@ -1216,7 +1225,7 @@ app.get("/api/me", authenticate, async (req, res) => {
             },
             channels,
             allJoined,
-            adsgram: { blockId: ADSGRAM_BLOCK_ID },
+            adsgram: { blockId: ADSGRAM_BLOCK_ID, interBlockId: ADSGRAM_INTERSTITIAL_BLOCK_ID },
             monetag: { zoneId: MONETAG_ZONE_ID },
             payout: { symbol: TOKEN_SYMBOL, ready: PAY_READY, explorer: EXPLORER_TX, bnb_price: bnbPrice, limits },
             bot: { username: BOT_USERNAME }
@@ -2668,6 +2677,13 @@ app.post("/api/telegram-webhook", async (req, res) => {
         const cb = req.body?.callback_query;
         if (cb) await handleAdminCallback(cb);
 
+        // a member left / was removed from a promoted channel -> take the reward back
+        const cmu = req.body?.chat_member;
+        if (cmu && cmu.new_chat_member && ["left", "kicked"].includes(cmu.new_chat_member.status)) {
+            try { await penalizeLeftMember(cmu.chat, cmu.new_chat_member.user); }
+            catch (e) { console.error("chat_member", e.message); }
+        }
+
         const msg = req.body?.message;
 
         // admin commands: /ban <id|@username> [reason]  and  /unban <id|@username>
@@ -2732,7 +2748,7 @@ app.get("/api/setup-webhook", async (req, res) => {
         await telegram("setWebhook", {
             url,
             secret_token: WEBHOOK_SECRET,
-            allowed_updates: ["message", "callback_query"],
+            allowed_updates: ["message", "callback_query", "chat_member"],
             drop_pending_updates: true
         });
         await telegram("setChatMenuButton", {
@@ -2944,7 +2960,7 @@ const OFFER_SECRET = String(process.env.OFFER_SECRET || "");
 const CRON_SECRET = String(process.env.CRON_SECRET || "");
 const SPIN_PRIZES = [{ p: 0.5, w: 40 }, { p: 1, w: 30 }, { p: 2, w: 18 }, { p: 5, w: 9 }, { p: 10, w: 3 }];
 const DAY_START = `date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`;
-const FEATURE_KEYS = ["spin_enabled", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled"];
+const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled"];
 
 const wrap = fn => async (req, res) => {
     try { await fn(req, res); }
@@ -3010,7 +3026,9 @@ app.get("/api/cron/reminders", wrap(async (req, res) => {
     const ok = (WEBHOOK_SECRET && safeSecretEqual(req.query.key, WEBHOOK_SECRET)) ||
                (CRON_SECRET && safeSecretEqual(bearer, "Bearer " + CRON_SECRET));
     if (!ok) return res.status(403).json({ ok: false, error: "Wrong key." });
-    res.json({ ok: true, ...(await runReminders()) });
+    let swept = 0;
+    try { swept = await penalizeLeavers(null, 40, 0); } catch (e) { console.error("sweep", e.message); }
+    res.json({ ok: true, penalized: swept, ...(await runReminders()) });
 }));
 app.post("/api/admin/reminders/run", authenticate, requireAdmin, wrap(async (req, res) => {
     res.json({ ok: true, ...(await runReminders()) });
@@ -3021,11 +3039,26 @@ app.post("/api/admin/reminders/run", authenticate, requireAdmin, wrap(async (req
 app.get("/api/proof-feed", authenticate, wrap(async (req, res) => {
     await requireDatabase();
     const r = await pool.query(
-        `SELECT w.method, COALESCE(w.usd_amount, w.token_amount, 0) AS usd, w.processed_at, u.first_name, u.username
+        `SELECT w.method, w.amount, w.fee, w.final_amount, w.address, w.tx_hash,
+                COALESCE(w.usd_amount, w.token_amount, 0) AS usd, w.token_amount, w.processed_at, u.first_name, u.username
          FROM mr_withdrawals w LEFT JOIN mr_users u ON u.telegram_id = w.telegram_id
          WHERE w.status = 'approved' ORDER BY w.processed_at DESC NULLS LAST LIMIT 15`);
     const mask = s => { s = String(s || "User"); return s.slice(0, 2) + "***"; };
-    res.json({ ok: true, feed: r.rows.map(x => ({ name: mask(x.first_name || x.username), usd: Number(x.usd), method: x.method, at: x.processed_at })) });
+    const short = (s, a, b) => { s = String(s || ""); return s.length > a + b + 3 ? s.slice(0, a) + "..." + s.slice(-b) : s; };
+    res.json({
+        ok: true,
+        feed: r.rows.map(x => ({
+            name: mask(x.first_name || x.username),
+            usd: Number(x.usd),
+            method: x.method,
+            points: x.amount === null ? null : Number(x.amount),
+            fee: x.fee === null ? null : Number(x.fee),
+            final: x.final_amount === null ? null : Number(x.final_amount),
+            wallet: short(x.address, 6, 4),
+            tx: short(x.tx_hash, 8, 6),
+            at: x.processed_at
+        }))
+    });
 }));
 
 /* ---------------------- 3) LUCKY SPIN ---------------------- */
@@ -3033,11 +3066,12 @@ app.get("/api/proof-feed", authenticate, wrap(async (req, res) => {
 async function spinInfo(q, id, st) {
     const u = await q.query(`SELECT COUNT(*)::int AS c FROM mr_spins WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [id]);
     const a = await q.query(`SELECT COUNT(*)::int AS c FROM mr_ad_rewards WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [id]);
+    const freeTotal = Math.max(0, Math.floor(st.spin_free ?? 1));      // admin: free spins per day
     const used = u.rows[0].c, ads = a.rows[0].c, maxX = Math.floor(st.spin_max_extra ?? 3);
-    const extraUsed = Math.max(0, used - 1);
-    const free = used < 1 ? 1 : 0;   // one free spin per day, extra spins are unlocked by watching ads
+    const extraUsed = Math.max(0, used - freeTotal);
+    const free = Math.max(0, freeTotal - used);   // free spins left, extra spins are unlocked by watching ads
     return {
-        enabled: (st.spin_enabled ?? 1) > 0, used, free,
+        enabled: (st.spin_enabled ?? 1) > 0, used, free, free_total: freeTotal, max_extra: maxX,
         available: free + Math.max(0, Math.min(maxX, ads) - extraUsed),
         extra_left: Math.max(0, maxX - extraUsed),
         prizes: SPIN_PRIZES.map(x => Number((x.p * (st.spin_scale ?? 1)).toFixed(4)))
@@ -3062,51 +3096,18 @@ app.post("/api/spin", authenticate, wrap(async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(429).json({ ok: false, error: info.enabled ? "No spins left. Watch an ad for an extra spin." : "Lucky Spin is off." });
         }
-        let n = crypto.randomInt(SPIN_PRIZES.reduce((s, x) => s + x.w, 0)), prize = SPIN_PRIZES[0].p;
-        for (const x of SPIN_PRIZES) { if (n < x.w) { prize = x.p; break; } n -= x.w; }
+        let n = crypto.randomInt(SPIN_PRIZES.reduce((s, x) => s + x.w, 0)), prize = SPIN_PRIZES[0].p, index = 0;
+        for (let i = 0; i < SPIN_PRIZES.length; i++) { const x = SPIN_PRIZES[i]; if (n < x.w) { prize = x.p; index = i; break; } n -= x.w; }
         prize = Number((prize * (st.spin_scale ?? 1)).toFixed(4));
         await client.query(`INSERT INTO mr_spins(telegram_id, prize) VALUES($1,$2)`, [id, prize]);
         await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [id, prize]);
         await client.query("COMMIT");
-        res.json({ ok: true, prize });
+        res.json({ ok: true, prize, index });
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
 }));
 
-/* ---------------------- 4) BANNER / FEATURED SLOT ---------------------- */
-
-app.get("/api/banners", authenticate, wrap(async (req, res) => {
-    await requireDatabase();
-    const r = await pool.query(`SELECT id, title, text, url FROM mr_banners WHERE enabled = TRUE AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY id DESC LIMIT 3`);
-    res.json({ ok: true, banners: r.rows });
-}));
-app.post("/api/banners/:id/click", authenticate, wrap(async (req, res) => {
-    if (!isId(req.params.id)) return res.status(400).json({ ok: false });
-    await requireDatabase();
-    await pool.query(`UPDATE mr_banners SET clicks = clicks + 1 WHERE id = $1`, [req.params.id]);
-    res.json({ ok: true });
-}));
-app.get("/api/admin/banners", authenticate, requireAdmin, wrap(async (req, res) => {
-    await requireDatabase();
-    const r = await pool.query(`SELECT id, title, text, url, expires_at, clicks, (enabled AND (expires_at IS NULL OR expires_at > NOW())) AS live FROM mr_banners ORDER BY id DESC LIMIT 50`);
-    res.json({ ok: true, banners: r.rows });
-}));
-app.post("/api/admin/banners", authenticate, requireAdmin, wrap(async (req, res) => {
-    await requireDatabase();
-    const title = String(req.body?.title || "").trim().slice(0, 80), text = String(req.body?.text || "").trim().slice(0, 160);
-    const url = String(req.body?.url || "").trim(), days = Number(req.body?.days || 0);
-    if (!title) return res.status(400).json({ ok: false, error: "Title is required." });
-    if (!/^https?:\/\/\S+$/i.test(url)) return res.status(400).json({ ok: false, error: "Link must start with http:// or https://" });
-    if (!Number.isFinite(days) || days < 0 || days > 365) return res.status(400).json({ ok: false, error: "Days must be 0-365 (0 = no end)." });
-    await pool.query(`INSERT INTO mr_banners(title, text, url, expires_at) VALUES($1,$2,$3, CASE WHEN $4::numeric > 0 THEN NOW() + ($4::numeric * INTERVAL '1 day') ELSE NULL END)`, [title, text, url, days]);
-    res.json({ ok: true });
-}));
-app.post("/api/admin/banners/:id/delete", authenticate, requireAdmin, wrap(async (req, res) => {
-    if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
-    await requireDatabase();
-    await pool.query(`DELETE FROM mr_banners WHERE id = $1`, [req.params.id]);
-    res.json({ ok: true });
-}));
+/* ---------------------- 4) (banner slot removed) ---------------------- */
 
 /* ---------------------- 5) OFFERWALL / CPA OFFERS ---------------------- */
 
@@ -3221,6 +3222,69 @@ app.get("/api/promote/mine", authenticate, wrap(async (req, res) => {
          FROM mr_tasks t WHERE t.sponsor_owner = $1 ORDER BY t.id DESC LIMIT 20`, [String(req.telegramUser.id)]);
     res.json({ ok: true, campaigns: r.rows });
 }));
+
+/* ------- 6b) CHANNEL LEFT -> POINTS TAKEN BACK (promoted channels only) ------- */
+
+// takes the task reward back from one claim (once). returns true if a penalty was applied
+async function applyLeavePenalty(claimId) {
+    const client = await pool.connect();
+    let info = null;
+    try {
+        await client.query("BEGIN");
+        const c = await client.query(
+            `UPDATE mr_task_claims c SET left_at = NOW()
+             FROM mr_tasks t
+             WHERE c.id = $1 AND c.left_at IS NULL AND c.completed_at IS NOT NULL AND t.id = c.task_id
+             RETURNING c.telegram_id, t.reward, t.channel`, [claimId]);
+        if (!c.rows.length) { await client.query("ROLLBACK"); return false; }
+        const { telegram_id, reward, channel } = c.rows[0];
+        const u = await client.query(`SELECT points FROM mr_users WHERE telegram_id = $1 FOR UPDATE`, [telegram_id]);
+        const take = u.rows.length ? Math.min(Number(reward), Math.max(0, Number(u.rows[0].points))) : 0;
+        if (take > 0) await client.query(`UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1`, [telegram_id, take]);
+        await client.query(`UPDATE mr_task_claims SET penalty = $2 WHERE id = $1`, [claimId, take]);
+        await client.query("COMMIT");
+        info = { telegram_id, channel, take: Number(reward) };
+    } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
+    finally { client.release(); }
+    if (info) notifyUser(info.telegram_id, `⚠️ You left ${info.channel}. -${info.take} points were taken back. Join again is not rewarded twice.`);
+    return true;
+}
+
+// checks the promoted-channel claims (one user, or everybody oldest-checked first) and penalizes the ones who left
+async function penalizeLeavers(telegramId, limit, minAgeMs) {
+    await requireDatabase();
+    const params = [Math.max(1, limit | 0), Math.max(0, Math.floor((minAgeMs || 0) / 1000))];
+    let who = "";
+    if (telegramId) { params.push(String(telegramId)); who = "AND c.telegram_id = $3"; }
+    const r = await pool.query(
+        `SELECT c.id, c.telegram_id, t.channel
+         FROM mr_task_claims c JOIN mr_tasks t ON t.id = c.task_id
+         WHERE t.sponsor_owner IS NOT NULL AND t.channel IS NOT NULL AND t.channel <> ''
+           AND c.completed_at IS NOT NULL AND c.left_at IS NULL
+           AND (c.last_check IS NULL OR c.last_check < NOW() - ($2::int * INTERVAL '1 second')) ${who}
+         ORDER BY c.last_check NULLS FIRST, c.id LIMIT $1`, params);
+    if (!r.rows.length) return 0;
+    await pool.query(`UPDATE mr_task_claims SET last_check = NOW() WHERE id = ANY($1::bigint[])`, [r.rows.map(x => x.id)]);
+    let n = 0;
+    await Promise.all(r.rows.map(async row => {
+        const chk = await checkChannel(row.telegram_id, row.channel);
+        // only a clear "left" / "kicked" counts - API errors never cost anybody points
+        if (["left", "kicked"].includes(chk.status) && await applyLeavePenalty(row.id)) n++;
+    }));
+    return n;
+}
+
+// instant version, called from the Telegram chat_member update
+async function penalizeLeftMember(chat, user) {
+    if (!chat || !user || user.is_bot || !chat.username) return;
+    await requireDatabase();
+    const r = await pool.query(
+        `SELECT c.id FROM mr_task_claims c JOIN mr_tasks t ON t.id = c.task_id
+         WHERE t.sponsor_owner IS NOT NULL AND LOWER(t.channel) = LOWER($1)
+           AND c.telegram_id = $2 AND c.completed_at IS NOT NULL AND c.left_at IS NULL`,
+        ["@" + chat.username, String(user.id)]);
+    for (const row of r.rows) await applyLeavePenalty(row.id);
+}
 
 /* ---------------------- 7) POST A PROMO CODE TO THE CHANNEL ---------------------- */
 
