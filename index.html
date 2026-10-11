@@ -291,18 +291,18 @@ nav button.active svg{stroke:#8ec5ff}
       </div>
     </div>
 
-    <h2><span class="ib sm blue">📣</span>Promote your channel</h2>
+    <h2><span class="ib sm blue">📣</span>Add task (promote your channel)</h2>
     <div class="card">
       <div class="muted" id="pmInfo">Get real members. Pay with your points, a task is created automatically.</div>
       <label>Channel (bot must be admin)</label><input id="pm_chan" type="text" placeholder="@yourchannel">
       <label>Number of joins</label><input id="pm_joins" type="number" min="1" step="1" placeholder="100">
       <div class="muted" id="pmQuote" style="margin-top:8px"></div>
       <div class="pm-support hidden" id="pmSupport">
-        <div style="font-weight:700">You have no points yet.</div>
-        <div class="muted" style="margin-top:4px">You need points to start a campaign. Please talk to Support and they will help you.</div>
+        <div style="font-weight:700" id="pmSupportTitle">You have no points yet.</div>
+        <div class="muted" style="margin-top:4px" id="pmSupportMsg">You need points to add a task. Please contact Support and the admin will help you.</div>
         <button class="btn dark sm" id="pmSupportBtn" type="button" style="margin-top:10px;width:auto;padding:10px 18px">Contact Support</button>
       </div>
-      <button class="btn green" id="pmBtn" style="margin-top:12px">Start campaign</button>
+      <button class="btn green" id="pmBtn" style="margin-top:12px">Add task</button>
       <div id="pmMine" style="margin-top:10px"></div>
     </div>
 
@@ -1536,23 +1536,35 @@ function renderPromoQuote() {
   const j = Math.floor(Number($("pm_joins").value) || 0);
   $("pmInfo").textContent = "Pay " + fmt(p) + " points per join (min " + mj + " joins). Members earn " + fmt(p * sh / 100) + " points each.";
   $("pmQuote").textContent = j > 0 ? "Total cost: " + fmt(j * p) + " points" : "";
-  // nobody with 0 points can pay for a campaign -> send him to Support
-  const pts = Number(ME && ME.user && ME.user.points) || 0;
-  $("pmSupport").classList.toggle("hidden", pts > 0);
+  // not enough points for this task (or no points at all) -> send him to Support
+  const pts = Number(ME && ME.user && ME.user.points) || 0, need = j * p;
+  let show = false;
+  if (pts <= 0) {
+    show = true;
+    $("pmSupportTitle").textContent = "You have no points yet.";
+    $("pmSupportMsg").textContent = "You need points to add a task. Please contact Support and the admin will help you.";
+  } else if (j > 0 && need > pts) {
+    show = true;
+    $("pmSupportTitle").textContent = "Not enough points for " + fmt(j) + " joins.";
+    $("pmSupportMsg").textContent = "You need " + fmt(need) + " points but you have " + fmt(pts) + ". Please contact Support admin to get more points, or lower the number of joins.";
+  }
+  $("pmSupport").classList.toggle("hidden", !show);
 }
 $("pmSupportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
 $("pm_joins").oninput = renderPromoQuote;
 $("pmBtn").onclick = async () => {
   const joins = Math.floor(Number($("pm_joins").value) || 0), chan = $("pm_chan").value.trim();
-  if ((Number(ME && ME.user && ME.user.points) || 0) <= 0) {
+  const pts = Number(ME && ME.user && ME.user.points) || 0, price = Number(((ME && ME.settings) || {}).promo_price_per_join ?? 10);
+  if (pts <= 0 || (joins > 0 && joins * price > pts)) {
+    renderPromoQuote();
     $("pmSupport").classList.remove("hidden");
-    return toast("You have no points. Please contact Support.", "err");
+    return toast("Not enough points. Please contact Support admin.", "err");
   }
-  if (!(await confirmBox("Start the campaign for " + chan + " (" + joins + " joins)?"))) return;
+  if (!(await confirmBox("Add this task for " + chan + " (" + joins + " joins)?"))) return;
   $("pmBtn").disabled = true;
   try {
     const r = await api("/api/promote", "POST", { channel: chan, joins });
-    toast("Campaign started. -" + fmt(r.cost) + " points", "ok");
+    toast("Task added. -" + fmt(r.cost) + " points", "ok");
     $("pm_chan").value = ""; $("pm_joins").value = "";
     await refreshMe(); renderPromoQuote(); loadMyCampaigns();
   } catch (e) { toast(e.message, "err"); }
