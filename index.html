@@ -457,6 +457,16 @@ const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#070b16"); tg.setBackgroundColor && tg.setBackgroundColor("#070b16"); } catch (e) {} }
 const INIT_DATA = tg ? tg.initData : "";
 
+// device id (used by the server to detect multiple accounts on one device)
+let DEVICE_ID = "";
+try {
+  DEVICE_ID = localStorage.getItem("device_installation_id") || "";
+  if (!DEVICE_ID) {
+    DEVICE_ID = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
+    localStorage.setItem("device_installation_id", DEVICE_ID);
+  }
+} catch (e) {}
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
@@ -538,7 +548,7 @@ function toast(msg, type) {
 async function api(path, method, body) {
   const res = await fetch(path, {
     method: method || "GET",
-    headers: { "Content-Type": "application/json", "x-telegram-init-data": INIT_DATA },
+    headers: { "Content-Type": "application/json", "x-telegram-init-data": INIT_DATA, "x-device": DEVICE_ID },
     body: body ? JSON.stringify(body) : undefined
   });
   let data = {};
@@ -546,6 +556,7 @@ async function api(path, method, body) {
   if (!res.ok || data.ok === false) {
     const err = new Error(data.error || ("Request failed (" + res.status + ")"));
     err.pending = !!data.pending;
+    err.banned = data.status === "banned";
     throw err;
   }
   return data;
@@ -1339,8 +1350,10 @@ async function init() {
     const wait = Math.max(0, 2300 - (performance.now() - t0));
     setTimeout(() => { $("splash").classList.add("out"); setTimeout(() => $("splash").remove(), 700); }, wait);
   } catch (e) {
-    $("spT1").textContent = "Error";
+    $("spT1").textContent = e.banned ? "Access blocked" : "Error";
     $("spName").textContent = e.message;
+    $("spName").style.whiteSpace = "normal";
+    $("spName").style.fontSize = "18px";
   }
 }
 init();
