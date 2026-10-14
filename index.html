@@ -312,7 +312,10 @@ nav button.active svg{stroke:#8ec5ff}
 
     <div id="partnerBox" class="hidden">
       <h2><span class="ib sm green">🌐</span>Partner tasks</h2>
-      <div class="card" style="padding:12px" id="partnerCard"></div>
+      <div class="card" style="padding:12px">
+        <div id="partnerCard"></div>
+        <div class="muted" id="partnerStat" style="margin-top:10px;font-size:13px"></div>
+      </div>
     </div>
 
     <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
@@ -1414,11 +1417,18 @@ async function loadEarnExtras() { setupPartnerTask(); renderPromoQuote(); loadMy
 
 /* ---- Adsgram partner tasks (visit a website, join a channel ... paid by the advertiser) ---- */
 let partnerBlock = "";
+function updatePartnerStat() {
+  const p = (ME && ME.partner) || { today: 0, points: 0, total: 0 };
+  const daily = Number(((ME && ME.settings) || {}).adsgram_task_daily ?? 10);
+  $("partnerStat").textContent = "Completed today: " + p.today + (daily > 0 ? " / " + daily : "") +
+    " · Earned today: +" + fmt(p.points) + " points · Total completed: " + p.total;
+}
 function setupPartnerTask() {
   const id = String((ME && ME.adsgram && ME.adsgram.taskBlockId) || "");
   const box = $("partnerBox");
   if (!id) { box.classList.add("hidden"); return; }
   box.classList.remove("hidden");
+  updatePartnerStat();
   if (partnerBlock === id) return;
   partnerBlock = id;
   const pts = Number(((ME && ME.settings) || {}).adsgram_task_reward ?? 2);
@@ -1431,7 +1441,9 @@ function setupPartnerTask() {
   const el = $("partnerCard").querySelector("adsgram-task");
   el.addEventListener("reward", () => {
     toast("Task completed! Your points are being added.", "ok");
-    setTimeout(refreshMe, 2500); setTimeout(refreshMe, 7000);   // Adsgram calls the server a moment later
+    // Adsgram calls the server a moment later, so refresh twice
+    setTimeout(() => Promise.resolve(refreshMe()).then(updatePartnerStat), 2500);
+    setTimeout(() => Promise.resolve(refreshMe()).then(updatePartnerStat), 7000);
   });
   el.addEventListener("onBannerNotFound", () => box.classList.add("hidden"));   // no partner task available now
   el.addEventListener("onError", () => box.classList.add("hidden"));

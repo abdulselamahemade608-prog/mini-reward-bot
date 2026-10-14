@@ -33,7 +33,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
 // optional Adsgram "int-..." (interstitial) block used for surprise ads; when empty the rewarded block is used
 // Adsgram "Task" block (partner tasks: visit a website / join a channel ...), e.g. "task-12345"
-const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "task-53801").trim();
+const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "").trim();
 const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
 const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
@@ -1212,9 +1212,20 @@ app.get("/api/me", authenticate, async (req, res) => {
         try { withdrawReq = await getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day); }
         catch (e) { console.error("withdrawReq", e.message); }
 
+        let partner = { today: 0, points: 0, total: 0 };
+        try {
+            const pr = await pool.query(
+                `SELECT COUNT(*) FILTER (WHERE created_at >= ${DAY_START})::int AS today,
+                        COALESCE(SUM(reward) FILTER (WHERE created_at >= ${DAY_START}), 0) AS points,
+                        COUNT(*)::int AS total
+                 FROM mr_partner_tasks WHERE telegram_id = $1`, [telegramId]);
+            partner = { today: pr.rows[0].today, points: Number(pr.rows[0].points), total: pr.rows[0].total };
+        } catch (e) { console.error("partner stats", e.message); }
+
         res.json({
             ok: true,
             settings,
+            partner,
             withdraw_next_at: withdrawNextAt,
             withdraw_req: withdrawReq,
             today_ads: todayRes.rows[0].c,
