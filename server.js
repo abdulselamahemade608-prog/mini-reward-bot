@@ -179,7 +179,15 @@ async function nextWithdrawAt(db, telegramId, cooldownHours) {
 }
 
 // To withdraw, the user must have finished ALL of today's ads and ALL active tasks.
-async function getWithdrawRequirements(db, telegramId, maxAds) {
+// how many Adsgram partner tasks a user must finish today before he can withdraw (0 = not required / no partner block set)
+function partnerNeeded(st) {
+    if (!ADSGRAM_TASK_BLOCK_ID) return 0;
+    let need = Math.max(0, Math.floor(st.partner_required ?? 1));
+    const daily = Math.floor(st.adsgram_task_daily ?? 10);
+    if (daily > 0) need = Math.min(need, daily);
+    return need;
+}
+async function getWithdrawRequirements(db, telegramId, maxAds, partnerNeed = 0) {
     const max = Number.isFinite(Number(maxAds)) ? Number(maxAds) : 100;
     const r = await db.query(
         `SELECT
@@ -191,10 +199,12 @@ async function getWithdrawRequirements(db, telegramId, maxAds) {
                   SELECT 1 FROM mr_task_claims c
                   WHERE c.task_id = t.id AND c.telegram_id = $1
                     AND (c.completed_at IS NOT NULL OR c.was_member = TRUE))      -- done, or already joined before (no reward)
-                AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims x WHERE x.task_id = t.id AND x.completed_at IS NOT NULL))) AS tasks`,
+                AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims x WHERE x.task_id = t.id AND x.completed_at IS NOT NULL))) AS tasks,
+            (SELECT COUNT(*)::int FROM mr_partner_tasks p
+              WHERE p.telegram_id = $1 AND p.created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS partner`,
         [telegramId]
     );
-    return { adsToday: r.rows[0].ads, maxAds: max, tasksLeft: r.rows[0].tasks };
+    return { adsToday: r.rows[0].ads, maxAds: max, tasksLeft: r.rows[0].tasks, partnerDone: r.rows[0].partner, partnerNeed: Math.max(0, Math.floor(partnerNeed || 0)) };
 }
 
 // Tells the admin (once per day) that the daily payout budget is finished.
@@ -1212,7 +1222,7 @@ app.get("/api/me", authenticate, async (req, res) => {
         try { withdrawNextAt = await nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours); }
         catch (e) { console.error("withdrawNextAt", e.message); }
         let withdrawReq = null;
-        try { withdrawReq = await getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day); }
+        try { withdrawReq = await getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day, partnerNeeded(settings)); }
         catch (e) { console.error("withdrawReq", e.message); }
 
         let partner = { today: 0, points: 0, total: 0 };
@@ -2082,7 +2092,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         }
 
         // must finish ALL of today's ads and ALL tasks first
-        const reqs = await getWithdrawRequirements(pool, telegramId, S.max_ads_per_day);
+        const reqs = await getWithdrawRequirements(pool, telegramId, S.max_ads_per_day, partnerNeeded(S));
         if (reqs.maxAds > 0 && reqs.adsToday < reqs.maxAds) {
             return res.status(400).json({
                 ok: false,
@@ -2093,6 +2103,12 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
             return res.status(400).json({
                 ok: false,
                 error: `Complete all tasks first: ${reqs.tasksLeft} task(s) left.`
+            });
+        }
+        if (reqs.partnerNeed > 0 && reqs.partnerDone < reqs.partnerNeed) {
+            return res.status(400).json({
+                ok: false,
+                error: `Complete the Partner tasks first: ${reqs.partnerDone} / ${reqs.partnerNeed} done today.`
             });
         }
 
@@ -3043,7 +3059,7 @@ app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, 
 const CRON_SECRET = String(process.env.CRON_SECRET || "");
 const SPIN_PRIZES = [{ p: 0.5, w: 40 }, { p: 1, w: 30 }, { p: 2, w: 18 }, { p: 5, w: 9 }, { p: 10, w: 3 }];
 const DAY_START = `date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`;
-const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled", "adsgram_task_reward", "adsgram_task_daily"];
+const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled", "adsgram_task_reward", "adsgram_task_daily", "partner_required"];
 
 const wrap = fn => async (req, res) => {
     try { await fn(req, res); }
