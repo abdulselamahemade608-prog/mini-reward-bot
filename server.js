@@ -225,8 +225,8 @@ async function alertBudgetFull(used, limit) {
             disable_web_page_preview: true,
             text:
                 "\u26A0\uFE0F <b>Daily withdraw budget finished!</b>\n\n" +
-                `\u{1F4B5} <b>Budget:</b> $${Number(limit).toFixed(2)} USDT\n` +
-                `\u{1F4B8} <b>Used today:</b> $${Number(used).toFixed(2)} USDT\n\n` +
+                `<b>Budget:</b> $${Number(limit).toFixed(2)} USDT\n` +
+                `<b>Used today:</b> $${Number(used).toFixed(2)} USDT\n\n` +
                 "New withdraw requests are blocked until tomorrow, or until you raise the budget in Settings."
         });
     } catch (e) {
@@ -246,7 +246,7 @@ const EMOJI_STATUS = "6267186570034419608";  // status
 const EMOJI_PROOF = "5294338978130972025";   // proof
 
 // <tg-emoji> needs a normal emoji inside as fallback
-const em = (id, fallback = "\u{1F4B8}") => `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`;
+const em = (id, fallback = "") => "";
 
 // escape text for Telegram parse_mode: "HTML"
 const esc = s => String(s ?? "")
@@ -708,7 +708,7 @@ const banHead = type =>
     type === "vpn" ? "VPN/Proxy detected." : type === "multi" ? "Multiple accounts detected." : "";
 
 const banDm = type =>
-    "\u{1F6AB} " + (banHead(type) ? banHead(type) + "\n\n" : "") + "Your account has been permanently banned from Adewa.";
+    "" + (banHead(type) ? banHead(type) + "\n\n" : "") + "Your account has been permanently banned from Adewa.";
 
 const banApiText = type =>
     (banHead(type) ? banHead(type) + " " : "") + "Your account has been permanently banned.";
@@ -890,7 +890,7 @@ async function securityGate(req, tgUser) {
         }
         if (ADMIN_ID) {
             const who = [tgUser.first_name, tgUser.username ? "@" + tgUser.username : ""].filter(Boolean).join(" ");
-            await trySend(ADMIN_ID, `\u{1F6AB} Auto-ban: ${who} (ID ${id})\nReason: ${reason}\n\nWrong? Send /unban ${id}`);
+            await trySend(ADMIN_ID, `Auto-ban: ${who} (ID ${id})\nReason: ${reason}\n\nWrong? Send /unban ${id}`);
         }
         return { ok: false, reason, message: banApiText(type) };
     }
@@ -1507,7 +1507,7 @@ app.get("/api/adsgram-task-reward", async (req, res) => {
             given = true;
         } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
         finally { client.release(); }
-        if (given) notifyUser(userId, `✅ Partner task completed! +${reward} points were added.`);
+        if (given) notifyUser(userId, `Partner task completed! +${reward} points were added.`);
         res.json({ ok: true, reward });
     } catch (error) {
         console.error("/api/adsgram-task-reward", error.message);
@@ -1767,26 +1767,26 @@ function requestLines(w, name, opts = {}) {
         ? `<a href="tg://user?id=${esc(w.telegram_id)}">${esc(name)}</a>`
         : esc(name);
     return (
-        `${em(EMOJI_USER_ID, "\u{1F464}")} <b>User:</b> ${nameHtml}\n` +
-        `${em(EMOJI_AMOUNT, "\u{1F4B5}")} <b>Amount:</b> $${fmtUsd(m.finalUsd)} ${TOKEN_SYMBOL} (after $${fmtFeeUsd(m.feeUsd)} fee)\n` +
-        `\u{1FA99} <b>Gateway:</b> ${TOKEN_SYMBOL} BEP20\n` +
-        `${em(EMOJI_ADDRESS, "\u{1F4E6}")} <b>Address:</b> <code>${esc(addr)}</code>`
+        `${em(EMOJI_USER_ID, "")} <b>User:</b> ${nameHtml}\n` +
+        `${em(EMOJI_AMOUNT, "")} <b>Amount:</b> $${fmtUsd(m.finalUsd)} ${TOKEN_SYMBOL} (after $${fmtFeeUsd(m.feeUsd)} fee)\n` +
+        `<b>Gateway:</b> ${TOKEN_SYMBOL} BEP20\n` +
+        `${em(EMOJI_ADDRESS, "")} <b>Address:</b> <code>${esc(addr)}</code>`
     );
 }
 
 // message the ADMIN gets for every withdraw request
 function buildAdminRequestHtml(w, status, name) {
     let t = `${em(EMOJI_NOTI, "\u26A1")} <b>Withdrawal Request!</b>\n\n` + requestLines(w, name, { link: true });
-    if (BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "\u{1F680}")} <b>App:</b> @${esc(BOT_USERNAME)}`;
-    t += `\n\n-----------\n${em(EMOJI_STATUS, "\u{1F4B8}")} <b>Status:</b> <i>${esc(status)}</i>`;
-    if (w.tx_hash) t += `\n\n\u{1F517} <a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
+    if (BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "")} <b>App:</b> @${esc(BOT_USERNAME)}`;
+    t += `\n\n-----------\n${em(EMOJI_STATUS, "")} <b>Status:</b> <i>${esc(status)}</i>`;
+    if (w.tx_hash) t += `\n\n<a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
     return t;
 }
 
 // "Withdrawal Successful!" - for the user (with App link) and for the proof channel (masked, no App link)
 function buildSuccessHtml(w, name, opts = {}) {
     let t = `${em(EMOJI_NOTI, "\u26A1")} <b>Withdrawal Successful!</b>\n\n` + requestLines(w, name, { mask: !!opts.mask });
-    if (opts.forUser && BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "\u{1F680}")} <b>App:</b> ${esc(appLink())}`;
+    if (opts.forUser && BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "")} <b>App:</b> ${esc(appLink())}`;
     return t;
 }
 
@@ -1803,7 +1803,7 @@ async function sendWithCheckout(chatId, text, txHash) {
         console.error("sendWithCheckout (styled)", e.message);
         await telegram("sendMessage", {
             ...base,
-            reply_markup: { inline_keyboard: [[{ text: "\u{1F517} Check out", url }]] }
+            reply_markup: { inline_keyboard: [[{ text: "Check out", url }]] }
         });
     }
 }
@@ -2247,7 +2247,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
                             { text: "\u274C Reject", callback_data: `wd:reject:${wid}`, style: "danger" }
                         ],
                         [
-                            { text: "\u{1F4F1} Open App", web_app: { url: APP_URL }, style: "primary" }
+                            { text: "Open App", web_app: { url: APP_URL }, style: "primary" }
                         ]
                     ]
                 }
@@ -3107,8 +3107,8 @@ async function runReminders() {
         const jobs = [];
         for (const u of b.rows) {
             let text = null;
-            if (Number(u.ads) >= maxAds) text = "You have watched all of today's ads! 🎯\nCome back tomorrow, new ads and points are waiting for you.";
-            else if (!u.last_active || new Date(u.last_active) < new Date(dayStart)) text = "You have not checked in today! ⏰\nOpen the app, watch an ad and keep earning points.";
+            if (Number(u.ads) >= maxAds) text = "You have watched all of today's ads! \nCome back tomorrow, new ads and points are waiting for you.";
+            else if (!u.last_active || new Date(u.last_active) < new Date(dayStart)) text = "You have not checked in today! \nOpen the app, watch an ad and keep earning points.";
             if (text) jobs.push(telegram("sendMessage", { chat_id: Number(u.telegram_id), text, reply_markup: markup }).then(() => sent++, () => {}));
         }
         await Promise.all(jobs);
@@ -3228,8 +3228,8 @@ async function announceTask(taskId, budgetMs = 5000) {
         await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
         return 0;
     }
-    const text = `🆕 New task available!\n\n${t.title}\nReward: +${Number(t.reward)} points\n\nTap the button below and complete it before it is full.`;
-    const reply_markup = { inline_keyboard: [[{ text: "🔥 Do task now", web_app: { url: APP_URL }, style: "danger" }]] };
+    const text = `New task available!\n\n${t.title}\nReward: +${Number(t.reward)} points\n\nTap the button below and complete it before it is full.`;
+    const reply_markup = { inline_keyboard: [[{ text: "Do task now", web_app: { url: APP_URL }, style: "danger" }]] };
     let sent = 0;
     while (Date.now() - t0 < budgetMs) {
         const batch = await pool.query(
@@ -3309,7 +3309,7 @@ async function applyLeavePenalty(claimId) {
         info = { telegram_id, channel, take };
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
-    if (info) notifyUser(info.telegram_id, `⚠️ You left ${info.channel}. -${info.take} points were taken back.\n\nIf you join ${info.channel} again, you can complete this task again and earn the reward.`);
+    if (info) notifyUser(info.telegram_id, `You left ${info.channel}. -${info.take} points were taken back.\n\nIf you join ${info.channel} again, you can complete this task again and earn the reward.`);
     return true;
 }
 
@@ -3361,7 +3361,7 @@ app.post("/api/admin/promos/:code/post", authenticate, requireAdmin, wrap(async 
     const link = appLink();
     await telegram("sendMessage", {
         chat_id: PROOF_CHANNEL, parse_mode: "HTML",
-        text: `🎁 <b>New promo code!</b>\n\nCode: <code>${esc(code)}</code>\nReward: <b>+${esc(Number(p.rows[0].reward))} points</b>\nLimited to the first <b>${left}</b> users.\n\nOpen the app → Earn → Promo code.`,
+        text: `<b>New promo code!</b>\n\nCode: <code>${esc(code)}</code>\nReward: <b>+${esc(Number(p.rows[0].reward))} points</b>\nLimited to the first <b>${left}</b> users.\n\nOpen the app → Earn → Promo code.`,
         ...(link ? { reply_markup: { inline_keyboard: [[{ text: APP_BUTTON_TEXT, url: link }]] } } : {})
     });
     res.json({ ok: true });
