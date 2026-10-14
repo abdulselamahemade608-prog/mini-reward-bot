@@ -59,9 +59,10 @@ svg{display:block}
 .wheel-wrap{position:relative;width:210px;height:222px;margin:14px auto 0}
 .wheel-ptr{position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid #fbbf24;z-index:2;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 #wheelSvg{position:absolute;left:5px;top:17px;width:200px;height:200px;will-change:transform;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
-.adsgram-task{display:flex;align-items:center;gap:10px;width:100%}
-.adsgram-task .pt-reward{flex:1;font-weight:700}
-.adsgram-task .pt-btn{display:inline-block;box-sizing:border-box;min-width:70px;text-align:center;flex-shrink:0;padding:9px 12px;border-radius:12px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}
+#partnerCard{max-width:100%;overflow:hidden}
+.adsgram-task{display:flex;align-items:center;gap:8px;width:100%;max-width:100%;min-width:0;overflow:hidden;box-sizing:border-box}
+.adsgram-task .pt-reward{flex:1 1 auto;min-width:0;font-weight:700;font-size:14px}
+.adsgram-task .pt-btn{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:8px 4px;overflow:hidden;white-space:nowrap;text-align:center;font-size:13px;line-height:1.2;border-radius:12px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer}
 .adsgram-task .pt-done{background:#6b7280}
 .pm-support{margin-top:12px;padding:12px;border-radius:14px;border:1px solid #f59e0b;background:rgba(245,158,11,.08)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
@@ -1425,11 +1426,21 @@ function setupPartnerTask() {
     '<div slot="claim" class="pt-btn">Claim</div>' +
     '<div slot="done" class="pt-btn pt-done">Done</div></adsgram-task>';
   const el = $("partnerCard").querySelector("adsgram-task");
-  el.addEventListener("reward", () => {
-    toast("Task completed! Your points are being added.", "ok");
-    // Adsgram calls the server a moment later, so refresh twice
-    setTimeout(() => Promise.resolve(refreshMe()).then(updatePartnerStat), 2500);
-    setTimeout(() => Promise.resolve(refreshMe()).then(updatePartnerStat), 7000);
+  el.addEventListener("reward", async () => {
+    // points are only added after Adsgram confirms (server-to-server) that the task was really completed
+    const before = Number((ME && ME.partner && ME.partner.total) || 0), pointsBefore = Number((ME && ME.user && ME.user.points) || 0);
+    toast("Checking your task...", "ok");
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, i === 0 ? 2500 : 3500));
+      try { await refreshMe(); } catch (e) {}
+      updatePartnerStat();
+      if (Number((ME && ME.partner && ME.partner.total) || 0) > before) {
+        const gained = Number((ME && ME.user && ME.user.points) || 0) - pointsBefore;
+        toast("Task verified! +" + fmt(gained > 0 ? gained : pts) + " points added.", "ok");
+        return;
+      }
+    }
+    toast("Not verified yet. Points are added only after the partner confirms the task.", "err");
   });
   el.addEventListener("onBannerNotFound", () => box.classList.add("hidden"));   // no partner task available now
   el.addEventListener("onError", () => box.classList.add("hidden"));
