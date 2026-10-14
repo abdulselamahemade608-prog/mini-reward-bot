@@ -32,6 +32,8 @@ const ADMIN_ID = String(process.env.ADMIN_ID || "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
 // optional Adsgram "int-..." (interstitial) block used for surprise ads; when empty the rewarded block is used
+// Adsgram "Task" block (partner tasks: visit a website / join a channel ...), e.g. "task-12345"
+const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "").trim();
 const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
 const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
@@ -462,6 +464,10 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS penalty NUMERIC NOT NULL DEFAULT 0`);
             await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS last_check TIMESTAMPTZ`);
             await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS was_member BOOLEAN NOT NULL DEFAULT FALSE`);
+            await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS announce_pending BOOLEAN NOT NULL DEFAULT FALSE`);
+            await pool.query(`CREATE TABLE IF NOT EXISTS mr_partner_tasks (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, provider TEXT NOT NULL DEFAULT 'adsgram', reward NUMERIC NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_partner_tasks_user ON mr_partner_tasks(telegram_id, created_at)`);
+            await pool.query(`CREATE TABLE IF NOT EXISTS mr_task_msgs (task_id BIGINT NOT NULL, chat_id BIGINT NOT NULL, message_id BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (task_id, chat_id))`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_spins (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, prize NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`CREATE INDEX IF NOT EXISTS mr_spins_user ON mr_spins(telegram_id, created_at)`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_banners (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, text TEXT DEFAULT '', url TEXT NOT NULL, expires_at TIMESTAMPTZ, enabled BOOLEAN NOT NULL DEFAULT TRUE, clicks INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -1139,6 +1145,12 @@ app.get("/api/me", authenticate, async (req, res) => {
         await createOrUpdateUser(req.telegramUser, referral);
         pool.query(`UPDATE mr_users SET last_active = NOW() WHERE telegram_id = $1`, [telegramId]).catch(() => {});
 
+        // finish pending task announcements / delete announcements of finished tasks (at most once a minute)
+        if (Date.now() - lastTaskSweep > 60000) {
+            lastTaskSweep = Date.now();
+            sweepTaskMessages(4000).catch(e => console.error("sweepTaskMessages", e.message));
+        }
+
         // if this user left a channel he promoted-joined, take the reward back (checked at most every 5 minutes per user)
         try { await penalizeLeavers(telegramId, 8, 5 * 60 * 1000); }
         catch (e) { console.error("penalizeLeavers", e.message); }
@@ -1224,7 +1236,7 @@ app.get("/api/me", authenticate, async (req, res) => {
             },
             channels,
             allJoined,
-            adsgram: { blockId: ADSGRAM_BLOCK_ID, interBlockId: ADSGRAM_INTERSTITIAL_BLOCK_ID },
+            adsgram: { blockId: ADSGRAM_BLOCK_ID, interBlockId: ADSGRAM_INTERSTITIAL_BLOCK_ID, taskBlockId: ADSGRAM_TASK_BLOCK_ID },
             monetag: { zoneId: MONETAG_ZONE_ID },
             payout: { symbol: TOKEN_SYMBOL, ready: PAY_READY, explorer: EXPLORER_TX, bnb_price: bnbPrice, limits },
             bot: { username: BOT_USERNAME }
@@ -1436,6 +1448,45 @@ app.get("/api/adsgram-reward", async (req, res) => {
         res.status(r.code).json(r.body);
     } catch (error) {
         console.error("/api/adsgram-reward", error.message);
+        res.status(500).json({ ok: false });
+    }
+});
+
+// Adsgram TASK reward URL (set it in the Adsgram dashboard for your task block):
+//   https://YOUR-APP/api/adsgram-task-reward?userid=[userId]&secret=YOUR_ADSGRAM_SECRET
+// Adsgram calls it from its server when the user finished a partner task (visited the website, joined the channel ...).
+app.get("/api/adsgram-task-reward", async (req, res) => {
+    try {
+        if (!ADSGRAM_SECRET) return res.status(503).json({ ok: false, error: "ADSGRAM_SECRET is not set." });
+        if (!safeSecretEqual(req.query.secret, ADSGRAM_SECRET)) return res.status(403).json({ ok: false });
+        const userId = String(req.query.userid ?? req.query.userId ?? "").trim();
+        if (!/^\d{3,15}$/.test(userId)) return res.status(400).json({ ok: false, error: "Bad userid." });
+        await requireDatabase();
+
+        const st = await settingsMap();
+        const reward = Number(st.adsgram_task_reward ?? 2), daily = Math.floor(st.adsgram_task_daily ?? 10);
+        if (!(reward > 0)) return res.json({ ok: true, ignored: "reward is 0" });
+
+        const client = await pool.connect();
+        let given = false;
+        try {
+            await client.query("BEGIN");
+            const u = await client.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1 FOR UPDATE`, [userId]);
+            if (!u.rows.length || u.rows[0].is_banned) { await client.query("ROLLBACK"); return res.status(403).json({ ok: false, error: "User not allowed." }); }
+            if (daily > 0) {
+                const c = await client.query(`SELECT COUNT(*)::int AS c FROM mr_partner_tasks WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [userId]);
+                if (c.rows[0].c >= daily) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "daily limit" }); }
+            }
+            await client.query(`INSERT INTO mr_partner_tasks(telegram_id, provider, reward) VALUES($1,'adsgram',$2)`, [userId, reward]);
+            await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [userId, reward]);
+            await client.query("COMMIT");
+            given = true;
+        } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
+        finally { client.release(); }
+        if (given) notifyUser(userId, `✅ Partner task completed! +${reward} points were added.`);
+        res.json({ ok: true, reward });
+    } catch (error) {
+        console.error("/api/adsgram-task-reward", error.message);
         res.status(500).json({ ok: false });
     }
 });
@@ -2884,6 +2935,14 @@ app.post("/api/tasks/:id/claim", authenticate, async (req, res) => {
         }
 
         res.json({ ok: true, reward: Number(task.reward) });
+
+        // the task got all the users it needs -> delete the announcement message from every chat
+        if (task.max_users > 0) {
+            try {
+                const cnt = await pool.query(`SELECT COUNT(*)::int AS c FROM mr_task_claims WHERE task_id = $1 AND completed_at IS NOT NULL`, [task.id]);
+                if (cnt.rows[0].c >= task.max_users) await cleanupTaskMessages(task.id, 6000);
+            } catch (e) { console.error("cleanupTaskMessages", e.message); }
+        }
     } catch (error) {
         console.error("/api/tasks/claim", error);
         res.status(500).json({ ok: false, error: error.message });
@@ -2927,11 +2986,13 @@ app.post("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
             return res.status(400).json({ ok: false, error: "Reward must be greater than 0." });
         }
 
-        await pool.query(
-            `INSERT INTO mr_tasks(title, description, url, channel, reward, max_users) VALUES($1,$2,$3,$4,$5,$6)`,
+        const ins = await pool.query(
+            `INSERT INTO mr_tasks(title, description, url, channel, reward, max_users, announce_pending) VALUES($1,$2,$3,$4,$5,$6,TRUE) RETURNING id`,
             [title, description, url, channel || null, reward, maxUsers]
         );
         res.json({ ok: true });
+        // tell everybody about the new task (the cron sweep finishes the rest if time runs out)
+        await announceTask(ins.rows[0].id, 6000).catch(e => console.error("announceTask", e.message));
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
@@ -2954,6 +3015,7 @@ app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, 
             client.release();
         }
         res.json({ ok: true });
+        await cleanupTaskMessages(req.params.id, 6000).catch(e => console.error("cleanupTaskMessages", e.message));
     } catch (error) {
         res.status(500).json({ ok: false, error: error.message });
     }
@@ -2967,7 +3029,7 @@ app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, 
 const CRON_SECRET = String(process.env.CRON_SECRET || "");
 const SPIN_PRIZES = [{ p: 0.5, w: 40 }, { p: 1, w: 30 }, { p: 2, w: 18 }, { p: 5, w: 9 }, { p: 10, w: 3 }];
 const DAY_START = `date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`;
-const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled"];
+const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled", "adsgram_task_reward", "adsgram_task_daily"];
 
 const wrap = fn => async (req, res) => {
     try { await fn(req, res); }
@@ -3035,6 +3097,7 @@ app.get("/api/cron/reminders", wrap(async (req, res) => {
     if (!ok) return res.status(403).json({ ok: false, error: "Wrong key." });
     let swept = 0;
     try { swept = await penalizeLeavers(null, 40, 0); } catch (e) { console.error("sweep", e.message); }
+    try { await sweepTaskMessages(8000); } catch (e) { console.error("sweepTaskMessages", e.message); }
     res.json({ ok: true, penalized: swept, ...(await runReminders()) });
 }));
 app.post("/api/admin/reminders/run", authenticate, requireAdmin, wrap(async (req, res) => {
@@ -3145,19 +3208,22 @@ app.post("/api/promote", authenticate, wrap(async (req, res) => {
         `SELECT 1 FROM mr_tasks t WHERE t.channel = $1 AND t.enabled = TRUE AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL)) LIMIT 1`, [channel]);
     if (dup.rows.length) return res.status(409).json({ ok: false, error: "This channel already has an active campaign." });
 
+    let newTaskId = null;
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
         const pay = await client.query(`UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1 AND points >= $2 RETURNING points`, [id, cost]);
         if (!pay.rows.length) { await client.query("ROLLBACK"); return res.status(400).json({ ok: false, error: `You need ${cost} points for this campaign.` }); }
-        await client.query(
-            `INSERT INTO mr_tasks(title, description, url, channel, reward, sponsored, max_users, sponsor_owner)
-             VALUES($1,'Sponsored',$2,$3,$4,TRUE,$5,$6)`,
+        const taskIns = await client.query(
+            `INSERT INTO mr_tasks(title, description, url, channel, reward, sponsored, max_users, sponsor_owner, announce_pending)
+             VALUES($1,'Sponsored',$2,$3,$4,TRUE,$5,$6,TRUE) RETURNING id`,
             ["Join " + channel, "https://t.me/" + channel.slice(1), channel, userReward, joins, id]);
         await client.query("COMMIT");
         res.json({ ok: true, cost, joins, reward: userReward });
+        newTaskId = taskIns.rows[0].id;
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
+    if (newTaskId) await announceTask(newTaskId, 6000).catch(e => console.error("announceTask", e.message));
 }));
 
 app.get("/api/promote/mine", authenticate, wrap(async (req, res) => {
@@ -3167,6 +3233,81 @@ app.get("/api/promote/mine", authenticate, wrap(async (req, res) => {
          FROM mr_tasks t WHERE t.sponsor_owner = $1 ORDER BY t.id DESC LIMIT 20`, [String(req.telegramUser.id)]);
     res.json({ ok: true, campaigns: r.rows });
 }));
+
+/* ------- 6a) NEW TASK ANNOUNCEMENT (sent to every user, deleted when the task is full) ------- */
+
+let lastTaskSweep = 0;
+const taskFull = async t => t.max_users > 0 && (await pool.query(
+    `SELECT COUNT(*)::int AS c FROM mr_task_claims WHERE task_id = $1 AND completed_at IS NOT NULL`, [t.id])).rows[0].c >= t.max_users;
+
+// sends the "new task" message (with a red/danger inline button) to every user who did not get it yet
+async function announceTask(taskId, budgetMs = 5000) {
+    await requireDatabase();
+    const t0 = Date.now();
+    const tr = await pool.query(`SELECT id, title, reward, sponsor_owner, max_users, enabled FROM mr_tasks WHERE id = $1`, [taskId]);
+    if (!tr.rows.length) return 0;
+    const t = tr.rows[0];
+    if (!t.enabled || await taskFull(t)) {
+        await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
+        return 0;
+    }
+    const text = `🆕 New task available!\n\n${t.title}\nReward: +${Number(t.reward)} points\n\nTap the button below and complete it before it is full.`;
+    const reply_markup = { inline_keyboard: [[{ text: "🔥 Do task now", web_app: { url: APP_URL }, style: "danger" }]] };
+    let sent = 0;
+    while (Date.now() - t0 < budgetMs) {
+        const batch = await pool.query(
+            `SELECT u.telegram_id FROM mr_users u
+             WHERE u.is_banned = FALSE
+               AND ($2::bigint IS NULL OR u.telegram_id <> $2::bigint)
+               AND NOT EXISTS (SELECT 1 FROM mr_task_msgs m WHERE m.task_id = $1 AND m.chat_id = u.telegram_id)
+             ORDER BY u.telegram_id LIMIT 25`, [taskId, t.sponsor_owner || null]);
+        if (!batch.rows.length) {
+            await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
+            break;
+        }
+        const ids = batch.rows.map(r => String(r.telegram_id));
+        const results = await Promise.allSettled(ids.map(uid =>
+            telegram("sendMessage", { chat_id: Number(uid), text, reply_markup, disable_web_page_preview: true })));
+        const msgIds = results.map(r => r.status === "fulfilled" ? Number(r.value.message_id) || 0 : 0);   // 0 = could not send (blocked), never retried
+        sent += msgIds.filter(Boolean).length;
+        await pool.query(
+            `INSERT INTO mr_task_msgs(task_id, chat_id, message_id)
+             SELECT $1, x.c, x.m FROM UNNEST($2::bigint[], $3::bigint[]) AS x(c, m) ON CONFLICT DO NOTHING`,
+            [taskId, ids, msgIds]);
+        await sleep(1100);
+    }
+    return sent;
+}
+
+// deletes the announcement of a finished / removed task from every chat
+async function cleanupTaskMessages(taskId, budgetMs = 6000) {
+    await requireDatabase();
+    const t0 = Date.now();
+    await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
+    while (Date.now() - t0 < budgetMs) {
+        const r = await pool.query(`SELECT chat_id, message_id FROM mr_task_msgs WHERE task_id = $1 ORDER BY chat_id LIMIT 30`, [taskId]);
+        if (!r.rows.length) return true;
+        await Promise.allSettled(r.rows.filter(x => Number(x.message_id) > 0).map(x =>
+            telegram("deleteMessage", { chat_id: Number(x.chat_id), message_id: Number(x.message_id) })));
+        await pool.query(`DELETE FROM mr_task_msgs WHERE task_id = $1 AND chat_id = ANY($2::bigint[])`, [taskId, r.rows.map(x => String(x.chat_id))]);
+        await sleep(1000);
+    }
+    return false;
+}
+
+// safety net (cron / lazy): delete messages of finished tasks, continue unfinished announcements
+async function sweepTaskMessages(budgetMs = 6000) {
+    await requireDatabase();
+    const t0 = Date.now(), left = () => Math.max(0, budgetMs - (Date.now() - t0));
+    const done = await pool.query(
+        `SELECT DISTINCT m.task_id FROM mr_task_msgs m LEFT JOIN mr_tasks t ON t.id = m.task_id
+         WHERE t.id IS NULL OR t.enabled = FALSE
+            OR (t.max_users > 0 AND (SELECT COUNT(*) FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL) >= t.max_users)
+         LIMIT 5`);
+    for (const row of done.rows) { if (!left()) return; await cleanupTaskMessages(row.task_id, left()); }
+    const pend = await pool.query(`SELECT id FROM mr_tasks WHERE announce_pending = TRUE AND enabled = TRUE ORDER BY id LIMIT 3`);
+    for (const row of pend.rows) { if (!left()) return; await announceTask(row.id, left()); }
+}
 
 /* ------- 6b) CHANNEL LEFT -> POINTS TAKEN BACK (promoted channels only) ------- */
 

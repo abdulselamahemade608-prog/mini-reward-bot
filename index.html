@@ -59,6 +59,10 @@ svg{display:block}
 .wheel-wrap{position:relative;width:210px;height:222px;margin:14px auto 0}
 .wheel-ptr{position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid #fbbf24;z-index:2;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 #wheelSvg{position:absolute;left:5px;top:17px;width:200px;height:200px;will-change:transform;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.adsgram-task{display:flex;align-items:center;gap:10px;width:100%}
+.adsgram-task .pt-reward{flex:1;font-weight:700}
+.adsgram-task .pt-btn{padding:9px 16px;border-radius:12px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}
+.adsgram-task .pt-done{background:#6b7280}
 .pm-support{margin-top:12px;padding:12px;border-radius:14px;border:1px solid #f59e0b;background:rgba(245,158,11,.08)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -306,6 +310,11 @@ nav button.active svg{stroke:#8ec5ff}
       <div id="pmMine" style="margin-top:10px"></div>
     </div>
 
+    <div id="partnerBox" class="hidden">
+      <h2><span class="ib sm green">🌐</span>Partner tasks</h2>
+      <div class="card" style="padding:12px" id="partnerCard"></div>
+    </div>
+
     <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
     <div id="taskList"></div>
   </section>
@@ -459,6 +468,8 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Channel promotion: price per join (points)</label><input id="f_price" type="number" min="0" step="any">
         <label>Share paid to the user per join (%)</label><input id="f_share" type="number" min="0" max="100" step="any">
         <label>Minimum joins per campaign</label><input id="f_minj" type="number" min="1" step="1">
+        <label>Partner task (Adsgram) reward in points</label><input id="f_ptr" type="number" min="0" step="any">
+        <label>Partner tasks per user per day (0 = no limit)</label><input id="f_ptd" type="number" min="0" step="1">
         <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
         <button class="btn green" id="f_save" style="margin-top:14px">Save</button>
         <button class="btn dark" id="f_remind" style="margin-top:8px">Send reminders now</button>
@@ -1399,7 +1410,32 @@ const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFi
 let SP = null;
 
 async function loadHomeExtras() { loadProof(); loadSpin(); }
-async function loadEarnExtras() { renderPromoQuote(); loadMyCampaigns(); }
+async function loadEarnExtras() { setupPartnerTask(); renderPromoQuote(); loadMyCampaigns(); }
+
+/* ---- Adsgram partner tasks (visit a website, join a channel ... paid by the advertiser) ---- */
+let partnerBlock = "";
+function setupPartnerTask() {
+  const id = String((ME && ME.adsgram && ME.adsgram.taskBlockId) || "");
+  const box = $("partnerBox");
+  if (!id) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  if (partnerBlock === id) return;
+  partnerBlock = id;
+  const pts = Number(((ME && ME.settings) || {}).adsgram_task_reward ?? 2);
+  $("partnerCard").innerHTML =
+    '<adsgram-task class="adsgram-task" data-block-id="' + esc(id) + '" data-debug="false">' +
+    '<span slot="reward" class="pt-reward">+' + fmt(pts) + ' points</span>' +
+    '<div slot="button" class="pt-btn">Go</div>' +
+    '<div slot="claim" class="pt-btn">Claim</div>' +
+    '<div slot="done" class="pt-btn pt-done">Done</div></adsgram-task>';
+  const el = $("partnerCard").querySelector("adsgram-task");
+  el.addEventListener("reward", () => {
+    toast("Task completed! Your points are being added.", "ok");
+    setTimeout(refreshMe, 2500); setTimeout(refreshMe, 7000);   // Adsgram calls the server a moment later
+  });
+  el.addEventListener("onBannerNotFound", () => box.classList.add("hidden"));   // no partner task available now
+  el.addEventListener("onError", () => box.classList.add("hidden"));
+}
 
 /* ---- proof feed: one payout at a time, fades in and out ---- */
 const PROOF_SHOW_MS = 2600, PROOF_FADE_MS = 700;
@@ -1590,12 +1626,12 @@ $("segMore").onclick = () => admSeg("more");
 async function loadMore() {
   const s = ME.settings || {};
   $("f_spin").value = s.spin_enabled ?? 1; $("f_spinf").value = s.spin_free ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
-  $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1;
+  $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1; $("f_ptr").value = s.adsgram_task_reward ?? 2; $("f_ptd").value = s.adsgram_task_daily ?? 10;
 }
 $("f_save").onclick = async () => {
   try {
     await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_free: $("f_spinf").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
-      promo_price_per_join: $("f_price").value, promo_user_share: $("f_share").value, promo_min_joins: $("f_minj").value, remind_enabled: $("f_rem").value });
+      promo_price_per_join: $("f_price").value, promo_user_share: $("f_share").value, promo_min_joins: $("f_minj").value, remind_enabled: $("f_rem").value, adsgram_task_reward: $("f_ptr").value, adsgram_task_daily: $("f_ptd").value });
     toast("Saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
 };
