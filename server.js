@@ -480,6 +480,8 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS announce_pending BOOLEAN NOT NULL DEFAULT FALSE`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_partner_tasks (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, provider TEXT NOT NULL DEFAULT 'adsgram', reward NUMERIC NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`CREATE INDEX IF NOT EXISTS mr_partner_tasks_user ON mr_partner_tasks(telegram_id, created_at)`);
+            await pool.query(`ALTER TABLE mr_partner_tasks ADD COLUMN IF NOT EXISTS task_key TEXT`);
+            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS mr_partner_tasks_once ON mr_partner_tasks(telegram_id, task_key) WHERE task_key IS NOT NULL`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_task_msgs (task_id BIGINT NOT NULL, chat_id BIGINT NOT NULL, message_id BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (task_id, chat_id))`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_spins (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, prize NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`CREATE INDEX IF NOT EXISTS mr_spins_user ON mr_spins(telegram_id, created_at)`);
@@ -1485,6 +1487,9 @@ app.get("/api/adsgram-task-reward", async (req, res) => {
         if (!safeSecretEqual(req.query.secret, ADSGRAM_SECRET)) return res.status(403).json({ ok: false });
         const userId = String(req.query.userid ?? req.query.userId ?? "").trim();
         if (!/^\d{3,15}$/.test(userId)) return res.status(400).json({ ok: false, error: "Bad userid." });
+        // the id of the partner task, if Adsgram sends one (put &taskid=[taskId] in the reward URL when available).
+        // one task id is paid only once per user, so the same task can never pay twice.
+        const taskKey = String(req.query.taskid ?? req.query.task_id ?? req.query.sourceid ?? "").trim().slice(0, 100) || null;
         await requireDatabase();
 
         const st = await settingsMap();
@@ -1492,16 +1497,29 @@ app.get("/api/adsgram-task-reward", async (req, res) => {
         if (!(reward > 0)) return res.json({ ok: true, ignored: "reward is 0" });
 
         const client = await pool.connect();
-        let given = false;
+        let given = false, why = null;
         try {
             await client.query("BEGIN");
             const u = await client.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1 FOR UPDATE`, [userId]);
             if (!u.rows.length || u.rows[0].is_banned) { await client.query("ROLLBACK"); return res.status(403).json({ ok: false, error: "User not allowed." }); }
+
+            // same task reported again -> ignore
+            if (taskKey) {
+                const dup = await client.query(`SELECT 1 FROM mr_partner_tasks WHERE telegram_id = $1 AND task_key = $2`, [userId, taskKey]);
+                if (dup.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "task already rewarded" }); }
+            }
+            // two rewards within 20 seconds for one user = the same task fired twice -> only the first one counts
+            const burst = await client.query(`SELECT 1 FROM mr_partner_tasks WHERE telegram_id = $1 AND created_at > NOW() - INTERVAL '20 seconds' LIMIT 1`, [userId]);
+            if (burst.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "duplicate within 20s" }); }
+
             if (daily > 0) {
                 const c = await client.query(`SELECT COUNT(*)::int AS c FROM mr_partner_tasks WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [userId]);
                 if (c.rows[0].c >= daily) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "daily limit" }); }
             }
-            await client.query(`INSERT INTO mr_partner_tasks(telegram_id, provider, reward) VALUES($1,'adsgram',$2)`, [userId, reward]);
+            const ins = await client.query(
+                `INSERT INTO mr_partner_tasks(telegram_id, provider, reward, task_key) VALUES($1,'adsgram',$2,$3)
+                 ON CONFLICT DO NOTHING RETURNING id`, [userId, reward, taskKey]);
+            if (!ins.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "task already rewarded" }); }
             await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [userId, reward]);
             await client.query("COMMIT");
             given = true;

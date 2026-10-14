@@ -64,6 +64,8 @@ svg{display:block}
 .pt-slot .adsgram-task{flex:1 1 auto;min-width:0}
 .pt-ic{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;box-shadow:0 6px 16px rgba(0,0,0,.35)}
 .pt-ic.orange{background:linear-gradient(135deg,#f59e0b,#ea580c)}
+.pt-ic.gray{background:linear-gradient(135deg,#64748b,#334155)}
+.pt-wait{opacity:.6}
 .pt-ic.green{background:linear-gradient(135deg,#22c55e,#15803d)}
 .pt-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pt-txt{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -1441,6 +1443,11 @@ function setupPartnerTask() {
   partnerKey = key;
   let h = "";
   for (let i = 0; i < active; i++) {
+    if (i > 0) {   // only one live task at a time, the next one loads after this one is finished
+      h += '<div class="pt-slot pt-wait"><div class="pt-ic gray">' + svg("clock") + '</div>' +
+           '<div class="pt-txt"><b>Next partner task</b><span>Finish the current task first</span></div></div>';
+      continue;
+    }
     h += '<div class="pt-slot"><div class="pt-ic orange">' + svg("star") + '</div>' +
          '<adsgram-task class="adsgram-task" data-block-id="' + esc(id) + '" data-debug="false">' +
          '<span slot="reward" class="pt-reward">+' + fmt(partnerPts()) + ' points</span>' +
@@ -1455,7 +1462,11 @@ function setupPartnerTask() {
   }
   $("partnerCard").innerHTML = h;
   $("partnerCard").querySelectorAll("adsgram-task").forEach(el => {
-    el.addEventListener("reward", () => onPartnerReward());
+    el.addEventListener("reward", () => {
+      const slot = el.closest(".pt-slot");
+      if (slot) { slot.style.opacity = ".5"; el.remove(); }   // remove the live task at once, so it cannot be claimed twice
+      onPartnerReward();
+    });
     el.addEventListener("onBannerNotFound", () => { const slot = el.closest(".pt-slot"); if (slot) slot.remove(); });
     el.addEventListener("onError", () => { const slot = el.closest(".pt-slot"); if (slot) slot.remove(); });
   });
@@ -1475,6 +1486,8 @@ async function onPartnerReward() {
       return;
     }
   }
+  partnerKey = "";
+  setupPartnerTask();
   toast("Not verified yet. Points are added only after the partner confirms the task.", "err");
 }
 
