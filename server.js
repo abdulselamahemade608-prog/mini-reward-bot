@@ -186,9 +186,12 @@ async function getWithdrawRequirements(db, telegramId, maxAds) {
             (SELECT COUNT(*)::int FROM mr_ad_rewards
               WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS ads,
             (SELECT COUNT(*)::int FROM mr_tasks t
-              WHERE t.enabled = TRUE AND NOT EXISTS (
-                SELECT 1 FROM mr_task_claims c
-                WHERE c.task_id = t.id AND c.telegram_id = $1 AND c.completed_at IS NOT NULL)) AS tasks`,
+              WHERE t.enabled = TRUE
+                AND NOT EXISTS (
+                  SELECT 1 FROM mr_task_claims c
+                  WHERE c.task_id = t.id AND c.telegram_id = $1
+                    AND (c.completed_at IS NOT NULL OR c.was_member = TRUE))      -- done, or already joined before (no reward)
+                AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims x WHERE x.task_id = t.id AND x.completed_at IS NOT NULL))) AS tasks`,
         [telegramId]
     );
     return { adsToday: r.rows[0].ads, maxAds: max, tasksLeft: r.rows[0].tasks };
@@ -3190,60 +3193,7 @@ app.post("/api/spin", authenticate, wrap(async (req, res) => {
 
 /* ---------------------- 4) (banner slot removed) ---------------------- */
 
-/* ------- 6) SELF-SERVE CHANNEL PROMOTION (owners pay with points, a task is created automatically) ------- */
-
-let BOT_ID = null;
-
-app.post("/api/promote", authenticate, wrap(async (req, res) => {
-    const id = await activeUser(req, res);
-    if (!id) return;
-    const st = await settingsMap();
-    const channel = String(req.body?.channel || "").trim();
-    const joins = Math.floor(Number(req.body?.joins));
-    const minJ = Math.max(1, Math.floor(st.promo_min_joins ?? 20));
-    if (!/^@[A-Za-z0-9_]{4,}$/.test(channel)) return res.status(400).json({ ok: false, error: "Channel must look like @channelname." });
-    if (!Number.isFinite(joins) || joins < minJ || joins > 5000) return res.status(400).json({ ok: false, error: `Joins must be between ${minJ} and 5000.` });
-    const price = st.promo_price_per_join ?? 10, share = Math.min(100, st.promo_user_share ?? 25);
-    const cost = Number((joins * price).toFixed(4)), userReward = Number((price * share / 100).toFixed(4));
-    if (!(price > 0) || !(userReward > 0)) return res.status(400).json({ ok: false, error: "Promotion is not available right now." });
-
-    // the bot must be an admin of the channel, otherwise joins cannot be verified
-    try {
-        if (!BOT_ID) BOT_ID = (await telegram("getMe")).id;
-        const m = await telegram("getChatMember", { chat_id: channel, user_id: BOT_ID });
-        if (!["administrator", "creator"].includes(m.status)) throw new Error("not admin");
-    } catch (e) {
-        return res.status(400).json({ ok: false, error: "Add the bot as an admin of your channel first, then try again." });
-    }
-    const dup = await pool.query(
-        `SELECT 1 FROM mr_tasks t WHERE t.channel = $1 AND t.enabled = TRUE AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL)) LIMIT 1`, [channel]);
-    if (dup.rows.length) return res.status(409).json({ ok: false, error: "This channel already has an active campaign." });
-
-    let newTaskId = null;
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-        const pay = await client.query(`UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1 AND points >= $2 RETURNING points`, [id, cost]);
-        if (!pay.rows.length) { await client.query("ROLLBACK"); return res.status(400).json({ ok: false, error: `You need ${cost} points for this campaign.` }); }
-        const taskIns = await client.query(
-            `INSERT INTO mr_tasks(title, description, url, channel, reward, sponsored, max_users, sponsor_owner, announce_pending)
-             VALUES($1,'Sponsored',$2,$3,$4,TRUE,$5,$6,TRUE) RETURNING id`,
-            ["Join " + channel, "https://t.me/" + channel.slice(1), channel, userReward, joins, id]);
-        await client.query("COMMIT");
-        res.json({ ok: true, cost, joins, reward: userReward });
-        newTaskId = taskIns.rows[0].id;
-    } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
-    finally { client.release(); }
-    if (newTaskId) await announceTask(newTaskId, 6000).catch(e => console.error("announceTask", e.message));
-}));
-
-app.get("/api/promote/mine", authenticate, wrap(async (req, res) => {
-    await requireDatabase();
-    const r = await pool.query(
-        `SELECT t.id, t.channel, t.max_users, (SELECT COUNT(*)::int FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL) AS done
-         FROM mr_tasks t WHERE t.sponsor_owner = $1 ORDER BY t.id DESC LIMIT 20`, [String(req.telegramUser.id)]);
-    res.json({ ok: true, campaigns: r.rows });
-}));
+/* ------- 6) (self-serve channel promotion removed) ------- */
 
 /* ------- 6a) NEW TASK ANNOUNCEMENT (sent to every user, deleted when the task is full) ------- */
 

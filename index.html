@@ -295,21 +295,6 @@ nav button.active svg{stroke:#8ec5ff}
       </div>
     </div>
 
-    <h2><span class="ib sm blue">📣</span>Add task (promote your channel)</h2>
-    <div class="card">
-      <div class="muted" id="pmInfo">Get real members. Pay with your points, a task is created automatically.</div>
-      <label>Channel (bot must be admin)</label><input id="pm_chan" type="text" placeholder="@yourchannel">
-      <label>Number of joins</label><input id="pm_joins" type="number" min="1" step="1" placeholder="100">
-      <div class="muted" id="pmQuote" style="margin-top:8px"></div>
-      <div class="pm-support hidden" id="pmSupport">
-        <div style="font-weight:700" id="pmSupportTitle">You have no points yet.</div>
-        <div class="muted" style="margin-top:4px" id="pmSupportMsg">You need points to add a task. Please contact Support and the admin will help you.</div>
-        <button class="btn dark sm" id="pmSupportBtn" type="button" style="margin-top:10px;width:auto;padding:10px 18px">Contact Support</button>
-      </div>
-      <button class="btn green" id="pmBtn" style="margin-top:12px">Add task</button>
-      <div id="pmMine" style="margin-top:10px"></div>
-    </div>
-
     <div id="partnerBox" class="hidden">
       <h2><span class="ib sm green">🌐</span>Partner tasks</h2>
       <div class="card" style="padding:12px">
@@ -468,9 +453,6 @@ nav button.active svg{stroke:#8ec5ff}
         <label>Free spins per day (first spins, no ad needed)</label><input id="f_spinf" type="number" min="0" step="1">
         <label>Extra spins per day (each one unlocked by watching an ad)</label><input id="f_spinx" type="number" min="0" step="1">
         <label>Spin prize multiplier (x)</label><input id="f_spins" type="number" min="0" step="any">
-        <label>Channel promotion: price per join (points)</label><input id="f_price" type="number" min="0" step="any">
-        <label>Share paid to the user per join (%)</label><input id="f_share" type="number" min="0" max="100" step="any">
-        <label>Minimum joins per campaign</label><input id="f_minj" type="number" min="1" step="1">
         <label>Partner task (Adsgram) reward in points</label><input id="f_ptr" type="number" min="0" step="any">
         <label>Partner tasks per user per day (0 = no limit)</label><input id="f_ptd" type="number" min="0" step="1">
         <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
@@ -1413,7 +1395,7 @@ const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFi
 let SP = null;
 
 async function loadHomeExtras() { loadProof(); loadSpin(); }
-async function loadEarnExtras() { setupPartnerTask(); renderPromoQuote(); loadMyCampaigns(); }
+async function loadEarnExtras() { setupPartnerTask(); }
 
 /* ---- Adsgram partner tasks (visit a website, join a channel ... paid by the advertiser) ---- */
 let partnerBlock = "";
@@ -1579,52 +1561,6 @@ $("spinBtn").onclick = async () => {
   finally { spinBusy = false; autoIdle = 0; await loadSpin(); }
 };
 
-function renderPromoQuote() {
-  const st = (ME && ME.settings) || {}, p = st.promo_price_per_join ?? 10, sh = st.promo_user_share ?? 25, mj = st.promo_min_joins ?? 20;
-  const j = Math.floor(Number($("pm_joins").value) || 0);
-  $("pmInfo").textContent = "Pay " + fmt(p) + " points per join (min " + mj + " joins). Members earn " + fmt(p * sh / 100) + " points each.";
-  $("pmQuote").textContent = j > 0 ? "Total cost: " + fmt(j * p) + " points" : "";
-  // not enough points for this task (or no points at all) -> send him to Support
-  const pts = Number(ME && ME.user && ME.user.points) || 0, need = j * p;
-  let show = false;
-  if (pts <= 0) {
-    show = true;
-    $("pmSupportTitle").textContent = "You have no points yet.";
-    $("pmSupportMsg").textContent = "You need points to add a task. Please contact Support and the admin will help you.";
-  } else if (j > 0 && need > pts) {
-    show = true;
-    $("pmSupportTitle").textContent = "Not enough points for " + fmt(j) + " joins.";
-    $("pmSupportMsg").textContent = "You need " + fmt(need) + " points but you have " + fmt(pts) + ". Please contact Support admin to get more points, or lower the number of joins.";
-  }
-  $("pmSupport").classList.toggle("hidden", !show);
-}
-$("pmSupportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
-$("pm_joins").oninput = renderPromoQuote;
-$("pmBtn").onclick = async () => {
-  const joins = Math.floor(Number($("pm_joins").value) || 0), chan = $("pm_chan").value.trim();
-  const pts = Number(ME && ME.user && ME.user.points) || 0, price = Number(((ME && ME.settings) || {}).promo_price_per_join ?? 10);
-  if (pts <= 0 || (joins > 0 && joins * price > pts)) {
-    renderPromoQuote();
-    $("pmSupport").classList.remove("hidden");
-    return toast("Not enough points. Please contact Support admin.", "err");
-  }
-  if (!(await confirmBox("Add this task for " + chan + " (" + joins + " joins)?"))) return;
-  $("pmBtn").disabled = true;
-  try {
-    const r = await api("/api/promote", "POST", { channel: chan, joins });
-    toast("Task added. -" + fmt(r.cost) + " points", "ok");
-    $("pm_chan").value = ""; $("pm_joins").value = "";
-    await refreshMe(); renderPromoQuote(); loadMyCampaigns();
-  } catch (e) { toast(e.message, "err"); }
-  $("pmBtn").disabled = false;
-};
-async function loadMyCampaigns() {
-  try {
-    const d = await api("/api/promote/mine");
-    $("pmMine").innerHTML = d.campaigns.map(c => `<div class="muted">${esc(c.channel)} · ${c.done} / ${c.max_users} joined</div>`).join("");
-  } catch (e) {}
-}
-
 /* ---- admin: More ---- */
 const _admSeg = admSeg;
 admSeg = function (name) {
@@ -1638,12 +1574,12 @@ $("segMore").onclick = () => admSeg("more");
 async function loadMore() {
   const s = ME.settings || {};
   $("f_spin").value = s.spin_enabled ?? 1; $("f_spinf").value = s.spin_free ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
-  $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1; $("f_ptr").value = s.adsgram_task_reward ?? 2; $("f_ptd").value = s.adsgram_task_daily ?? 10;
+   $("f_rem").value = s.remind_enabled ?? 1; $("f_ptr").value = s.adsgram_task_reward ?? 2; $("f_ptd").value = s.adsgram_task_daily ?? 10;
 }
 $("f_save").onclick = async () => {
   try {
     await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_free: $("f_spinf").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
-      promo_price_per_join: $("f_price").value, promo_user_share: $("f_share").value, promo_min_joins: $("f_minj").value, remind_enabled: $("f_rem").value, adsgram_task_reward: $("f_ptr").value, adsgram_task_daily: $("f_ptd").value });
+      remind_enabled: $("f_rem").value, adsgram_task_reward: $("f_ptr").value, adsgram_task_daily: $("f_ptd").value });
     toast("Saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
 };
