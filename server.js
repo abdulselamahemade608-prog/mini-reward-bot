@@ -33,7 +33,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
 // optional Adsgram "int-..." (interstitial) block used for surprise ads; when empty the rewarded block is used
 // Adsgram "Task" block (partner tasks: visit a website / join a channel ...), e.g. "task-12345"
-const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "").trim();
+const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "task-53801").trim();
 const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
 const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
