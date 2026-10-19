@@ -290,6 +290,112 @@ nav button.active svg{stroke:#2563eb}
 .sp-t2{background:linear-gradient(90deg,#0f172a,#3b5bdb);-webkit-background-clip:text;background-clip:text;color:transparent}
 .bar{background:rgba(15,23,42,.08)}
 .logo .core{box-shadow:0 10px 30px rgba(99,102,241,.35)}
+
+/* ===================== POLISH PASS 2 ===================== */
+:root{--accent:#2f5bff;--accent2:#7c4dff;--ring:0 0 0 3px rgba(47,91,255,.2)}
+body{line-height:1.45;font-feature-settings:"tnum" 1}
+::selection{background:rgba(47,91,255,.18)}
+button{font-family:inherit}
+:focus-visible{outline:none;box-shadow:var(--ring)}
+
+/* header */
+.head{margin-bottom:18px}
+.head .t{font-size:12.5px;font-weight:500}
+.head .n{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.pill{background:#fff;padding:5px 13px 5px 5px;gap:8px;font-weight:800;font-size:14px}
+
+/* balance: the one bold element */
+.balance{border-radius:28px;padding:24px 22px 20px;
+  background:
+    radial-gradient(260px 160px at 100% 0%,rgba(255,255,255,.22),transparent 70%),
+    radial-gradient(220px 160px at 0% 100%,rgba(236,72,153,.32),transparent 70%),
+    linear-gradient(140deg,#2347e8 0%,#5b3df5 55%,#8b3dff 100%);
+  box-shadow:0 18px 36px -10px rgba(60,50,220,.5),inset 0 1px 0 rgba(255,255,255,.28)}
+.balance::after{animation-duration:7s}
+.balance small{font-size:12px;font-weight:700;letter-spacing:1.4px;opacity:.82}
+.balance .big{font-size:48px;font-weight:800;letter-spacing:-1.5px;line-height:1.05;margin:6px 0 14px;font-variant-numeric:tabular-nums}
+.bnbline{font-size:15px;margin:-4px 0 18px}
+.bnbline .sub{font-size:12px;opacity:.78}
+.balance .btn.glass{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:13px;border-radius:14px}
+#hWithdraw{background:#fff;border-color:transparent;color:#3a31d8;box-shadow:0 8px 18px -6px rgba(15,23,42,.35)}
+#hWithdraw svg{stroke:#3a31d8}
+
+/* stats */
+.stat{padding:14px 8px 12px;border-radius:18px}
+.stat .ib{width:36px;height:36px;border-radius:12px;margin-bottom:10px}
+.stat .ib svg{width:20px;height:20px}
+.stat .v{font-size:19px;font-weight:800;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.stat .l{font-size:11.5px;font-weight:600}
+
+/* cards + rows */
+.card{border-radius:20px;border:1px solid var(--line)}
+.line .x b{font-size:15.5px;font-weight:700;letter-spacing:-.1px}
+.line .x span{font-size:13px}
+h2{margin:26px 0 12px}
+.rankn{font-size:17px;font-variant-numeric:tabular-nums}
+#topList .card:nth-child(1) .rankn{color:#d49a06}
+#topList .card:nth-child(2) .rankn{color:#8b97ab}
+#topList .card:nth-child(3) .rankn{color:#c2773a}
+.proof-slot .card{border-left:3px solid #22c55e}
+.linkbox{font-weight:600;border-radius:14px}
+
+/* buttons */
+.btn{border-radius:14px;padding:14px;font-weight:700;letter-spacing:.1px;
+  background:linear-gradient(180deg,#4170ff,#2f5bff);
+  box-shadow:0 8px 18px -6px rgba(47,91,255,.55),inset 0 1px 0 rgba(255,255,255,.22)}
+.btn.green{background:linear-gradient(180deg,#27b768,#12a150);box-shadow:0 8px 18px -6px rgba(18,161,80,.5),inset 0 1px 0 rgba(255,255,255,.22)}
+.btn.red{background:linear-gradient(180deg,#f2564f,#e03a35);box-shadow:0 8px 18px -6px rgba(224,58,53,.45),inset 0 1px 0 rgba(255,255,255,.2)}
+.btn.dark{background:#fff;border:1px solid var(--line);color:var(--text);box-shadow:0 1px 2px rgba(15,23,42,.05)}
+.btn.sm{padding:10px 14px;border-radius:12px;font-size:14px}
+.btn:active{transform:scale(.97)}
+
+/* inputs (16px stops iOS zooming on focus) */
+input,select,textarea{font-size:16px;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);transition:border-color .15s,box-shadow .15s,background .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:var(--ring)}
+label{font-size:12.5px;font-weight:600;color:#475569;margin:14px 0 6px}
+
+/* tabs / chips / progress */
+.seg{background:#e9eef7;border-radius:14px;box-shadow:inset 0 1px 2px rgba(15,23,42,.06)}
+.seg button{border-radius:10px;font-weight:700;font-size:13.5px;color:#64748b}
+.seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 3px rgba(15,23,42,.14)}
+.chip{background:#fff;font-weight:600}
+.chip.on{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 4px 10px -2px rgba(47,91,255,.4)}
+.progress{height:8px;background:#e6ebf5}
+.progress i{background:linear-gradient(90deg,#22c55e,#10b981)}
+.badge{font-size:11.5px;font-weight:700}
+
+/* empty states */
+.empty{border:1.5px dashed #d5dbe8;border-radius:16px;background:#fafbfe;padding:24px 12px}
+
+/* lucky spin: wheel sits on a white disc */
+.wheel-wrap::before{content:"";position:absolute;left:0;top:12px;width:210px;height:210px;border-radius:50%;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.12),inset 0 0 0 1px var(--line)}
+
+/* verification gate */
+.gate-in h1{font-size:26px;font-weight:800;letter-spacing:-.5px}
+#gIc{background:linear-gradient(135deg,#2f5bff,#7c4dff);color:#fff;box-shadow:0 14px 30px -8px rgba(91,61,245,.5)}
+
+/* bottom nav */
+nav{left:16px;right:16px;padding:6px;border-radius:24px;background:rgba(255,255,255,.88);
+  -webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);
+  border:1px solid rgba(15,23,42,.06);box-shadow:0 12px 32px -6px rgba(15,23,42,.2)}
+nav button{padding:8px 2px 6px;border-radius:18px;font-weight:600}
+nav button:active{transform:scale(.95)}
+nav button.active{color:var(--accent);background:rgba(47,91,255,.1);font-weight:700}
+nav button.active svg{stroke:var(--accent)}
+
+/* modal sheet with grabber */
+#modal .sheet{position:relative;padding-top:28px;border-radius:28px 28px 0 0}
+#modal .sheet::before{content:"";position:absolute;top:10px;left:50%;width:38px;height:4px;border-radius:4px;background:#d5dbe8;transform:translateX(-50%)}
+#modal .sheet.rcpt{padding-top:0}
+#modal .sheet.rcpt::before{background:rgba(255,255,255,.6);z-index:2}
+
+/* toast */
+.toast{border-radius:16px;line-height:1.35}
+
+/* respect reduced motion */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
