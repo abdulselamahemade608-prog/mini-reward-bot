@@ -2,11 +2,22 @@ import express from "express";
 import crypto from "crypto";
 import pg from "pg";
 import path from "path";
+import fs from "fs";
 import { ethers } from "ethers";
 import { fileURLToPath } from "url";
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Background work. On Vercel `waitUntil` keeps the function alive after the response was sent
+// (install it with:  npm i @vercel/functions ). Without the package this is plain fire-and-forget.
+let _waitUntil = null;
+try { ({ waitUntil: _waitUntil } = await import("@vercel/functions")); } catch { /* optional package */ }
+const bg = p => {
+    const pr = Promise.resolve(p).catch(e => console.error("background task:", e && e.message));
+    try { if (_waitUntil) _waitUntil(pr); } catch { /* ignore */ }
+    return pr;
+};
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -35,7 +46,7 @@ const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
 // Adsgram "Task" block (partner tasks: visit a website / join a channel ...), e.g. "task-12345"
 const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "").trim();
 const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
-const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 5);
+const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
 /* ---- BNB auto payment (native BNB on BNB Smart Chain) ---- */
 const BSC_RPC_URL = String(process.env.BSC_RPC_URL || "").trim();
@@ -48,52 +59,25 @@ const ERC20_ABI = [
     "function transfer(address to, uint256 amount) returns (bool)",
     "function balanceOf(address owner) view returns (uint256)"
 ];
-// BNB price in USD, used to convert points (point_value_usd) into BNB. Update it in Vercel env when the price changes.
-// Now only a LAST-RESORT fallback: the live price is fetched automatically (see getBnbPrice below).
-const BNB_PRICE_USD = Number(process.env.BNB_PRICE_USD || 0);
 const EXPLORER_TX = String(process.env.EXPLORER_TX_URL || "https://bscscan.com/tx/");
 const PAY_READY = !!(BSC_RPC_URL && PAYOUT_PRIVATE_KEY);
 
-/* ===================== LIVE BNB PRICE (automatic) ===================== */
-// Tries several public price APIs one after another (some block certain server regions),
-// keeps the answer for 60 seconds, and rejects crazy values.
-const PRICE_TTL_MS = 60 * 1000;
-const PRICE_STALE_OK_MS = 15 * 60 * 1000;   // if every source fails, a price up to 15 min old is still used
-let priceCache = { value: 0, at: 0, source: "" };
+// Hard safety caps that do not depend on the Settings in the database (0 = off).
+const MAX_SINGLE_PAYOUT_USD = Number(process.env.MAX_SINGLE_PAYOUT_USD ?? 50);     // one payout
+const HARD_DAILY_PAYOUT_USD = Number(process.env.HARD_DAILY_PAYOUT_USD ?? 500);    // all payouts of one day
+const RECEIPT_WAIT_MS = Number(process.env.RECEIPT_WAIT_MS || 20000);               // how long to wait for the blockchain confirmation
+const WITHDRAW_MAX_AUTH_AGE = 3600;                                                  // seconds: a withdraw needs a session opened in the last hour
+const PREMIUM_EMOJI = String(process.env.PREMIUM_EMOJI || "false").toLowerCase() === "true";
+const SETUP_KEY = String(process.env.SETUP_KEY || "");                              // key for /api/setup-webhook (falls back to WEBHOOK_SECRET)
+const PUBLIC_ERR = "Server error. Please try again.";
 
-async function fetchJson(url) {
-    const r = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json" } });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.json();
-}
-
-const PRICE_SOURCES = [
-    ["binance",       async () => Number((await fetchJson("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT")).price)],
-    ["coingecko",     async () => Number((await fetchJson("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd")).binancecoin.usd)],
-    ["cryptocompare", async () => Number((await fetchJson("https://min-api.cryptocompare.com/data/price?fsym=BNB&tsyms=USD")).USD)],
-    ["coinbase",      async () => Number((await fetchJson("https://api.coinbase.com/v2/prices/BNB-USD/spot")).data.amount)]
-];
-
-async function getBnbPrice() {
-    const now = Date.now();
-    if (priceCache.value && now - priceCache.at < PRICE_TTL_MS) return priceCache.value;
-
-    for (const [name, load] of PRICE_SOURCES) {
-        try {
-            const p = await load();
-            if (Number.isFinite(p) && p >= 10 && p <= 100000) {
-                priceCache = { value: p, at: Date.now(), source: name };
-                return p;
-            }
-            console.error("bnb price: bad value from", name, p);
-        } catch (e) {
-            console.error("bnb price:", name, e.message);
-        }
-    }
-    if (priceCache.value && now - priceCache.at < PRICE_STALE_OK_MS) return priceCache.value;
-    if (BNB_PRICE_USD > 0) return BNB_PRICE_USD;
-    throw new Error("BNB price is not available right now. Please try again in a minute.");
-}
+// settings every normal user may see (the admin gets all of them)
+const PUBLIC_SETTING_KEYS = new Set([
+    "ad_reward", "invite_reward", "max_ads_per_day", "min_withdraw", "verify_ads", "daily_withdraw_limit",
+    "milestone_5", "milestone_10", "milestone_25", "withdraw_fee_percent", "point_value_usd", "auto_ad_seconds",
+    "withdraw_closed_until", "adsgram_task_reward", "adsgram_task_daily", "partner_required",
+    "spin_enabled", "spin_free", "spin_max_extra", "spin_scale"
+]);
 
 /* ===================== PAYOUT LIMITS (bot-wide) ===================== */
 // withdraw_hourly_limit : max number of withdrawal requests the whole bot accepts per rolling hour (0 = off)
@@ -163,7 +147,7 @@ function fmtWait(ms) {
 //  - only ONE withdrawal per account per day (rejected ones do not count)
 //  - plus the optional extra wait (hours) the admin sets in Settings
 async function nextWithdrawAt(db, telegramId, cooldownHours) {
-    const hrs = 0;   // no hourly wait any more - only ONE withdrawal per day
+    const hrs = Math.max(0, Number(cooldownHours) || 0);   // extra wait (hours) from Settings; 0 = only the one-withdrawal-per-day rule
     const r = await db.query(
         `SELECT MAX(created_at) AS t, date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}' AS d0
          FROM mr_withdrawals WHERE telegram_id = $1 AND status <> 'rejected'`,
@@ -246,7 +230,9 @@ const EMOJI_STATUS = "6267186570034419608";  // status
 const EMOJI_PROOF = "5294338978130972025";   // proof
 
 // <tg-emoji> needs a normal emoji inside as fallback
-const em = (id, fallback = "") => "";
+// Premium emoji are OFF by default (a wrong tag would make Telegram refuse the whole message).
+// Set PREMIUM_EMOJI=true in the environment to turn them on.
+const em = (id, fallback = "\u2B50") => PREMIUM_EMOJI ? `<tg-emoji emoji-id="${id}">${fallback || "\u2B50"}</tg-emoji>` : "";
 
 // escape text for Telegram parse_mode: "HTML"
 const esc = s => String(s ?? "")
@@ -260,10 +246,16 @@ const stripTags = s => String(s).replace(/<[^>]+>/g, "")
 /* ========================== DATABASE ========================== */
 
 
+// SSL to the database. Default = the old behaviour (no certificate check).
+// For a strict check set DATABASE_SSL_STRICT=true (system CAs) and optionally DATABASE_CA (PEM text of your provider's CA).
+const DATABASE_SSL = String(process.env.DATABASE_SSL_STRICT || "").toLowerCase() === "true"
+    ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA ? { ca: process.env.DATABASE_CA } : {}) }
+    : { rejectUnauthorized: false };
+
 const pool = DATABASE_URL
     ? new Pool({
         connectionString: DATABASE_URL,
-        ssl: { rejectUnauthorized: false },
+        ssl: DATABASE_SSL,
         max: 4,
         idleTimeoutMillis: 10000,
         connectionTimeoutMillis: 10000
@@ -274,6 +266,9 @@ if (pool) {
     pool.on("error", e => console.error("pg pool error", e.message));
 }
 
+// Bump this number whenever you add something to the schema below: the tables are then created once,
+// and every later cold start only runs one cheap SELECT.
+const SCHEMA_VERSION = "2";
 let schemaPromise = null;
 
 async function ensureDatabase() {
@@ -281,6 +276,10 @@ async function ensureDatabase() {
 
     if (!schemaPromise) {
         schemaPromise = (async () => {
+            try {
+                const v = await pool.query(`SELECT value FROM mr_app_settings WHERE key = 'schema_version'`);
+                if (v.rows[0] && v.rows[0].value === SCHEMA_VERSION) return;
+            } catch (e) { /* tables do not exist yet: create them below */ }
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS mr_users (
                     telegram_id BIGINT PRIMARY KEY,
@@ -509,6 +508,21 @@ async function ensureDatabase() {
                     (3,'3rd Place Reward','Third leaderboard reward')
                 ON CONFLICT(position) DO NOTHING;
             `);
+            // signed payout transaction (saved BEFORE it is broadcast, so a payout can never be sent twice)
+            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS raw_tx TEXT;`);
+            // indexes for the queries that run on every request
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_ad_rewards_user_time ON mr_ad_rewards(telegram_id, created_at)`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_withdrawals_user_status ON mr_withdrawals(telegram_id, status, created_at)`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_withdrawals_status_time ON mr_withdrawals(status, created_at)`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_withdrawals_address ON mr_withdrawals(LOWER(address))`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_users_points_active ON mr_users(points DESC) WHERE is_banned = FALSE`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_task_claims_user ON mr_task_claims(telegram_id)`);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_referrals_inviter ON mr_referrals(inviter_id)`);
+            await pool.query(
+                `INSERT INTO mr_app_settings(key, value) VALUES('schema_version', $1)
+                 ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+                [SCHEMA_VERSION]
+            );
         })().catch(err => {
             schemaPromise = null;
             throw err;
@@ -555,7 +569,8 @@ app.get("/api/health", async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ ok: false, database: false, error: error.message });
+        console.error("/api/health", error.message);
+        res.status(500).json({ ok: false, database: false, error: PUBLIC_ERR });
     }
 });
 
@@ -600,7 +615,7 @@ function validateTelegramInitData(initData) {
     }
     if (!user.id) throw new Error("Telegram user ID is missing.");
 
-    return { user, startParam: params.get("start_param") || "" };
+    return { user, startParam: params.get("start_param") || "", authDate };
 }
 
 function getInitData(req) {
@@ -613,15 +628,44 @@ function getInitData(req) {
     return "";
 }
 
-function authenticate(req, res, next) {
-    try {
-        const result = validateTelegramInitData(getInitData(req));
-        req.telegramUser = result.user;
-        req.startParam = result.startParam;
-        next();
-    } catch (error) {
-        res.status(401).json({ ok: false, error: error.message });
+// small in-memory rate limiter (per server instance)
+const rateBuckets = new Map();
+function rateAllow(key, max, windowMs) {
+    const now = Date.now();
+    let b = rateBuckets.get(key);
+    if (!b || now - b.at >= windowMs) { b = { at: now, n: 0 }; rateBuckets.set(key, b); }
+    b.n++;
+    if (rateBuckets.size > 20000) {
+        for (const [k, v] of rateBuckets) if (now - v.at > 120000) rateBuckets.delete(k);
     }
+    return b.n <= max;
+}
+
+// the admin sees the real error text, everybody else gets a generic message
+function publicError(e, req) {
+    const isAdmin = ADMIN_ID && req && req.telegramUser && String(req.telegramUser.id) === ADMIN_ID;
+    return isAdmin ? String((e && e.message) || e) : PUBLIC_ERR;
+}
+
+function authenticate(req, res, next) {
+    let result;
+    try {
+        result = validateTelegramInitData(getInitData(req));
+    } catch (error) {
+        return res.status(401).json({ ok: false, error: error.message });
+    }
+    req.telegramUser = result.user;
+    req.startParam = result.startParam;
+    req.initAuthDate = result.authDate;
+
+    const uid = String(result.user.id);
+    if (!ADMIN_ID || uid !== ADMIN_ID) {
+        const isMe = String(req.originalUrl || "").split("?")[0] === "/api/me";
+        if (!rateAllow("all:" + uid, 120, 60000) || (isMe && !rateAllow("me:" + uid, 30, 60000))) {
+            return res.status(429).json({ ok: false, error: "Too many requests. Please slow down." });
+        }
+    }
+    next();
 }
 
 /* ========================== TELEGRAM API ========================== */
@@ -654,9 +698,26 @@ async function checkChannel(telegramId, channel) {
     }
 }
 
-async function checkAllChannels(telegramId) {
+const CHANNEL_CACHE_MS = 90 * 1000;
+const chanCache = new Map();
+async function checkAllChannels(telegramId, opts = {}) {
     if (!REQUIRED_CHANNELS.length) return [];
-    return Promise.all(REQUIRED_CHANNELS.map(c => checkChannel(telegramId, c)));
+    const key = String(telegramId);
+    const hit = chanCache.get(key);
+    if (!opts.fresh && hit && Date.now() - hit.at < CHANNEL_CACHE_MS) return hit.channels;
+
+    const channels = await Promise.all(REQUIRED_CHANNELS.map(c => checkChannel(telegramId, c)));
+    // only a positive answer is cached, so a user who just joined is never held back
+    if (channels.length && channels.every(x => x.joined)) {
+        chanCache.set(key, { at: Date.now(), channels });
+        if (chanCache.size > 5000) {
+            const now = Date.now();
+            for (const [k, v] of chanCache) if (now - v.at > CHANNEL_CACHE_MS) chanCache.delete(k);
+        }
+    } else {
+        chanCache.delete(key);
+    }
+    return channels;
 }
 
 const allJoinedOf = channels => channels.length === 0 || channels.every(x => x.joined);
@@ -768,11 +829,13 @@ async function detectMultiAccount(id, ipHash, deviceHash, firstSeen) {
             [ipHash, id, since, deviceHash]
         );
         if (i.rows.length) {
-            return { detected: true, reason: "Multiple Telegram accounts detected from the same IP address." };
+            // same IP but a different device: many real people share one IP (mobile networks, home Wi-Fi),
+            // so this is only a flag for the admin to review, never an automatic ban
+            return { detected: false, flagged: true, reason: "Same IP address as another account (different device)." };
         }
     }
 
-    return { detected: false, reason: "" };
+    return { detected: false, flagged: false, reason: "" };
 }
 
 async function saveFraud(tgUser, f) {
@@ -897,9 +960,14 @@ async function securityGate(req, tgUser) {
         return { ok: false, reason, message: banApiText(type) };
     }
 
+    const newlyFlagged = !!multi.flagged && (!row || Number(row.risk_score) < 50);
     await saveFraud(tgUser, {
-        ipHash, deviceHash, vpn: false, proxy: false, risk: 0, status: "verified", reason: ""
+        ipHash, deviceHash, vpn: false, proxy: false, risk: multi.flagged ? 50 : 0, status: "verified", reason: ""
     });
+    if (newlyFlagged && ADMIN_ID) {
+        const who = [tgUser.first_name, tgUser.username ? "@" + tgUser.username : ""].filter(Boolean).join(" ");
+        bg(trySend(ADMIN_ID, `Review needed: ${who} (ID ${id}) uses the same IP as another account but a different device.\nNot banned. If it is a cheater: /ban ${id}`));
+    }
 
     if (!row || !row.verification_message_sent) {
         if (await trySend(id, "\u2705 Your verification is successfully.")) {
@@ -907,6 +975,22 @@ async function securityGate(req, tgUser) {
         }
     }
     return { ok: true };
+}
+
+// Runs the security gate (cached for 10 minutes per user) on the endpoints that give or pay out points,
+// so nobody can skip the VPN / multi-account checks by calling them directly without /api/me.
+async function requireGate(req, res, next) {
+    try {
+        await requireDatabase();
+        const gate = await securityGate(req, req.telegramUser);
+        if (!gate.ok) {
+            return res.status(403).json({ ok: false, status: "banned", reason: gate.reason, error: gate.message });
+        }
+        next();
+    } catch (error) {
+        console.error("requireGate", error.message);
+        res.status(500).json({ ok: false, error: PUBLIC_ERR });
+    }
 }
 
 // /ban <id|@username> [reason]   and   /unban <id|@username>   (admin only, private chat with the bot)
@@ -1129,9 +1213,9 @@ async function tryVerifyReferral(userId, joined) {
     }
 
     if (paid) {
-        notifyUser(inviterId, `Your friend is verified. You earned ${reward} points!`);
+        bg(notifyUser(inviterId, `Your friend is verified. You earned ${reward} points!`));
         for (const b of bonuses) {
-            notifyUser(inviterId, `Milestone reached: ${b.m} verified friends! Bonus +${b.bonus} points.`);
+            bg(notifyUser(inviterId, `Milestone reached: ${b.m} verified friends! Bonus +${b.bonus} points.`));
         }
     }
 }
@@ -1158,12 +1242,12 @@ app.get("/api/me", authenticate, async (req, res) => {
         }
 
         await createOrUpdateUser(req.telegramUser, referral);
-        pool.query(`UPDATE mr_users SET last_active = NOW() WHERE telegram_id = $1`, [telegramId]).catch(() => {});
+        bg(pool.query(`UPDATE mr_users SET last_active = NOW() WHERE telegram_id = $1`, [telegramId]));
 
         // finish pending task announcements / delete announcements of finished tasks (at most once a minute)
         if (Date.now() - lastTaskSweep > 60000) {
             lastTaskSweep = Date.now();
-            sweepTaskMessages(4000).catch(e => console.error("sweepTaskMessages", e.message));
+            bg(sweepTaskMessages(4000));
         }
 
         // if this user left a channel he promoted-joined, take the reward back (checked at most every 5 minutes per user)
@@ -1200,46 +1284,43 @@ app.get("/api/me", authenticate, async (req, res) => {
             return res.status(403).json({ ok: false, error: "Your account is banned." });
         }
 
-        const rankResult = await pool.query(
-            `SELECT COUNT(*) + 1 AS rank FROM mr_users WHERE is_banned = FALSE AND points > $1`,
-            [user.points]
-        );
-
         const sRes = await pool.query(`SELECT key, value FROM mr_app_settings`);
         const settings = {};
         for (const r of sRes.rows) settings[r.key] = Number(r.value);
 
-        const todayRes = await pool.query(
-            `SELECT COUNT(*)::int AS c FROM mr_ad_rewards
-             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`,
-            [telegramId]
-        );
-
-        // live BNB price (cached 60s) + current payout limits, shown in the app
-        const bnbPrice = null;   // payouts are USDT now, no BNB price needed
-        let limits = null;
-        try { limits = await getPayoutLimits(pool, settings); } catch (e) { console.error("limits", e.message); }
-
-        let withdrawNextAt = 0;
-        try { withdrawNextAt = await nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours); }
-        catch (e) { console.error("withdrawNextAt", e.message); }
-        let withdrawReq = null;
-        try { withdrawReq = await getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day, partnerNeeded(settings)); }
-        catch (e) { console.error("withdrawReq", e.message); }
-
-        let partner = { today: 0, points: 0, total: 0 };
-        try {
-            const pr = await pool.query(
+        // the rest does not depend on each other, so it runs in parallel
+        const [rankResult, todayRes, limits, withdrawNextAt, withdrawReq, partner] = await Promise.all([
+            pool.query(
+                `SELECT COUNT(*) + 1 AS rank FROM mr_users WHERE is_banned = FALSE AND points > $1`,
+                [user.points]
+            ),
+            pool.query(
+                `SELECT COUNT(*)::int AS c FROM mr_ad_rewards WHERE telegram_id = $1 AND created_at >= ${DAY_START}`,
+                [telegramId]
+            ),
+            getPayoutLimits(pool, settings).catch(e => { console.error("limits", e.message); return null; }),
+            nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours).catch(e => { console.error("withdrawNextAt", e.message); return 0; }),
+            getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day, partnerNeeded(settings)).catch(e => { console.error("withdrawReq", e.message); return null; }),
+            pool.query(
                 `SELECT COUNT(*) FILTER (WHERE created_at >= ${DAY_START})::int AS today,
                         COALESCE(SUM(reward) FILTER (WHERE created_at >= ${DAY_START}), 0) AS points,
                         COUNT(*)::int AS total
-                 FROM mr_partner_tasks WHERE telegram_id = $1`, [telegramId]);
-            partner = { today: pr.rows[0].today, points: Number(pr.rows[0].points), total: pr.rows[0].total };
-        } catch (e) { console.error("partner stats", e.message); }
+                 FROM mr_partner_tasks WHERE telegram_id = $1`, [telegramId]
+            ).then(pr => ({ today: pr.rows[0].today, points: Number(pr.rows[0].points), total: pr.rows[0].total }))
+             .catch(e => { console.error("partner stats", e.message); return { today: 0, points: 0, total: 0 }; })
+        ]);
+        const bnbPrice = null;   // payouts are USDT, the app still reads this field
+
+        // normal users only get the settings the app really shows; the admin gets everything
+        const isAdminUser = !!ADMIN_ID && telegramId === ADMIN_ID;
+        const publicSettings = {};
+        for (const [k, v] of Object.entries(settings)) {
+            if (isAdminUser || PUBLIC_SETTING_KEYS.has(k)) publicSettings[k] = v;
+        }
 
         res.json({
             ok: true,
-            settings,
+            settings: publicSettings,
             partner,
             withdraw_next_at: withdrawNextAt,
             withdraw_req: withdrawReq,
@@ -1269,7 +1350,7 @@ app.get("/api/me", authenticate, async (req, res) => {
         });
     } catch (error) {
         console.error("/api/me", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -1277,22 +1358,28 @@ app.get("/api/me", authenticate, async (req, res) => {
 
 app.get("/api/channels", authenticate, async (req, res) => {
     try {
-        const channels = await checkAllChannels(String(req.telegramUser.id));
+        const channels = await checkAllChannels(String(req.telegramUser.id), { fresh: true });
         res.json({ ok: true, channels, allJoined: allJoinedOf(channels) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
 /* =========================== AD REWARD =========================== */
 
-app.post("/api/ad-reward", authenticate, async (req, res) => {
+app.post("/api/ad-reward", authenticate, requireGate, async (req, res) => {
     try {
         await requireDatabase();
 
         const telegramId = String(req.telegramUser.id);
         const provider = req.body?.provider === "monetag" ? "monetag" : "adsgram";
         const strict = provider === "monetag" ? STRICT_MONETAG : STRICT_ADS;
+
+        // FAIL CLOSED: without the provider's secret there is no server-side proof that an ad was watched,
+        // so nothing is paid (before, the client could pick the provider and claim free points)
+        if (!strict) {
+            return res.status(503).json({ ok: false, error: "Ad rewards are temporarily unavailable." });
+        }
 
         if (provider === "monetag" && !MONETAG_ZONE_ID) {
             return res.status(400).json({ ok: false, error: "Monetag is not configured." });
@@ -1433,7 +1520,7 @@ app.post("/api/ad-reward", authenticate, async (req, res) => {
         });
     } catch (error) {
         console.error("/api/ad-reward", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -1525,7 +1612,7 @@ app.get("/api/adsgram-task-reward", async (req, res) => {
             given = true;
         } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
         finally { client.release(); }
-        if (given) notifyUser(userId, `Partner task completed! +${reward} points were added.`);
+        if (given) bg(notifyUser(userId, `Partner task completed! +${reward} points were added.`));
         res.json({ ok: true, reward });
     } catch (error) {
         console.error("/api/adsgram-task-reward", error.message);
@@ -1584,7 +1671,7 @@ app.get("/api/leaderboard", authenticate, async (req, res) => {
             }))
         });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -1599,7 +1686,7 @@ app.get("/api/rewards", authenticate, async (req, res) => {
         );
         res.json({ ok: true, rewards: result.rows });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -1647,7 +1734,7 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
 
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -1678,7 +1765,7 @@ app.post("/api/admin/reward", authenticate, requireAdmin, async (req, res) => {
 
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -1696,10 +1783,11 @@ function getPayer() {
 }
 
 // Sends USDT (BEP20 token transfer). The wallet also needs a little BNB for the gas fee.
+// The transaction is SIGNED first, its hash and raw bytes are saved in the database (hooks.onPrepared),
+// and only then it is broadcast. If the function dies at any point, the very same signed transaction
+// (same nonce) can be re-broadcast, so one request can never be paid twice.
 // A DB advisory lock makes sure two payouts never use the same nonce.
-// onSent(hash) is called right after the transaction is broadcast, so the hash is saved
-// in the database immediately (even if the serverless function is stopped afterwards).
-async function sendPayout(to, tokenAmount, onSent) {
+async function sendPayout(to, tokenAmount, hooks = {}) {
     const { wallet, provider } = getPayer();
     const token = new ethers.Contract(USDT_CONTRACT, ERC20_ABI, wallet);
     const lock = await pool.connect();
@@ -1717,19 +1805,50 @@ async function sendPayout(to, tokenAmount, onSent) {
             throw new Error("Transfer would fail: " + (e.shortMessage || e.message));
         }
         const feeData = await provider.getFeeData();
+        const gasPrice = feeData.gasPrice;
+        if (!gasPrice) throw new Error("Could not read the gas price.");
         const bnbBal = await provider.getBalance(wallet.address);
-        if (bnbBal < gasLimit * (feeData.gasPrice || 0n)) {
+        if (bnbBal < gasLimit * gasPrice) {
             throw new Error("Payout wallet has not enough BNB for the gas fee.");
         }
 
-        const tx = await token.transfer(to, amt, { gasLimit });
-        if (typeof onSent === "function") {
-            try { await onSent(tx.hash); } catch (e) { console.error("onSent", e.message); }
+        const nonce = await provider.getTransactionCount(wallet.address, "pending");
+        const signed = await wallet.signTransaction({
+            to: USDT_CONTRACT,
+            data: token.interface.encodeFunctionData("transfer", [to, amt]),
+            value: 0n, nonce, gasLimit, gasPrice, chainId: BSC_CHAIN_ID, type: 0
+        });
+        const hash = ethers.keccak256(signed);
+
+        // MUST be saved before anything is sent to the network
+        await hooks.onPrepared(hash, signed);
+
+        try {
+            await provider.broadcastTransaction(signed);
+        } catch (e) {
+            // maybe the network already knows it ("already known") - only if it really does not, the payout was NOT sent
+            const known = await provider.getTransaction(hash).catch(() => null);
+            if (!known) {
+                if (hooks.onUnsent) await hooks.onUnsent().catch(() => {});
+                throw new Error("Broadcast failed: " + (e.shortMessage || e.message));
+            }
         }
-        return tx.hash;
+        return hash;
     } finally {
         await lock.query("SELECT pg_advisory_unlock(778899)").catch(() => {});
         lock.release();
+    }
+}
+
+// "success" | "failed" (reverted on-chain, nothing was paid) | "pending" (no receipt yet)
+async function waitForReceipt(hash, ms) {
+    const { provider } = getPayer();
+    try {
+        const rc = await provider.waitForTransaction(hash, 1, ms);
+        if (!rc) return "pending";
+        return rc.status === 1 ? "success" : "failed";
+    } catch (e) {
+        return "pending";
     }
 }
 
@@ -1885,14 +2004,16 @@ async function syncAdminMessage(id, approve) {
     }
 }
 
-// Claims a request ('pending', or a 'processing' one that has been stuck for 3+ minutes),
-// sends the payout, then marks it approved.
+// Claims a request ('pending', or a 'processing' one that is stuck), makes sure the payout transaction
+// exists exactly once, waits for the blockchain confirmation, then marks it approved.
 async function approveWithdrawal(id, adminId) {
+    // stuck = 3+ minutes without any transaction, or 20+ seconds when the transaction was already sent (re-check it)
     const c = await pool.query(
         `UPDATE mr_withdrawals SET status = 'processing', processing_at = NOW()
          WHERE id = $1
            AND (status = 'pending'
-                OR (status = 'processing' AND (processing_at IS NULL OR processing_at < NOW() - INTERVAL '3 minutes')))
+                OR (status = 'processing' AND (processing_at IS NULL
+                    OR processing_at < NOW() - (CASE WHEN tx_hash IS NULL THEN INTERVAL '3 minutes' ELSE INTERVAL '20 seconds' END))))
          RETURNING *`,
         [id]
     );
@@ -1901,29 +2022,68 @@ async function approveWithdrawal(id, adminId) {
     }
     const row = c.rows[0];
 
-    // if an earlier attempt already broadcast the transaction, do not pay twice
     let txHash = row.tx_hash || null;
-    if (!txHash) {
-        try {
+    try {
+        if (txHash) {
+            // an earlier attempt already signed this payout: never create a second one, only re-send the same signed transaction
+            if (row.raw_tx) {
+                const { provider } = getPayer();
+                await provider.broadcastTransaction(row.raw_tx).catch(() => {});   // "already known" etc. is fine
+            }
+        } else {
             // USDT is 1:1 with USD: pay exactly the USD value saved with the request
             if (row.usd_amount === null || row.usd_amount === undefined) {
                 throw new Error("This old request has no USDT value saved. Please reject it.");
             }
             const fresh = Math.floor(Number(row.usd_amount) * 1e8) / 1e8;
             if (!(fresh > 0)) throw new Error("Amount is too small to pay out.");
+
+            // hard safety caps (they do not depend on the Settings, so a stolen admin account cannot empty the wallet)
+            if (MAX_SINGLE_PAYOUT_USD > 0 && fresh > MAX_SINGLE_PAYOUT_USD) {
+                throw new Error("Amount is above the safety cap per payout ($" + MAX_SINGLE_PAYOUT_USD + ").");
+            }
+            if (HARD_DAILY_PAYOUT_USD > 0) {
+                const d = await pool.query(
+                    `SELECT COALESCE(SUM(usd_amount), 0) AS s FROM mr_withdrawals
+                     WHERE id <> $1 AND (status = 'approved' OR (status = 'processing' AND tx_hash IS NOT NULL))
+                       AND COALESCE(processed_at, processing_at) >= ${DAY_START}`,
+                    [id]
+                );
+                if (Number(d.rows[0].s) + fresh > HARD_DAILY_PAYOUT_USD + 1e-9) {
+                    throw new Error("The daily safety cap for payouts ($" + HARD_DAILY_PAYOUT_USD + ") is reached.");
+                }
+            }
+
             await pool.query(`UPDATE mr_withdrawals SET token_amount = $2 WHERE id = $1`, [id, fresh]);
             row.token_amount = fresh;
-            txHash = await sendPayout(row.address, Number(row.token_amount), async h => {
-                await pool.query(`UPDATE mr_withdrawals SET tx_hash = $2 WHERE id = $1`, [id, h]);
+            txHash = await sendPayout(row.address, fresh, {
+                onPrepared: (h, raw) => pool.query(`UPDATE mr_withdrawals SET tx_hash = $2, raw_tx = $3 WHERE id = $1`, [id, h, raw]),
+                onUnsent: () => pool.query(`UPDATE mr_withdrawals SET tx_hash = NULL, raw_tx = NULL WHERE id = $1`, [id])
             });
-        } catch (e) {
-            console.error("payout failed", e.message);
-            await pool.query(
-                `UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1 AND tx_hash IS NULL`,
-                [id]
-            ).catch(() => {});
-            return { ok: false, error: "Payment failed: " + e.message };
         }
+    } catch (e) {
+        console.error("payout failed", e.message);
+        await pool.query(
+            `UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1 AND tx_hash IS NULL`,
+            [id]
+        ).catch(() => {});
+        return { ok: false, error: "Payment failed: " + e.message };
+    }
+
+    // do NOT mark it paid before the blockchain confirms it
+    const state = await waitForReceipt(txHash, RECEIPT_WAIT_MS);
+    if (state === "failed") {
+        await pool.query(
+            `UPDATE mr_withdrawals SET status = 'pending', tx_hash = NULL, raw_tx = NULL WHERE id = $1`,
+            [id]
+        ).catch(() => {});
+        return { ok: false, error: "The transaction failed on the blockchain. Nothing was paid. Check the payout wallet, then approve again." };
+    }
+    if (state === "pending") {
+        return {
+            ok: false,
+            error: "The payment was sent but is not confirmed yet (" + shortAddr(txHash) + "). Do NOT pay it again: wait a minute and press Approve again to finish it."
+        };
     }
 
     await pool.query(
@@ -2061,9 +2221,14 @@ async function handleAdminCallback(cb) {
     }
 }
 
-app.post("/api/withdraw", authenticate, async (req, res) => {
+app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
     try {
         await requireDatabase();
+
+        // a withdrawal needs a fresh session (the Telegram data is only valid for one hour here)
+        if (Math.floor(Date.now() / 1000) - Number(req.initAuthDate || 0) > WITHDRAW_MAX_AUTH_AGE) {
+            return res.status(401).json({ ok: false, error: "Your session is too old for a withdrawal. Please close the app and open it again." });
+        }
 
         const telegramId = String(req.telegramUser.id);
         const amount = Number(req.body?.amount);
@@ -2191,6 +2356,17 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
                 });
             }
 
+            // one wallet address = one account (checked inside the lock, so two requests cannot slip through together)
+            const dupAddr = await client.query(
+                `SELECT 1 FROM mr_withdrawals
+                 WHERE LOWER(address) = LOWER($1) AND telegram_id <> $2 AND status <> 'rejected' LIMIT 1`,
+                [address, telegramId]
+            );
+            if (dupAddr.rows.length) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ ok: false, error: "This wallet address is already used by another account." });
+            }
+
             const u = await client.query(
                 `SELECT points, is_banned FROM mr_users WHERE telegram_id = $1 FOR UPDATE`,
                 [telegramId]
@@ -2315,7 +2491,7 @@ app.post("/api/withdraw", authenticate, async (req, res) => {
         });
     } catch (error) {
         console.error("/api/withdraw", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2336,7 +2512,7 @@ app.get("/api/withdrawals", authenticate, async (req, res) => {
             }))
         });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2371,7 +2547,7 @@ app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) =
             }))
         });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2384,7 +2560,7 @@ app.post("/api/admin/withdrawals/:id/approve", authenticate, requireAdmin, async
         res.status(r.ok ? 200 : 400).json(r);
     } catch (error) {
         console.error("/api/admin/withdrawals/approve", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2398,7 +2574,7 @@ app.post("/api/admin/withdrawals/:id/reject", authenticate, requireAdmin, async 
         res.status(r.ok ? 200 : 400).json(r);
     } catch (error) {
         console.error("/api/admin/withdrawals/reject", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2424,7 +2600,7 @@ app.get("/api/referrals", authenticate, async (req, res) => {
         );
         res.json({ ok: true, friends: r.rows, claimed: cl.rows.map(x => x.milestone) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2432,7 +2608,7 @@ app.get("/api/referrals", authenticate, async (req, res) => {
 
 const PROMO_RE = /^[A-Z0-9_-]{3,32}$/;
 
-app.post("/api/promo/redeem", authenticate, async (req, res) => {
+app.post("/api/promo/redeem", authenticate, requireGate, async (req, res) => {
     try {
         await requireDatabase();
         const telegramId = String(req.telegramUser.id);
@@ -2491,7 +2667,7 @@ app.post("/api/promo/redeem", authenticate, async (req, res) => {
         res.json({ ok: true, reward });
     } catch (error) {
         console.error("/api/promo/redeem", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2504,7 +2680,7 @@ app.get("/api/admin/promos", authenticate, requireAdmin, async (req, res) => {
         );
         res.json({ ok: true, promos: r.rows.map(p => ({ ...p, reward: Number(p.reward) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2536,7 +2712,7 @@ app.post("/api/admin/promos", authenticate, requireAdmin, async (req, res) => {
         }
         res.json({ ok: true, code });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2549,7 +2725,7 @@ app.post("/api/admin/promos/:code/delete", authenticate, requireAdmin, async (re
         await pool.query(`DELETE FROM mr_promo_codes WHERE code = $1`, [code]);
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2576,7 +2752,7 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
         for (const k of ["paid_total", "paid_today", "pending_amount", "budget_used"]) x[k] = Number(x[k]);
         res.json({ ok: true, stats: x });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2602,7 +2778,7 @@ app.get("/api/admin/users", authenticate, requireAdmin, async (req, res) => {
         }
         res.json({ ok: true, users: r.rows.map(u => ({ ...u, points: Number(u.points) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2625,7 +2801,7 @@ app.post("/api/admin/users/:id/ban", authenticate, requireAdmin, async (req, res
         );
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2656,7 +2832,7 @@ app.post("/api/admin/users/:id/points", authenticate, requireAdmin, async (req, 
         );
         res.json({ ok: true, points: Number(r.rows[0].points) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2710,7 +2886,7 @@ app.post("/api/admin/broadcast", authenticate, requireAdmin, async (req, res) =>
         res.json({ ok: true, id: String(id), ...out });
     } catch (error) {
         console.error("/api/admin/broadcast", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2724,7 +2900,7 @@ app.post("/api/admin/broadcast/:id/continue", authenticate, requireAdmin, async 
         res.json({ ok: true, id: String(b.rows[0].id), ...out });
     } catch (error) {
         console.error("/api/admin/broadcast/continue", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -2839,7 +3015,7 @@ app.get("/api/setup-webhook", async (req, res) => {
         if (!WEBHOOK_SECRET) {
             return res.status(503).json({ ok: false, error: "Set the WEBHOOK_SECRET environment variable first." });
         }
-        if (req.query.key !== WEBHOOK_SECRET) {
+        if (!safeSecretEqual(req.query.key, SETUP_KEY || WEBHOOK_SECRET)) {
             return res.status(403).json({ ok: false, error: "Wrong key." });
         }
         const url = APP_URL + "/api/telegram-webhook";
@@ -2885,11 +3061,11 @@ app.get("/api/tasks", authenticate, async (req, res) => {
         );
         res.json({ ok: true, tasks: r.rows.map(t => ({ ...t, reward: Number(t.reward) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
-app.post("/api/tasks/:id/start", authenticate, async (req, res) => {
+app.post("/api/tasks/:id/start", authenticate, requireGate, async (req, res) => {
     try {
         await requireDatabase();
         if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
@@ -2913,11 +3089,11 @@ app.post("/api/tasks/:id/start", authenticate, async (req, res) => {
         );
         res.json({ ok: true, already_member: !!ins.rows[0].was_member });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
-app.post("/api/tasks/:id/claim", authenticate, async (req, res) => {
+app.post("/api/tasks/:id/claim", authenticate, requireGate, async (req, res) => {
     try {
         await requireDatabase();
         if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
@@ -2988,12 +3164,12 @@ app.post("/api/tasks/:id/claim", authenticate, async (req, res) => {
         if (task.max_users > 0) {
             try {
                 const cnt = await pool.query(`SELECT COUNT(*)::int AS c FROM mr_task_claims WHERE task_id = $1 AND completed_at IS NOT NULL`, [task.id]);
-                if (cnt.rows[0].c >= task.max_users) await cleanupTaskMessages(task.id, 6000);
+                if (cnt.rows[0].c >= task.max_users) bg(cleanupTaskMessages(task.id, 6000));
             } catch (e) { console.error("cleanupTaskMessages", e.message); }
         }
     } catch (error) {
         console.error("/api/tasks/claim", error);
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -3007,7 +3183,7 @@ app.get("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
         );
         res.json({ ok: true, tasks: r.rows.map(t => ({ ...t, reward: Number(t.reward) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -3040,9 +3216,9 @@ app.post("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
         );
         res.json({ ok: true });
         // tell everybody about the new task (the cron sweep finishes the rest if time runs out)
-        await announceTask(ins.rows[0].id, 6000).catch(e => console.error("announceTask", e.message));
+        bg(announceTask(ins.rows[0].id, 6000));
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -3063,9 +3239,9 @@ app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, 
             client.release();
         }
         res.json({ ok: true });
-        await cleanupTaskMessages(req.params.id, 6000).catch(e => console.error("cleanupTaskMessages", e.message));
+        bg(cleanupTaskMessages(req.params.id, 6000));
     } catch (error) {
-        res.status(500).json({ ok: false, error: error.message });
+        res.status(500).json({ ok: false, error: publicError(error, req) });
     }
 });
 
@@ -3081,7 +3257,7 @@ const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale
 
 const wrap = fn => async (req, res) => {
     try { await fn(req, res); }
-    catch (e) { console.error(req.path, e.message); if (!res.headersSent) res.status(500).json({ ok: false, error: e.message }); }
+    catch (e) { console.error(req.path, e.message); if (!res.headersSent) res.status(500).json({ ok: false, error: publicError(e, req) }); }
 };
 
 async function settingsMap() {
@@ -3140,8 +3316,10 @@ async function runReminders() {
 // Vercel cron / external cron:  /api/cron/reminders?key=WEBHOOK_SECRET   (or  Authorization: Bearer CRON_SECRET)
 app.get("/api/cron/reminders", wrap(async (req, res) => {
     const bearer = String(req.headers.authorization || "");
-    const ok = (WEBHOOK_SECRET && safeSecretEqual(req.query.key, WEBHOOK_SECRET)) ||
-               (CRON_SECRET && safeSecretEqual(bearer, "Bearer " + CRON_SECRET));
+    // with CRON_SECRET set, only it is accepted (the old WEBHOOK_SECRET key keeps working until you set CRON_SECRET)
+    const ok = CRON_SECRET
+        ? (safeSecretEqual(req.query.key, CRON_SECRET) || safeSecretEqual(bearer, "Bearer " + CRON_SECRET))
+        : !!(WEBHOOK_SECRET && safeSecretEqual(req.query.key, WEBHOOK_SECRET));
     if (!ok) return res.status(403).json({ ok: false, error: "Wrong key." });
     let swept = 0;
     try { swept = await penalizeLeavers(null, 40, 0); } catch (e) { console.error("sweep", e.message); }
@@ -3201,7 +3379,7 @@ app.get("/api/spin", authenticate, wrap(async (req, res) => {
     res.json({ ok: true, ...(await spinInfo(pool, String(req.telegramUser.id), await settingsMap())) });
 }));
 
-app.post("/api/spin", authenticate, wrap(async (req, res) => {
+app.post("/api/spin", authenticate, requireGate, wrap(async (req, res) => {
     const id = await activeUser(req, res);
     if (!id) return;
     const st = await settingsMap();
@@ -3327,7 +3505,7 @@ async function applyLeavePenalty(claimId) {
         info = { telegram_id, channel, take };
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
-    if (info) notifyUser(info.telegram_id, `You left ${info.channel}. -${info.take} points were taken back.\n\nIf you join ${info.channel} again, you can complete this task again and earn the reward.`);
+    if (info) bg(notifyUser(info.telegram_id, `You left ${info.channel}. -${info.take} points were taken back.\n\nIf you join ${info.channel} again, you can complete this task again and earn the reward.`));
     return true;
 }
 
@@ -3404,12 +3582,12 @@ app.use("/api", (req, res) => {
     res.status(404).json({ ok: false, error: "API route not found." });
 });
 
-const BLOCKED_FILES = new Set(["/server.js", "/package.json", "/package-lock.json", "/vercel.json"]);
-const staticFiles = express.static(__dirname, { index: false, dotfiles: "deny" });
-app.use((req, res, next) => {
-    if (BLOCKED_FILES.has(req.path.toLowerCase())) return res.status(404).end();
-    staticFiles(req, res, next);
-});
+// Only index.html (below) and an optional "public" folder are served. The project folder itself
+// (server.js, package.json, ...) is never served, whatever way the path is written.
+const PUBLIC_DIR = path.join(__dirname, "public");
+if (fs.existsSync(PUBLIC_DIR)) {
+    app.use(express.static(PUBLIC_DIR, { index: false, dotfiles: "deny" }));
+}
 
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
