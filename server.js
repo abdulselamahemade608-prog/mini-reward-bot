@@ -35,7 +35,7 @@ const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
 // Adsgram "Task" block (partner tasks: visit a website / join a channel ...), e.g. "task-12345"
 const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "").trim();
 const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
-const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
+const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 5);
 
 /* ---- BNB auto payment (native BNB on BNB Smart Chain) ---- */
 const BSC_RPC_URL = String(process.env.BSC_RPC_URL || "").trim();
