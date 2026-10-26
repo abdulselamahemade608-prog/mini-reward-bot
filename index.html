@@ -251,6 +251,161 @@ nav button.active svg{color:var(--cyan);filter:drop-shadow(0 0 6px rgba(34,211,2
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* =========================================================
+   ADEWA EARN — POLISHED UI LAYER
+   Visual-only overrides. Existing HTML/JS behavior is kept.
+   ========================================================= */
+:root{
+  --bg:#070b14;
+  --bg2:#0b1222;
+  --card:#101a2d;
+  --card2:#14213a;
+  --line:rgba(148,163,184,.14);
+  --line2:rgba(148,163,184,.24);
+  --text:#f4f7ff;
+  --muted:#91a0bd;
+  --cyan:#56e6f2;
+  --blue:#648bff;
+  --violet:#9a7bff;
+  --magenta:#e879f9;
+  --green:#48e5ad;
+  --amber:#ffd166;
+  --red:#ff7189;
+  --pink:#f49acb;
+  --grad:linear-gradient(135deg,#42d9e8 0%,#648bff 52%,#9b70f5 100%);
+  --glow-c:0 0 22px rgba(66,217,232,.18);
+  --shadow:0 1px 0 rgba(255,255,255,.035) inset,0 12px 32px rgba(0,0,0,.24);
+}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{
+  max-width:680px;
+  margin:0 auto;
+  padding:18px 16px calc(116px + env(safe-area-inset-bottom));
+  background-color:var(--bg);
+  letter-spacing:.005em;
+}
+body::before{
+  background:
+    radial-gradient(480px 300px at 100% 0%,rgba(100,139,255,.17),transparent 72%),
+    radial-gradient(400px 300px at 0% 35%,rgba(154,123,255,.12),transparent 72%),
+    radial-gradient(420px 280px at 50% 100%,rgba(66,217,232,.075),transparent 72%);
+}
+::selection{background:rgba(86,230,242,.25);color:#fff}
+.view{animation:fadeIn .32s ease both}
+.head{gap:13px;margin-bottom:20px}
+.avatar{width:52px;height:52px;border-color:rgba(86,230,242,.58);box-shadow:0 0 0 4px rgba(86,230,242,.06),0 5px 18px rgba(0,0,0,.22)}
+.head .t{font-size:12px;letter-spacing:.04em}
+.head .n{font-size:19px;font-weight:800}
+.pill{background:rgba(16,26,45,.82);border-color:var(--line2);box-shadow:0 6px 18px rgba(0,0,0,.12)}
+h2{margin:26px 0 13px;font-size:17px;letter-spacing:-.025em}
+.card,.stat{
+  border-color:var(--line);
+  background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.008)),var(--card);
+  box-shadow:var(--shadow);
+  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+}
+.card{border-radius:21px;padding:17px;margin-bottom:13px}
+@media (hover:hover){
+  .card:hover{border-color:rgba(100,139,255,.3);transform:translateY(-1px)}
+}
+.balance{
+  border-radius:27px;
+  padding:24px 21px;
+  box-shadow:0 18px 44px rgba(0,0,0,.3),0 0 28px rgba(100,139,255,.12);
+}
+.balance small{letter-spacing:1.7px;font-size:11px}
+.balance .big{font-size:clamp(36px,10vw,48px);letter-spacing:-1.7px;margin:8px 0 18px}
+.notice{border-radius:16px;backdrop-filter:blur(8px)}
+.btn{
+  min-height:50px;
+  border-radius:16px;
+  font-weight:750;
+  letter-spacing:.005em;
+  box-shadow:0 8px 20px rgba(79,139,255,.17);
+  transition:transform .16s ease,filter .16s ease,box-shadow .16s ease;
+}
+.btn:active{transform:scale(.985)}
+.btn:disabled{filter:saturate(.55)}
+.btn.glass,.btn.dark{border-color:var(--line2)}
+.btn.green{box-shadow:0 8px 20px rgba(31,227,160,.13)}
+.btn.red{box-shadow:0 8px 20px rgba(255,84,112,.13)}
+.stats{gap:9px}
+.stat{border-radius:18px;padding:15px 7px 13px}
+.stat .v{font-size:clamp(16px,4.5vw,20px)}
+.stat .l{font-size:11px}
+.ib{border-radius:14px}
+.line{gap:13px}
+.line .x b{font-size:14px}
+.line .x span{line-height:1.55}
+.progress{height:9px;background:rgba(255,255,255,.075)}
+.progress i{box-shadow:0 0 10px rgba(31,227,160,.25)}
+.linkbox{border-radius:15px;background:rgba(34,211,238,.045)}
+input,select,textarea{
+  border-radius:15px;
+  background:rgba(4,8,17,.65);
+  border-color:rgba(148,163,184,.22);
+}
+input:focus,select:focus,textarea:focus{
+  border-color:rgba(86,230,242,.8);
+  box-shadow:0 0 0 3px rgba(86,230,242,.10);
+}
+.chip{border-color:var(--line2);transition:all .16s ease}
+.chip.on,.seg button.on{box-shadow:0 5px 16px rgba(100,139,255,.2)}
+.badge{letter-spacing:.01em}
+nav{
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+  width:min(650px,calc(100% - 24px));
+  bottom:calc(10px + env(safe-area-inset-bottom));
+  padding:6px;
+  border-radius:23px;
+  background:rgba(9,15,29,.91);
+  border-color:rgba(148,163,184,.2);
+  box-shadow:0 12px 35px rgba(0,0,0,.42),0 1px 0 rgba(255,255,255,.035) inset;
+}
+nav button{padding:9px 2px;border-radius:17px;font-size:10px;gap:5px}
+nav button svg{width:21px;height:21px}
+nav button.active{background:linear-gradient(135deg,rgba(66,217,232,.14),rgba(154,123,255,.17))}
+#modal{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#modal .sheet{
+  border-radius:28px 28px 0 0;
+  background:linear-gradient(180deg,#121e36,#0a1120);
+  border-color:rgba(148,163,184,.2);
+  box-shadow:0 -15px 55px rgba(0,0,0,.42);
+}
+#splash{
+  background:
+    radial-gradient(550px 420px at 50% 35%,rgba(38,75,150,.42),transparent 72%),
+    #070b14;
+}
+.logo .core{border-radius:23px}
+.gate{background:radial-gradient(520px 380px at 50% 8%,rgba(100,139,255,.18),transparent 72%),var(--bg)}
+.gate-in h1{font-size:25px;letter-spacing:-.6px}
+.gate-in p{line-height:1.65}
+.receipt{border-radius:16px}
+.pt-slot{border-radius:16px;border-color:var(--line)}
+.pt-slot .pt-btn{border-radius:12px}
+.empty{line-height:1.7}
+button,input,select,textarea{-webkit-appearance:none;appearance:none}
+button{touch-action:manipulation}
+@media(min-width:560px){
+  body{padding-left:22px;padding-right:22px}
+  .balance{padding:27px}
+  .card{padding:19px}
+}
+@media(max-width:360px){
+  body{padding-left:12px;padding-right:12px}
+  .balance{padding:19px 16px}
+  .balance .big{font-size:35px}
+  .stats{gap:6px}
+  .stat{padding-left:4px;padding-right:4px}
+  nav{width:calc(100% - 18px)}
+  nav button{font-size:9px}
+}
+
 </style>
 </head>
 <body>
