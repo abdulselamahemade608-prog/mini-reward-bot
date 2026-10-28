@@ -8,295 +8,178 @@
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <!-- Monetag SDK (zone 11984693) -->
 <script src="https://libtl.com/sdk.js" data-zone="11984693" data-sdk="show_11984693"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
-  color-scheme:dark;
-  --bg:#06100c;--bg2:#08120e;--card:#0e1b16;--card2:#13241d;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.14);
-  --text:#f1f7f3;--muted:#86a095;
-  --cyan:#2dd4a0;--blue:#38bdf8;--violet:#a3e635;--magenta:#f5b942;--green:#1fe3a0;--amber:#fbbf24;--red:#ff5470;--pink:#f472b6;
-  --grad:linear-gradient(135deg,#2dd4a0 0%,#a3e635 100%);
-  --glow-c:0 0 24px rgba(45,212,160,.28);
-  --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 8px 24px rgba(0,0,0,.35);
+  --bg:#070b16;--card:#0f1730;--card2:#16213f;--line:#22305a;
+  --text:#f1f5ff;--muted:#8b9bc2;
+  --blue:#3b82f6;--cyan:#06b6d4;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--purple:#8b5cf6;--pink:#ec4899;
 }
-html{background:var(--bg);-webkit-text-size-adjust:100%}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  color:var(--text);min-height:100vh;line-height:1.4;-webkit-font-smoothing:antialiased;
-  padding:16px 16px calc(112px + env(safe-area-inset-bottom));
-}
-body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+html,body{background:var(--bg)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);min-height:100vh;
+  padding:16px 16px calc(104px + env(safe-area-inset-bottom));
   background:
-    radial-gradient(520px 340px at 95% -8%,rgba(56,189,248,.22),transparent 70%),
-    radial-gradient(460px 320px at -12% 22%,rgba(163,230,53,.16),transparent 70%),
-    radial-gradient(420px 300px at 50% 108%,rgba(45,212,160,.10),transparent 70%),
-    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px) 0 0/34px 34px,
-    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px) 0 0/34px 34px}
+    radial-gradient(520px 320px at 90% -5%,rgba(59,130,246,.22),transparent 70%),
+    radial-gradient(480px 300px at -10% 20%,rgba(139,92,246,.18),transparent 70%),var(--bg);
+  background-attachment:fixed}
 .hidden{display:none!important}
 svg{display:block}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
 
-/* ---------- icon chips (neon on dark) ---------- */
-.ib{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex:none;border:1px solid transparent}
-.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 6px currentColor)}
-.ib.sm{width:32px;height:32px;border-radius:10px}
-.ib.sm svg{width:18px;height:18px}
-.ib.blue{background:rgba(56,189,248,.14);color:#7dd3fc;border-color:rgba(56,189,248,.3)}
-.ib.green{background:rgba(31,227,160,.12);color:#1fe3a0;border-color:rgba(31,227,160,.3)}
-.ib.orange{background:rgba(251,191,36,.12);color:#fbbf24;border-color:rgba(251,191,36,.3)}
-.ib.purple{background:rgba(163,230,53,.16);color:#c4b5fd;border-color:rgba(163,230,53,.35)}
-.ib.pink{background:rgba(244,114,182,.14);color:#f472b6;border-color:rgba(244,114,182,.32)}
-.ib.teal{background:rgba(45,212,160,.12);color:#2dd4a0;border-color:rgba(45,212,160,.3)}
-.ib.redg{background:rgba(255,84,112,.13);color:#ff6b84;border-color:rgba(255,84,112,.32)}
-button.ib{cursor:pointer}
+/* icons */
+.ib{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ib.sm{width:32px;height:32px;border-radius:10px}.ib.sm svg{width:18px;height:18px}
+.blue{background:linear-gradient(135deg,#3b82f6,#06b6d4)}
+.green{background:linear-gradient(135deg,#22c55e,#10b981)}
+.orange{background:linear-gradient(135deg,#f59e0b,#f97316)}
+.purple{background:linear-gradient(135deg,#8b5cf6,#6366f1)}
+.pink{background:linear-gradient(135deg,#ec4899,#f43f5e)}
+.teal{background:linear-gradient(135deg,#14b8a6,#0ea5e9)}
+.redg{background:linear-gradient(135deg,#ef4444,#f97316)}
 
-/* ---------- splash ---------- */
-#splash{position:fixed;inset:0;z-index:200;background:radial-gradient(600px 420px at 50% 40%,#13392b,#06100c 72%);
+/* splash */
+#splash{position:fixed;inset:0;z-index:200;background:radial-gradient(600px 400px at 50% 40%,#16275a,#070b16 70%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .6s,transform .6s}
-#splash.out{opacity:0;transform:scale(1.05);pointer-events:none}
+#splash.out{opacity:0;transform:scale(1.06);pointer-events:none}
 .logo{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
-.logo .ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#2dd4a0;border-right-color:#a3e635;animation:spin 1.4s linear infinite;filter:drop-shadow(0 0 8px rgba(45,212,160,.6))}
-.logo .ring.r2{inset:12px;border-top-color:#38bdf8;border-right-color:#f5b942;animation-duration:2s;animation-direction:reverse}
+.logo .ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#3b82f6;border-right-color:#8b5cf6;animation:spin 1.4s linear infinite}
+.logo .ring.r2{inset:12px;border-top-color:#06b6d4;border-right-color:#ec4899;animation-duration:2s;animation-direction:reverse}
 .logo .core{width:68px;height:68px;border-radius:22px;display:flex;align-items:center;justify-content:center;color:#fff;
-  background:var(--grad);box-shadow:0 0 44px rgba(56,189,248,.65);animation:pulse 1.6s ease-in-out infinite}
+  background:linear-gradient(135deg,#3b82f6,#8b5cf6);box-shadow:0 0 40px rgba(99,102,241,.7);animation:pulse 1.6s ease-in-out infinite}
 .logo .core svg{width:36px;height:36px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.sp-t1{font-size:14px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;animation:fadeUp .8s .2s both}
-.sp-t2{font-size:28px;font-weight:800;text-align:center;padding:0 24px;letter-spacing:-.4px;animation:fadeUp .8s .5s both;
-  background:linear-gradient(90deg,#fff,#a7f3d0 60%,#fde68a);-webkit-background-clip:text;background-clip:text;color:transparent;
-  max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-t1{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;animation:fadeUp .8s .2s both}
+.sp-t2{font-size:28px;font-weight:800;text-align:center;padding:0 24px;animation:fadeUp .8s .5s both;
+  background:linear-gradient(90deg,#fff,#9db8ff);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar{width:160px;height:5px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;animation:fadeUp .8s .8s both}
-.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2dd4a0,#a3e635,#f5b942);box-shadow:0 0 12px rgba(45,212,160,.7);animation:load 1.8s .6s ease-out forwards}
-
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899);animation:load 1.8s .6s ease-out forwards}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes load{to{width:100%}}
-@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes shine{0%{transform:translateX(-120%)}100%{transform:translateX(220%)}}
 
-/* ---------- toast ---------- */
+/* toast */
 .toast{position:fixed;top:calc(12px + env(safe-area-inset-top));left:14px;right:14px;z-index:150;padding:13px 16px;border-radius:14px;
-  font-size:14px;font-weight:600;background:#16271f;color:#fff;border:1px solid var(--line2);box-shadow:0 12px 32px rgba(0,0,0,.55);animation:fadeIn .25s both}
-.toast.ok{background:#07281f;color:#5dfcc0;border:1px solid rgba(31,227,160,.45);box-shadow:0 12px 32px rgba(0,0,0,.55),0 0 20px rgba(31,227,160,.18)}
-.toast.err{background:#2c0e17;color:#ff9aab;border:1px solid rgba(255,84,112,.45)}
+  font-size:14px;font-weight:600;background:#2a2a40;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:fadeIn .25s both}
+.toast.ok{background:#0f3d28;color:#7dffb0;border:1px solid #1f7a4d}
+.toast.err{background:#451a1a;color:#ffb0b0;border:1px solid #8a2d2d}
 
-/* ---------- layout ---------- */
-.view{animation:fadeIn .25s both}
+/* layout */
+.view{animation:fadeIn .35s both}
 .head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;background:var(--grad);border:2px solid rgba(45,212,160,.55);box-shadow:0 0 16px rgba(45,212,160,.3)}
+.avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.15)}
 .head .t{font-size:13px;color:var(--muted)}
-.head .n{font-size:18px;font-weight:700;letter-spacing:-.2px;max-width:52vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill{margin-left:auto;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid var(--line2);padding:5px 12px 5px 5px;border-radius:30px;font-size:13px;font-weight:700;backdrop-filter:blur(8px)}
-h2{font-size:17px;font-weight:700;letter-spacing:-.2px;margin:24px 0 12px;display:flex;align-items:center;gap:10px}
-.card{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012)),var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
-
-/* balance: the neon centrepiece */
-.balance{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:14px;color:#fff;border:1px solid transparent;
-  background:
-    radial-gradient(320px 200px at 100% 0%,rgba(56,189,248,.35),transparent 65%),
-    radial-gradient(280px 200px at 0% 100%,rgba(245,185,66,.22),transparent 65%),
-    linear-gradient(160deg,#0c1f18,#08160f) padding-box,
-    linear-gradient(135deg,#2dd4a0,#38bdf8 45%,#f5b942) border-box;
-  box-shadow:0 0 36px rgba(56,189,248,.25),0 18px 40px rgba(0,0,0,.5)}
-.balance small{color:#9fd8c0;font-size:12px;letter-spacing:1.4px;font-weight:700}
-.balance .big{font-size:46px;font-weight:800;margin:4px 0 16px;letter-spacing:-1.4px;font-variant-numeric:tabular-nums;line-height:1.1;text-shadow:0 0 28px rgba(45,212,160,.45)}
-.bnbline{margin:-10px 0 16px;font-size:14px;font-weight:700;color:var(--green)}
-.bnbline .sub{font-size:12px;font-weight:500;color:var(--muted);margin-top:3px}
-.notice{background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.35);color:#fcd34d;border-radius:14px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.6;white-space:pre-line}
-
+.head .n{font-size:18px;font-weight:700;max-width:52vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);padding:7px 12px;border-radius:30px;font-size:13px;font-weight:700}
+h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:12px}
+.balance{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:14px;
+  background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 60%,#be185d 120%);box-shadow:0 16px 40px rgba(76,29,149,.45)}
+.balance::after{content:"";position:absolute;top:0;bottom:0;width:60px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);animation:shine 4s infinite}
+.balance small{opacity:.85;font-size:13px;letter-spacing:.5px}
+.balance .big{font-size:44px;font-weight:800;margin:4px 0 16px;letter-spacing:-1px}
+.bnbline{margin:-10px 0 16px;font-size:14px;font-weight:700}
+.bnbline .sub{font-size:12px;font-weight:500;opacity:.8;margin-top:3px}
+.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fbbf24;border-radius:14px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.6;white-space:pre-line}
+/* withdraw receipt card */
+#modal .sheet.rcpt{padding:0;overflow:hidden}
+.rc-top{padding:24px 18px 20px;text-align:center;background:linear-gradient(135deg,#16a34a 0%,#0d9488 55%,#0ea5e9 100%);position:relative}
+.rc-top::after{content:"";position:absolute;top:0;bottom:0;width:70px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.25),transparent);animation:shine 3.5s infinite}
+.rc-ic{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;animation:pop .55s both;box-shadow:0 0 0 8px rgba(255,255,255,.12)}
+.rc-ic svg{width:32px;height:32px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.rc-t{font-size:19px;font-weight:800;color:#fff}
+.rc-s{font-size:13px;color:rgba(255,255,255,.9);margin-top:4px}
+.rc-amt{text-align:center;padding:20px 16px 8px}
+.rc-amt small{display:block;color:var(--muted);font-size:12px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:4px}
+.rc-amt b{font-size:36px;font-weight:800;color:#4ade80;letter-spacing:-.5px}
+.rc-amt i{font-size:15px;font-style:normal;color:var(--muted);margin-left:4px;font-weight:700}
+.rc-rows{margin:12px 18px 0;border-top:2px dashed #2b3b6b;padding-top:6px}
+.rc-rows div{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.rc-rows div:last-child{border-bottom:0}
+.rc-rows span{color:var(--muted);flex:none}
+.rc-rows b{text-align:right;word-break:break-word;max-width:64%}
+.rc-rows .pend{background:rgba(245,158,11,.18);color:#fbbf24;padding:3px 10px;border-radius:20px;font-size:12px}
+.rc-foot{padding:16px 18px calc(18px + env(safe-area-inset-bottom))}
+@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
-
-/* ---------- buttons ---------- */
-.btn{border:0;border-radius:15px;padding:14px;min-height:48px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
-  background:var(--grad);box-shadow:0 0 22px rgba(56,189,248,.38),0 6px 16px rgba(0,0,0,.4);transition:transform .12s,opacity .2s,box-shadow .2s;width:100%}
+.btn{border:0;border-radius:16px;padding:15px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
+  background:linear-gradient(135deg,#3b82f6,#6366f1);box-shadow:0 8px 20px rgba(59,130,246,.35);transition:transform .12s,opacity .2s;width:100%}
 .btn:active{transform:scale(.97)}
-.btn:disabled{opacity:.45;box-shadow:none}
-.btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.btn.glass{background:rgba(255,255,255,.08);box-shadow:none;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18)}
-.btn.green{color:#02150d;background:linear-gradient(135deg,#1fe3a0,#2dd4a0);box-shadow:0 0 22px rgba(31,227,160,.35),0 6px 16px rgba(0,0,0,.4)}
-.btn.red{background:linear-gradient(135deg,#ff5470,#ff8a3d);box-shadow:0 0 20px rgba(255,84,112,.3),0 6px 16px rgba(0,0,0,.4)}
-.btn.dark{color:var(--text);background:rgba(255,255,255,.05);border:1px solid var(--line2);box-shadow:none}
-.btn.dark:active{background:rgba(255,255,255,.1)}
-.btn.sm{padding:10px 14px;min-height:40px;font-size:14px;border-radius:12px}
-
-/* ---------- stats ---------- */
+.btn:disabled{opacity:.5}
+.btn svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.glass{background:rgba(255,255,255,.16);box-shadow:none;backdrop-filter:blur(6px)}
+.btn.green{background:linear-gradient(135deg,#22c55e,#10b981);box-shadow:0 8px 20px rgba(34,197,94,.3)}
+.btn.red{background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 8px 20px rgba(239,68,68,.3)}
+.btn.dark{background:var(--card2);box-shadow:none;border:1px solid var(--line)}
+.btn.sm{padding:11px;font-size:14px;border-radius:13px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
-.stat{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01)),var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 8px 12px;text-align:center;box-shadow:var(--shadow)}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:13px 10px;text-align:center}
 .stat .ib{margin:0 auto 8px}
-.stat .v{font-size:18px;font-weight:800;letter-spacing:-.3px;font-variant-numeric:tabular-nums;word-break:break-word}
+.stat .v{font-size:18px;font-weight:800}
 .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
-
-/* ---------- rows ---------- */
 .line{display:flex;align-items:center;gap:12px}
 .line .x{flex:1;min-width:0}
 .line .x b{display:block;font-size:15px}
 .line .x span{font-size:13px;color:var(--muted)}
-.rankn{width:30px;text-align:center;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums;text-shadow:0 0 12px rgba(251,191,36,.5)}
+.rankn{width:30px;text-align:center;font-weight:800;color:var(--amber)}
 .ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.progress{height:10px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden;margin:10px 0 6px}
-.progress i{display:block;height:100%;border-radius:10px;background:linear-gradient(90deg,#1fe3a0,#2dd4a0);box-shadow:0 0 12px rgba(31,227,160,.6);transition:width .6s}
+.progress{height:10px;background:var(--card2);border-radius:10px;overflow:hidden;margin:10px 0 6px}
+.progress i{display:block;height:100%;border-radius:10px;background:linear-gradient(90deg,#22c55e,#06b6d4);transition:width .6s}
 .muted{color:var(--muted);font-size:13px}
-.linkbox{background:rgba(45,212,160,.06);border:1px dashed rgba(45,212,160,.4);border-radius:14px;padding:13px;font-size:13px;word-break:break-all;margin:12px 0;color:#6ee7b7}
-.receipt{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,.04);border:1px dashed var(--line2);border-radius:14px;padding:14px;
-  font-family:inherit;font-size:14px;line-height:1.6;color:var(--text);max-height:55vh;overflow:auto}
-.empty{text-align:center;color:var(--muted);padding:24px 10px;font-size:14px}
-.txlink{color:#6ee7b7;font-weight:600;text-decoration:underline;cursor:pointer}
-.task-done{opacity:.55}
-.ms{display:flex;align-items:center;gap:12px}
-
-/* ---------- forms ---------- */
-label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 6px}
-input,select,textarea{width:100%;background:rgba(5,13,9,.7);border:1px solid var(--line2);border-radius:14px;padding:13px;color:var(--text);font-size:16px;font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s,background .15s}
-input::placeholder,textarea::placeholder{color:#4f6a5e}
-input:focus,select:focus,textarea:focus{border-color:var(--cyan);background:rgba(5,13,9,.95);box-shadow:0 0 0 3px rgba(45,212,160,.16),0 0 18px rgba(45,212,160,.12)}
-textarea{resize:vertical;min-height:110px}
-
-/* ---------- chips / badges / segments ---------- */
+.linkbox{background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:13px;font-size:13px;word-break:break-all;margin:12px 0;color:#bcd0ff}
+.receipt{white-space:pre-wrap;word-break:break-word;background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:14px;
+  font-family:inherit;font-size:14px;line-height:1.6;color:#e6edff;max-height:55vh;overflow:auto}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+input,select,textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px;color:var(--text);font-size:15px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
-.chip{padding:8px 14px;border-radius:30px;background:rgba(255,255,255,.04);border:1px solid var(--line2);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
-.chip.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 0 16px rgba(56,189,248,.4)}
-.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;border:1px solid transparent}
-.badge.pending{background:rgba(251,191,36,.12);color:#fcd34d;border-color:rgba(251,191,36,.3)}
-.badge.processing{background:rgba(56,189,248,.14);color:#7dd3fc;border-color:rgba(56,189,248,.35)}
-.badge.approved{background:rgba(31,227,160,.12);color:#3df0b0;border-color:rgba(31,227,160,.32)}
-.badge.rejected{background:rgba(255,84,112,.13);color:#ff8094;border-color:rgba(255,84,112,.32)}
-.mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.mini span{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted)}
-.mini span.ok{background:rgba(31,227,160,.14);color:#3df0b0}
-.seg{display:flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:16px;padding:4px;margin-bottom:14px;overflow-x:auto;gap:4px;scrollbar-width:none}
-.seg::-webkit-scrollbar{display:none}
-.seg button{flex:none;border:0;background:none;color:var(--muted);padding:10px 14px;border-radius:12px;font-weight:700;font-size:14px;white-space:nowrap;cursor:pointer}
-.seg button.on{background:var(--grad);color:#fff;box-shadow:0 0 16px rgba(56,189,248,.4)}
+.chip{padding:8px 14px;border-radius:30px;background:var(--card2);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
+.chip.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent}
+.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.badge.pending{background:rgba(245,158,11,.18);color:#fbbf24}
+.badge.processing{background:rgba(59,130,246,.18);color:#60a5fa}
+.badge.approved{background:rgba(34,197,94,.18);color:#4ade80}
+.badge.rejected{background:rgba(239,68,68,.18);color:#f87171}
+.empty{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px}
+.txlink{color:#7dc4ff;font-weight:600;text-decoration:underline;cursor:pointer}
 
-/* ---------- avatars ---------- */
 .av{position:relative;width:46px;height:46px;border-radius:50%;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;
-  font-weight:800;color:#fff;background:var(--grad);border:2px solid rgba(45,212,160,.45)}
+  font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.12)}
 .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-
-/* ---------- gate ---------- */
+.mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.mini span{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--card2);color:var(--muted)}
+.mini span.ok{background:rgba(34,197,94,.16);color:#4ade80}
+.seg{overflow-x:auto;gap:4px;scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;padding:10px 14px;white-space:nowrap}
+textarea{resize:vertical;min-height:110px;font-family:inherit}
+.ms{display:flex;align-items:center;gap:12px}
+/* gate */
 .gate{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto;
-  background:radial-gradient(520px 380px at 50% 8%,rgba(45,212,160,.25),transparent 70%),var(--bg)}
-.gate-in{width:100%;max-width:440px;text-align:center;animation:fadeIn .4s both}
-.gate-in .ib{width:76px;height:76px;border-radius:26px;margin:0 auto 18px;box-shadow:0 0 36px rgba(163,230,53,.35)}
+  background:radial-gradient(520px 380px at 50% 10%,rgba(99,102,241,.35),transparent 70%),var(--bg)}
+.gate-in{width:100%;max-width:440px;text-align:center;animation:fadeIn .5s both}
+.gate-in .ib{width:76px;height:76px;border-radius:26px;margin:0 auto 18px}
 .gate-in .ib svg{width:40px;height:40px}
-.gate-in h1{font-size:24px;letter-spacing:-.4px;margin-bottom:8px}
+.gate-in h1{font-size:24px;margin-bottom:8px}
 .gate-in p{color:var(--muted);font-size:15px;margin-bottom:22px}
 .gate-in .card{text-align:left}
-
-/* ---------- bottom nav ---------- */
-nav{position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:flex;padding:6px;border-radius:26px;
-  background:rgba(10,22,16,.86);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--line2);box-shadow:0 12px 36px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.02) inset}
-nav button{flex:1;background:none;border:0;color:var(--muted);padding:8px 2px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:20px;transition:color .2s,background .2s;cursor:pointer}
+.task-done{opacity:.6}
+/* nav */
+nav{position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:flex;padding:7px;border-radius:26px;
+  background:rgba(15,23,48,.88);backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 12px 36px rgba(0,0,0,.55)}
+nav button{flex:1;background:none;border:0;color:var(--muted);padding:6px 2px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:20px;transition:all .2s}
 nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-nav button.active{color:#fff;background:linear-gradient(135deg,rgba(45,212,160,.2),rgba(163,230,53,.24));box-shadow:0 0 18px rgba(56,189,248,.25)}
-nav button.active svg{color:var(--cyan);filter:drop-shadow(0 0 6px rgba(45,212,160,.8))}
+nav button.active{color:#fff;background:linear-gradient(135deg,rgba(59,130,246,.35),rgba(139,92,246,.35))}
+nav button.active svg{stroke:#8ec5ff}
 
-/* ---------- modal ---------- */
-#modal{position:fixed;inset:0;background:rgba(1,8,5,.72);backdrop-filter:blur(4px);z-index:120;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s both}
-#modal .sheet{width:100%;max-width:520px;background:linear-gradient(180deg,#12241c,#0a1710);border-radius:26px 26px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));border:1px solid var(--line2);border-bottom:0;box-shadow:0 -12px 50px rgba(0,0,0,.6),0 -1px 0 rgba(45,212,160,.25)}
-
-/* withdraw receipt card */
-#modal .sheet.rcpt{padding:0;overflow:hidden}
-.rc-top{padding:26px 18px 20px;text-align:center;background:radial-gradient(300px 160px at 50% 0%,rgba(31,227,160,.4),transparent 70%),linear-gradient(135deg,#065f46,#0e7490)}
-.rc-ic{width:62px;height:62px;border-radius:50%;background:rgba(31,227,160,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;animation:pop .55s both;box-shadow:0 0 0 8px rgba(31,227,160,.1),0 0 30px rgba(31,227,160,.5)}
-.rc-ic svg{width:32px;height:32px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-.rc-t{font-size:19px;font-weight:800;color:#fff}
-.rc-s{font-size:13px;color:rgba(255,255,255,.85);margin-top:4px}
-.rc-amt{text-align:center;padding:20px 16px 8px}
-.rc-amt small{display:block;color:var(--muted);font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.rc-amt b{font-size:36px;font-weight:800;color:var(--green);letter-spacing:-.6px;font-variant-numeric:tabular-nums;text-shadow:0 0 24px rgba(31,227,160,.5)}
-.rc-amt i{font-size:15px;font-style:normal;color:var(--muted);margin-left:4px;font-weight:700}
-.rc-rows{margin:12px 18px 0;border-top:2px dashed var(--line2);padding-top:6px}
-.rc-rows div{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;font-size:14px;border-bottom:1px solid var(--line)}
-.rc-rows div:last-child{border-bottom:0}
-.rc-rows span{color:var(--muted);flex:none}
-.rc-rows b{text-align:right;word-break:break-word;max-width:64%}
-.rc-rows .pend{background:rgba(251,191,36,.14);color:#fcd34d;padding:3px 10px;border-radius:20px;font-size:12px}
-.rc-foot{padding:16px 18px calc(18px + env(safe-area-inset-bottom))}
-
-/* ---------- proof feed ---------- */
-.proof-slot{opacity:0;transition:opacity .7s ease}
-.proof-slot.show{opacity:1}
-.proof-det{margin-top:10px;line-height:1.75;word-break:break-all}
-
-/* ---------- lucky spin ---------- */
-.wheel-wrap{position:relative;width:210px;height:222px;margin:14px auto 0}
-.wheel-ptr{position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid #fbbf24;z-index:2;filter:drop-shadow(0 0 8px rgba(251,191,36,.8))}
-#wheelSvg{position:absolute;left:5px;top:17px;width:200px;height:200px;will-change:transform;filter:drop-shadow(0 0 18px rgba(163,230,53,.45))}
-
-/* ---------- partner tasks ---------- */
-#partnerCard{max-width:100%;overflow:hidden}
-.pt-slot{display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:10px;border-radius:14px;border:1px solid var(--line2);background:rgba(255,255,255,.03);min-width:0;max-width:100%;overflow:hidden}
-.pt-slot .adsgram-task{flex:1 1 auto;min-width:0}
-.pt-ic{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
-.pt-ic.orange{background:linear-gradient(135deg,#f59e0b,#ea580c);box-shadow:0 0 16px rgba(245,158,11,.35)}
-.pt-ic.gray{background:linear-gradient(135deg,#475569,#27303f)}
-.pt-ic.green{background:linear-gradient(135deg,#1fe3a0,#0f9d78);box-shadow:0 0 16px rgba(31,227,160,.35)}
-.pt-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.pt-wait{opacity:.55}
-.pt-txt{flex:1;min-width:0;display:flex;flex-direction:column}
-.pt-txt b{font-size:14px}
-.pt-txt span{font-size:12px;color:var(--muted)}
-.pt-chip{padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.12);color:#cbd5e1;font-weight:700;font-size:12px;flex:none}
-.pt-slot-done{opacity:.85}
-.adsgram-task{display:flex;align-items:center;gap:8px;width:100%;max-width:100%;min-width:0;overflow:hidden;color:var(--text)}
-.adsgram-task .pt-reward{flex:1 1 auto;min-width:0;font-weight:700;font-size:14px;color:var(--green)}
-.adsgram-task .pt-btn{display:block;width:100%;min-width:0;max-width:100%;padding:9px 4px;overflow:hidden;white-space:nowrap;text-align:center;font-size:13px;line-height:1.2;border-radius:12px;background:linear-gradient(135deg,#1fe3a0,#2dd4a0);color:#02150d;font-weight:700;cursor:pointer;box-shadow:0 0 14px rgba(31,227,160,.3)}
-.adsgram-task .pt-done{background:rgba(255,255,255,.14);color:#cbd5e1;box-shadow:none}
-.pm-support{margin-top:12px;padding:12px;border-radius:14px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.08)}
-
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-}
-
-/* ===== v2 theme: Emerald & Gold ===== */
-body{font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-body::before{background:radial-gradient(480px 320px at 100% -6%,rgba(45,212,160,.20),transparent 70%),radial-gradient(420px 300px at -10% 30%,rgba(245,185,66,.10),transparent 70%),radial-gradient(400px 300px at 50% 110%,rgba(163,230,53,.10),transparent 70%),radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/22px 22px}
-.d{fill:currentColor;fill-opacity:.28;stroke:none}
-.ib{border-radius:16px;border:0;color:#fff;box-shadow:0 6px 14px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.25) inset}
-.ib svg{stroke-width:1.8;filter:none}
-.ib.sm{border-radius:12px}
-.ib.blue{background:linear-gradient(135deg,#38bdf8,#2563eb);color:#fff}
-.ib.green{background:linear-gradient(135deg,#2dd4a0,#059669);color:#fff}
-.ib.orange{background:linear-gradient(135deg,#fbbf24,#ea580c);color:#fff}
-.ib.purple{background:linear-gradient(135deg,#a78bfa,#6d28d9);color:#fff}
-.ib.pink{background:linear-gradient(135deg,#fb7185,#db2777);color:#fff}
-.ib.teal{background:linear-gradient(135deg,#a3e635,#16a34a);color:#fff}
-.ib.redg{background:linear-gradient(135deg,#fb7185,#dc2626);color:#fff}
-.logo .core{border-radius:30px;color:#04150e}.logo .core svg{stroke:#04150e}
-.sp-t2{background:linear-gradient(90deg,#fff,#a7f3d0 55%,#fde68a);-webkit-background-clip:text;background-clip:text}
-.card{border-radius:24px;padding:18px;background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.01)),var(--card)}
-.stat{border-radius:22px}
-.pill{border-radius:16px;background:rgba(245,185,66,.1);border-color:rgba(245,185,66,.35);color:#fde68a}
-.avatar,.av{border-color:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,.15)}
-.balance{border-radius:30px;padding:24px;background:radial-gradient(300px 190px at 100% 0%,rgba(245,185,66,.26),transparent 65%),radial-gradient(260px 200px at 0% 100%,rgba(45,212,160,.24),transparent 65%),linear-gradient(160deg,#0f2a20,#08160f) padding-box,linear-gradient(135deg,#f5b942,#2dd4a0 60%,#a3e635) border-box;box-shadow:0 0 36px rgba(45,212,160,.18),0 18px 40px rgba(0,0,0,.5)}
-.balance small{color:#fcd34d;letter-spacing:2px}
-.balance .big{background:linear-gradient(90deg,#fff,#fde68a);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;font-weight:800}
-.btn{border-radius:18px;color:#04150e;box-shadow:0 8px 22px rgba(45,212,160,.28),0 1px 0 rgba(255,255,255,.35) inset}
-.btn.glass{color:#fff;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);box-shadow:none}
-.btn.dark{color:var(--text)}
-.btn.red{color:#fff}
-.btn.green{color:#2a1700;background:linear-gradient(135deg,#fde68a,#f59e0b);box-shadow:0 8px 22px rgba(245,158,11,.28),0 1px 0 rgba(255,255,255,.4) inset}
-.chip.on,.seg button.on{color:#04150e;box-shadow:0 4px 14px rgba(45,212,160,.3)}
-.seg{border-radius:18px}.seg button{border-radius:14px}
-input,select,textarea{border-radius:16px}
-.progress{height:12px}
-.progress i{background:linear-gradient(90deg,#2dd4a0,#a3e635,#f5b942)}
-.linkbox{border-radius:16px}
-nav{left:50%;right:auto;transform:translateX(-50%);width:calc(100% - 28px);max-width:460px;border-radius:30px;padding:7px;background:rgba(10,22,16,.88)}
-nav button{border-radius:24px;padding:9px 2px}
-nav button.active{color:#04150e;background:var(--grad);box-shadow:0 6px 18px rgba(45,212,160,.35)}
-nav button.active svg{color:#04150e;filter:none}
-#modal .sheet{border-radius:32px 32px 0 0}
-#modal .sheet:not(.rcpt)::before{content:"";display:block;width:44px;height:4px;border-radius:4px;background:rgba(255,255,255,.18);margin:-8px auto 16px}
-.rc-top{background:radial-gradient(300px 160px at 50% 0%,rgba(163,230,53,.35),transparent 70%),linear-gradient(135deg,#065f46,#0f766e)}
-.toast{border-radius:18px}
-.wheel-ptr{border-top-color:#f5b942}
-.pt-slot{border-radius:18px}
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:120;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s both}
+#modal .sheet{width:100%;max-width:520px;background:var(--card);border-radius:26px 26px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));border:1px solid var(--line)}
+.seg{display:flex;background:var(--card2);border-radius:16px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;border:0;background:none;color:var(--muted);padding:10px;border-radius:12px;font-weight:700;font-size:14px}
+.seg button.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff}
 </style>
 </head>
 <body>
@@ -335,6 +218,8 @@ nav button.active svg{color:#04150e;filter:none}
       <div class="pill"><span class="ib sm orange" id="hRankIc"></span><span id="hRank">#-</span></div>
     </div>
 
+    <div id="bannerBox"></div>
+
     <div class="balance">
       <small>TOTAL BALANCE</small>
       <div class="big" id="hPoints">0</div>
@@ -361,18 +246,14 @@ nav button.active svg{color:#04150e;filter:none}
 
     <div class="card" id="spinCard" style="margin-top:14px">
       <div class="line">
-        <span class="ib pink"><svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z"/></svg></span>
+        <span class="ib pink">🎡</span>
         <div class="x"><b>Lucky Spin</b><span id="spinSub">1 free spin every day</span></div>
       </div>
-      <div class="wheel-wrap" id="wheelWrap">
-        <div class="wheel-ptr"></div>
-        <svg id="wheelSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
-      </div>
-      <div id="spinRes" class="muted" style="margin-top:10px;font-weight:700;text-align:center"></div>
+      <div id="spinRes" class="muted" style="margin-top:10px;font-weight:700"></div>
       <button class="btn" id="spinBtn" style="margin-top:12px">Spin</button>
     </div>
 
-    <h2><span class="ib sm green"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Recent payouts</h2>
+    <h2><span class="ib sm green">✅</span>Recent payouts</h2>
     <div id="proofList"></div>
 
     <h2><span class="ib sm purple" id="topIc"></span>Top earners</h2>
@@ -401,12 +282,17 @@ nav button.active svg{color:#04150e;filter:none}
       </div>
     </div>
 
-    <div id="partnerBox" class="hidden">
-      <h2><span class="ib sm green"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/></svg></span>Partner tasks</h2>
-      <div class="card" style="padding:12px">
-        <div id="partnerCard"></div>
-        <div class="muted" id="partnerStat" style="margin-top:10px;font-size:13px;white-space:pre-line"></div>
-      </div>
+    <h2><span class="ib sm pink">🔥</span>Offerwall</h2>
+    <div id="offerList"></div>
+
+    <h2><span class="ib sm blue">📣</span>Promote your channel</h2>
+    <div class="card">
+      <div class="muted" id="pmInfo">Get real members. Pay with your points, a task is created automatically.</div>
+      <label>Channel (bot must be admin)</label><input id="pm_chan" type="text" placeholder="@yourchannel">
+      <label>Number of joins</label><input id="pm_joins" type="number" min="1" step="1" placeholder="100">
+      <div class="muted" id="pmQuote" style="margin-top:8px"></div>
+      <button class="btn green" id="pmBtn" style="margin-top:12px">Start campaign</button>
+      <div id="pmMine" style="margin-top:10px"></div>
     </div>
 
     <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
@@ -459,6 +345,13 @@ nav button.active svg{color:#04150e;filter:none}
       <div class="muted" id="wRate" style="margin-bottom:4px"></div>
       <div class="notice hidden" id="wNotice"></div>
       <div class="muted" id="wLimits" style="margin-bottom:4px"></div>
+      <div class="notice hidden" id="wDeposit" style="margin-top:6px">
+        <div id="wDepTxt"></div>
+        <div style="margin-top:8px;word-break:break-all;user-select:all;font-family:monospace;font-size:12px" id="wDepAddr"></div>
+        <button class="btn glass" id="wDepCopy" style="margin-top:8px">Copy address</button>
+        <input id="wDepTx" type="text" placeholder="Transaction hash (0x...)" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:10px">
+        <button class="btn green" id="wDepBtn" style="margin-top:10px">Verify deposit</button>
+      </div>
       <label>BEP20 wallet address</label>
       <input id="wAddr" type="text" placeholder="0x..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="42">
       <div class="muted" style="margin-top:6px">BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.</div>
@@ -556,15 +449,34 @@ nav button.active svg{color:#04150e;filter:none}
       <div class="card">
         <b>Growth settings</b>
         <label>Lucky Spin on (1/0)</label><input id="f_spin" type="number" min="0" step="1">
-        <label>Free spins per day (first spins, no ad needed)</label><input id="f_spinf" type="number" min="0" step="1">
-        <label>Extra spins per day (each one unlocked by watching an ad)</label><input id="f_spinx" type="number" min="0" step="1">
+        <label>Max extra spins per day (unlocked by ads)</label><input id="f_spinx" type="number" min="0" step="1">
         <label>Spin prize multiplier (x)</label><input id="f_spins" type="number" min="0" step="any">
-        <label>Partner task (Adsgram) reward in points</label><input id="f_ptr" type="number" min="0" step="any">
-        <label>Partner tasks required before withdraw (per day, 0 = not required)</label><input id="f_ptq" type="number" min="0" step="1">
-        <label>Partner tasks per user per day (0 = no limit)</label><input id="f_ptd" type="number" min="0" step="1">
+        <label>Channel promotion: price per join (points)</label><input id="f_price" type="number" min="0" step="any">
+        <label>Share paid to the user per join (%)</label><input id="f_share" type="number" min="0" max="100" step="any">
+        <label>Minimum joins per campaign</label><input id="f_minj" type="number" min="1" step="1">
         <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
         <button class="btn green" id="f_save" style="margin-top:14px">Save</button>
         <button class="btn dark" id="f_remind" style="margin-top:8px">Send reminders now</button>
+      </div>
+      <div class="card">
+        <b>Banner / featured slot</b>
+        <label>Title</label><input id="b_title" type="text" maxlength="80">
+        <label>Text (optional)</label><input id="b_text" type="text" maxlength="160">
+        <label>Link</label><input id="b_url" type="text" placeholder="https://...">
+        <label>Days (0 = no end)</label><input id="b_days" type="number" min="0" step="1" value="7">
+        <button class="btn" id="b_add" style="margin-top:12px">Add banner</button>
+        <div id="b_list" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <b>Offerwall / CPA offers</b>
+        <div class="muted">Use {userid} in the link. Postback: /api/offer-postback?secret=OFFER_SECRET&amp;userid={userid}&amp;txid={txid}&amp;offer=ID</div>
+        <label>Title</label><input id="o_title" type="text" maxlength="80">
+        <label>Description</label><input id="o_desc" type="text" maxlength="200">
+        <label>Link</label><input id="o_url" type="text" placeholder="https://...?sub={userid}">
+        <label>Reward (points)</label><input id="o_rew" type="number" min="0" step="any">
+        <label>Badge (e.g. High pay)</label><input id="o_badge" type="text" maxlength="20" value="High pay">
+        <button class="btn" id="o_add" style="margin-top:12px">Add offer</button>
+        <div id="o_list" style="margin-top:10px"></div>
       </div>
       <div class="card">
         <b>Post a promo code to the channel</b>
@@ -618,7 +530,7 @@ const ADSGRAM_INTERSTITIAL_ID = "";        // optional "int-..." block for surpr
 const MONETAG_ZONE = "11984693";           // Monetag zone id
 
 const tg = window.Telegram && window.Telegram.WebApp;
-if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#08120e"); tg.setBackgroundColor && tg.setBackgroundColor("#08120e"); } catch (e) {} }
+if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#070b16"); tg.setBackgroundColor && tg.setBackgroundColor("#070b16"); } catch (e) {} }
 const INIT_DATA = tg ? tg.initData : "";
 
 // device id (used by the server to detect multiple accounts on one device)
@@ -647,27 +559,26 @@ const shortAddr = a => String(a || "").slice(0, 6) + "..." + String(a || "").sli
 
 /* ---------------- icons ---------------- */
 const P = {
-  home:"<path class=\"d\" d=\"M5.5 10.2 12 4.5l6.5 5.7V19a1 1 0 01-1 1h-11a1 1 0 01-1-1z\"/><path d=\"M5.5 10.2 12 4.5l6.5 5.7V19a1 1 0 01-1 1h-11a1 1 0 01-1-1z\"/><path d=\"M3 11.5 12 4l9 7.5M10 20v-5h4v5\"/>",
-  play:"<circle class=\"d\" cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M10 8.5v7l6-3.5z\" fill=\"currentColor\"/>",
-  users:"<circle class=\"d\" cx=\"9\" cy=\"8\" r=\"3.2\"/><circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 5.5a2.7 2.7 0 010 5M18 14c2 .6 3.5 2.4 3.5 4.5\"/>",
-  user:"<circle class=\"d\" cx=\"12\" cy=\"8\" r=\"4\"/><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8\"/>",
-  wallet:"<rect class=\"d\" x=\"3\" y=\"6\" width=\"18\" height=\"14\" rx=\"4\"/><rect x=\"3\" y=\"6\" width=\"18\" height=\"14\" rx=\"4\"/><path d=\"M3 10.5h18M16 15h2\"/>",
-  shield:"<path class=\"d\" d=\"M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z\"/><path d=\"M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>",
-  check:"<path d=\"M5 12.5l4.5 4.5L19 7.5\"/>",
-  x:"<path d=\"M6 6l12 12M18 6L6 18\"/>",
-  clock:"<circle class=\"d\" cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/>",
-  coin:"<circle class=\"d\" cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v10M9.5 9.5h4a1.5 1.5 0 010 3h-3a1.5 1.5 0 000 3h4\"/>",
-  trophy:"<path class=\"d\" d=\"M8 4h8v5a4 4 0 01-8 0z\"/><path d=\"M8 4h8v5a4 4 0 01-8 0zM8 6H4c0 3 1.5 4.5 4 5M16 6h4c0 3-1.5 4.5-4 5M12 13v4M8.5 20h7M10 17h4\"/>",
-  copy:"<rect class=\"d\" x=\"8\" y=\"8\" width=\"12\" height=\"12\" rx=\"3\"/><rect x=\"8\" y=\"8\" width=\"12\" height=\"12\" rx=\"3\"/><path d=\"M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2\"/>",
-  share:"<circle class=\"d\" cx=\"6\" cy=\"12\" r=\"2.5\"/><circle class=\"d\" cx=\"18\" cy=\"6\" r=\"2.5\"/><circle class=\"d\" cx=\"18\" cy=\"18\" r=\"2.5\"/><circle cx=\"6\" cy=\"12\" r=\"2.5\"/><circle cx=\"18\" cy=\"6\" r=\"2.5\"/><circle cx=\"18\" cy=\"18\" r=\"2.5\"/><path d=\"M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6\"/>",
-  back:"<path d=\"M15 5l-7 7 7 7\"/>",
-  bolt:"<path class=\"d\" d=\"M13 3L5 13.5h6L10 21l8-10.5h-6z\"/><path d=\"M13 3L5 13.5h6L10 21l8-10.5h-6z\"/>",
-  send:"<path class=\"d\" d=\"M4 12l16-8-6 16-3-7z\"/><path d=\"M4 12l16-8-6 16-3-7z\"/>",
-  list:"<path d=\"M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01\"/>",
-  refresh:"<path d=\"M20 11a8 8 0 10-2.3 5.7\"/><path d=\"M20 4v7h-7\"/>",
-  gift:"<rect class=\"d\" x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><path d=\"M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z\"/>",
-  globe:"<circle class=\"d\" cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18\"/>",
-  star:"<path class=\"d\" d=\"M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z\"/><path d=\"M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z\"/>"
+  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/>',
+  play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.5 0 4.5 2 4.5 4.5"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+  wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2.5"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  coin:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',
+  trophy:'<path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 6H4c0 3 1.5 4.5 4 5M16 6h4c0 3-1.5 4.5-4 5M12 13v4M8.5 20h7M10 17h4"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
+  share:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  bolt:'<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>',
+  send:'<path d="M4 12l16-8-6 16-3-7z"/>',
+  list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  refresh:'<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z"/>',
+  star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>'
 };
 const svg = n => `<svg viewBox="0 0 24 24">${P[n] || ""}</svg>`;
 function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
@@ -696,8 +607,8 @@ const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invit
 document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
 
 /* ---------------- state / helpers ---------------- */
-let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null, interCtrlId = "";
-let watching = false, autoBusy = false, spinBusy = false, autoIdle = 0;
+let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null;
+let watching = false, autoBusy = false;
 let admStatus = "pending", currentTab = "home";
 const SUPPORT_BOT = "Adewa_eran_support_bot";
 const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -774,13 +685,14 @@ function withdrawNoticeText() {
   const closed = Number(st.withdraw_closed_until || 0) * 1000;
   if (closed > Date.now()) return "\u26D4 Withdraw requests are closed for today. They open on " + fmtDay(closed) + ".";
   const parts = [];
+  const gate = ME && ME.withdraw_gate;
+  if (gate && gate.need_deposit) parts.push("\u{1F4B3} Deposit " + gate.deposit_required_usd + " " + sym() + " (BEP20) once to unlock your next withdrawals.");
   const next = Number((ME && ME.withdraw_next_at) || 0);
   if (next > Date.now()) parts.push("\u23F3 Only one withdraw request per day. You can send the next one on " + fmtDay(next) + ".");
   const req = ME && ME.withdraw_req;
   if (req) {
-    if (req.maxAds > 0 && req.adsToday < req.maxAds) parts.push("Watch all of today's ads first: " + req.adsToday + " / " + req.maxAds + " done.");
-    if (req.tasksLeft > 0) parts.push("Complete all tasks first: " + req.tasksLeft + " left.");
-    if (req.partnerNeed > 0 && req.partnerDone < req.partnerNeed) parts.push("Complete the Partner tasks first: " + req.partnerDone + " / " + req.partnerNeed + " done today.");
+    if (req.maxAds > 0 && req.adsToday < req.maxAds) parts.push("\u{1F4FA} Watch all of today's ads first: " + req.adsToday + " / " + req.maxAds + " done.");
+    if (req.tasksLeft > 0) parts.push("\u{1F4DD} Complete all tasks first: " + req.tasksLeft + " left.");
   }
   return parts.join("\n");
 }
@@ -788,6 +700,14 @@ function renderNotice() {
   const t = withdrawNoticeText(), el = $("wNotice");
   el.textContent = t;
   el.classList.toggle("hidden", !t);
+  renderDeposit();
+}
+function renderDeposit() {
+  const g = ME && ME.withdraw_gate, box = $("wDeposit");
+  if (!g || !g.need_deposit || !g.deposit_address) { box.classList.add("hidden"); return; }
+  $("wDepTxt").textContent = "1) Send at least " + g.deposit_required_usd + " " + sym() + " (BEP20 / BNB Smart Chain) to this address.\n2) Paste the transaction hash below and tap Verify.";
+  $("wDepAddr").textContent = g.deposit_address;
+  box.classList.remove("hidden");
 }
 function renderLimits() {
   const L = ME && ME.payout && ME.payout.limits, el = $("wLimits");
@@ -825,7 +745,12 @@ function render() {
   $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
   $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
   updateFee();
-  $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
+  const gate = ME.withdraw_gate;
+  if (gate && gate.first) {
+    $("wMin").textContent = "First withdrawal min " + fmt(gate.first_min_points) + " ($" + gate.first_min_usd + ")";
+  } else {
+    $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
+  }
   $("wRate").textContent = "1 point = " + (st.point_value_usd ?? 0.01) + " USD · paid in " + sym() + " (BEP20)";
 
   renderBnb();
@@ -878,7 +803,7 @@ async function loadTop() {
     const my = String(ME.user.telegram_id);
     const list = d.leaderboard.slice(0, 5);
     $("topList").innerHTML = list.length ? list.map(u => `
-      <div class="card" style="padding:12px;${String(u.telegram_id) === my ? "border-color:#f5b942" : ""}">
+      <div class="card" style="padding:12px;${String(u.telegram_id) === my ? "border-color:#3b82f6" : ""}">
         <div class="line"><div class="rankn">${u.rank}</div>
         <div class="x"><b class="ellip">${esc(nameOf(u))}</b><span>${u.ads} ads · ${u.invites} invites</span></div>
         <b>${fmt(u.points)}</b></div></div>`).join("") : '<div class="empty">No users yet.</div>';
@@ -907,12 +832,9 @@ function getCtrl() {
   return adController;
 }
 function getInter() {
-  // surprise ads: use the interstitial block when one is set, otherwise the normal Adsgram block (so Adsgram shows too)
-  const id = String((ME && ME.adsgram && ME.adsgram.interBlockId) || ADSGRAM_INTERSTITIAL_ID || "");
-  if (!id) return getCtrl();
-  if (interCtrl && interCtrlId === id) return interCtrl;
-  if (!window.Adsgram) return null;
-  try { interCtrl = window.Adsgram.init({ blockId: id }); interCtrlId = id; } catch (e) { return null; }
+  if (interCtrl) return interCtrl;
+  if (!ADSGRAM_INTERSTITIAL_ID || !window.Adsgram) return null;
+  try { interCtrl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_ID }); } catch (e) { return null; }
   return interCtrl;
 }
 const monetagFn = () => { const f = window["show_" + MONETAG_ZONE]; return typeof f === "function" ? f : null; };
@@ -967,29 +889,18 @@ async function watchAd() {
     toast((e && (e.description || e.message)) || "Ad error", "err");
   } finally {
     setWatchBusy(false);
-    autoIdle = 0;
   }
 }
 $("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
 
-/* ---------------- surprise ads (admin sets the seconds) ----------------
-   The user stays N seconds in the app -> ONE ad. The next N seconds are counted
-   only AFTER that ad was closed, then the next ad comes. */
+/* ---------------- surprise ads (admin sets the seconds) ---------------- */
 let autoTimer = null, autoSec = 0;
 function scheduleAuto() {
   const s = Number(((ME && ME.settings) || {}).auto_ad_seconds || 0);
   if (s === autoSec) return;
-  autoSec = s; autoIdle = 0;
+  autoSec = s;
   clearInterval(autoTimer); autoTimer = null;
-  if (s >= 10) autoTimer = setInterval(autoTick, 1000);
-}
-function autoTick() {
-  // time only counts while the user is really in the app and nothing else is going on
-  if (document.hidden || autoBusy || watching || spinBusy) return;
-  if (!ME || !ME.allJoined) return;
-  if (!$("modal").classList.contains("hidden")) return;
-  autoIdle++;
-  if (autoIdle >= autoSec) { autoIdle = 0; showAutoAd(); }
+  if (s >= 10) autoTimer = setInterval(showAutoAd, s * 1000);
 }
 async function showAutoAd() {
   if (autoBusy || watching || document.hidden) return;
@@ -1009,10 +920,10 @@ async function showAutoAd() {
       }
       if (r !== "noad") { setTurn("autoTurn", other(p)); break; }
     }
-  } finally { autoBusy = false; autoIdle = 0; }   // the next countdown starts when this ad is closed
+  } finally { autoBusy = false; }
 }
 // pick up changes made by the admin
-setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy && !spinBusy) refreshMe().catch(() => {}); }, 60000);
+setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy) refreshMe().catch(() => {}); }, 60000);
 
 /* ---------------- invite ---------------- */
 $("shareBtn").onclick = () => {
@@ -1088,6 +999,23 @@ $("wBtn").onclick = async () => {
     $("wAmt").value = ""; updateFee();
     showReceipt(d);
     await refreshMe(); loadHistory();
+  } catch (e) { toast(e.message, "err"); }
+  btn.disabled = false;
+};
+
+$("wDepCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("wDepAddr").textContent); toast("Address copied", "ok"); }
+  catch (e) { toast("Press and hold the address to copy it.", "err"); }
+};
+$("wDepBtn").onclick = async () => {
+  const tx = $("wDepTx").value.trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(tx)) return toast("Enter a valid transaction hash (0x + 64 characters).", "err");
+  const btn = $("wDepBtn"); btn.disabled = true;
+  try {
+    const d = await api("/api/deposit/verify", "POST", { tx_hash: tx });
+    $("wDepTx").value = "";
+    toast(d.message || "Deposit verified.", "ok");
+    await refreshMe();
   } catch (e) { toast(e.message, "err"); }
   btn.disabled = false;
 };
@@ -1436,7 +1364,6 @@ async function loadTasks() {
       const started = t.completed ? false : (t.started || taskState[t.id]);
       let action;
       if (t.completed) action = statusBadge("approved").replace("Approved", "Done");
-      else if (t.was_member) action = '<span class="muted" style="text-align:right">Already joined<br>No reward</span>';
       else if (started) action = `<button class="btn green sm" data-claim="${esc(t.id)}" style="width:auto;padding:10px 18px">Claim</button>`;
       else action = `<button class="btn sm" data-start="${esc(t.id)}" style="width:auto;padding:10px 18px">Start</button>`;
       return `<div class="card ${t.completed ? "task-done" : ""}"><div class="line">
@@ -1449,10 +1376,9 @@ async function loadTasks() {
       const id = b.dataset.start, t = d.tasks.find(x => String(x.id) === id);
       b.disabled = true;
       try {
-        const sr = await api("/api/tasks/" + encodeURIComponent(id) + "/start", "POST");
+        await api("/api/tasks/" + encodeURIComponent(id) + "/start", "POST");
         taskState[id] = "started";
-        if (sr && sr.already_member) toast("You were already a member of this channel, so this task gives no reward.", "err");
-        else openLink(t.url);
+        openLink(t.url);
         loadTasks();
       } catch (e) { toast(e.message, "err"); b.disabled = false; }
     });
@@ -1498,221 +1424,95 @@ $("addTask").onclick = async () => {
 };
 
 /* =====================================================
-   GROWTH FEATURES (proof feed, spin, promotion, admin)
+   GROWTH FEATURES (proof feed, spin, banner, offerwall, promotion, admin)
 ===================================================== */
 const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFixed(4));
 let SP = null;
 
-async function loadHomeExtras() { loadProof(); loadSpin(); }
-async function loadEarnExtras() { setupPartnerTask(); }
+async function loadHomeExtras() { loadBanner(); loadProof(); loadSpin(); }
+async function loadEarnExtras() { loadOffers(); renderPromoQuote(); loadMyCampaigns(); }
 
-/* ---- Adsgram partner tasks (visit a website, join a channel ... paid by the advertiser) ---- */
-let partnerKey = "";
-// how many partner tasks the user must do today (admin setting), shown as slots
-function partnerSlots() {
-  const need = Number(((ME && ME.withdraw_req) || {}).partnerNeed || 0);
-  return need > 0 ? need : 1;
-}
-function partnerDoneCount() {
-  const p = (ME && ME.partner) || { today: 0 };
-  return Math.min(Number(p.today) || 0, partnerSlots());
-}
-function updatePartnerStat() {
-  const p = (ME && ME.partner) || { today: 0, points: 0, total: 0 };
-  const need = Number(((ME && ME.withdraw_req) || {}).partnerNeed || 0);
-  $("partnerStat").textContent = "Completed today: " + p.today + " · Earned today: +" + fmt(p.points) +
-    " points · Total completed: " + p.total + (need > 0 ? "\nRequired to withdraw: " + Math.min(p.today, need) + " / " + need + " today" : "");
-}
-function partnerPts() { return Number(((ME && ME.settings) || {}).adsgram_task_reward ?? 2); }
-function setupPartnerTask() {
-  const id = String((ME && ME.adsgram && ME.adsgram.taskBlockId) || "");
-  const box = $("partnerBox");
-  if (!id) { box.classList.add("hidden"); return; }
-  box.classList.remove("hidden");
-  updatePartnerStat();
-  const total = partnerSlots(), done = partnerDoneCount(), active = total - done;
-  const key = id + "|" + total + "|" + done + "|" + partnerPts();
-  if (key === partnerKey) return;
-  partnerKey = key;
-  let h = "";
-  for (let i = 0; i < active; i++) {
-    if (i > 0) {   // only one live task at a time, the next one loads after this one is finished
-      h += '<div class="pt-slot pt-wait"><div class="pt-ic gray">' + svg("clock") + '</div>' +
-           '<div class="pt-txt"><b>Next partner task</b><span>Finish the current task first</span></div></div>';
-      continue;
-    }
-    h += '<div class="pt-slot"><div class="pt-ic orange">' + svg("star") + '</div>' +
-         '<adsgram-task class="adsgram-task" data-block-id="' + esc(id) + '" data-debug="false">' +
-         '<span slot="reward" class="pt-reward">+' + fmt(partnerPts()) + ' points</span>' +
-         '<div slot="button" class="pt-btn">Go</div>' +
-         '<div slot="claim" class="pt-btn">Claim</div>' +
-         '<div slot="done" class="pt-btn pt-done">Done</div></adsgram-task></div>';
-  }
-  for (let i = 0; i < done; i++) {
-    h += '<div class="pt-slot pt-slot-done"><div class="pt-ic green">' + svg("check") + '</div>' +
-         '<div class="pt-txt"><b>Partner task</b><span>+' + fmt(partnerPts()) + ' points · Completed</span></div>' +
-         '<div class="pt-chip">Done</div></div>';
-  }
-  $("partnerCard").innerHTML = h;
-  $("partnerCard").querySelectorAll("adsgram-task").forEach(el => {
-    el.addEventListener("reward", () => {
-      const slot = el.closest(".pt-slot");
-      if (slot) { slot.style.opacity = ".5"; el.remove(); }   // remove the live task at once, so it cannot be claimed twice
-      onPartnerReward();
+async function loadBanner() {
+  try {
+    const d = await api("/api/banners");
+    $("bannerBox").innerHTML = d.banners.map(b => `<div class="card" data-bn="${esc(b.id)}" style="margin-top:12px;border-color:#f59e0b;cursor:pointer">
+      <div class="line"><span class="ib orange">⭐</span><div class="x"><b>${esc(b.title)}</b><span>${esc(b.text || "")}</span></div><span class="muted">Sponsored</span></div></div>`).join("");
+    $("bannerBox").querySelectorAll("[data-bn]").forEach(el => el.onclick = () => {
+      const b = d.banners.find(x => String(x.id) === el.dataset.bn);
+      api("/api/banners/" + encodeURIComponent(b.id) + "/click", "POST").catch(() => {});
+      openLink(b.url);
     });
-    el.addEventListener("onBannerNotFound", () => { const slot = el.closest(".pt-slot"); if (slot) slot.remove(); });
-    el.addEventListener("onError", () => { const slot = el.closest(".pt-slot"); if (slot) slot.remove(); });
-  });
-  if (!$("partnerCard").children.length && !partnerDoneCount()) box.classList.add("hidden");
-}
-// Adsgram confirms the task on the server first; the points and the "Done" slot appear only after that
-async function onPartnerReward() {
-  const before = Number((ME && ME.partner && ME.partner.total) || 0), pointsBefore = Number((ME && ME.user && ME.user.points) || 0);
-  toast("Checking your task...", "ok");
-  for (let i = 0; i < 6; i++) {
-    await new Promise(r => setTimeout(r, i === 0 ? 2500 : 3500));
-    try { await refreshMe(); } catch (e) {}
-    setupPartnerTask();
-    if (Number((ME && ME.partner && ME.partner.total) || 0) > before) {
-      const gained = Number((ME && ME.user && ME.user.points) || 0) - pointsBefore;
-      toast("Task verified! +" + fmt(gained > 0 ? gained : partnerPts()) + " points added.", "ok");
-      return;
-    }
-  }
-  partnerKey = "";
-  setupPartnerTask();
-  toast("Not verified yet. Points are added only after the partner confirms the task.", "err");
+  } catch (e) { $("bannerBox").innerHTML = ""; }
 }
 
-/* ---- proof feed: one payout at a time, fades in and out ---- */
-const PROOF_SHOW_MS = 2600, PROOF_FADE_MS = 700;
-let proofFeed = [], proofIdx = 0, proofTimer = null;
-function proofCard(p) {
-  const rows = [];
-  if (p.points !== null && p.points !== undefined) rows.push("Withdrawn: <b>" + fmt(p.points) + " pts</b>");
-  if (p.fee) rows.push("Fee: " + fmt(p.fee) + " pts");
-  if (p.final !== null && p.final !== undefined) rows.push("Received: <b>" + fmt(p.final) + " pts</b>");
-  if (p.wallet) rows.push("Wallet: " + esc(p.wallet));
-  if (p.tx) rows.push("TX: " + esc(p.tx));
-  return `<div class="card" style="padding:14px"><div class="line">
-    <span class="ib sm green">${svg("check")}</span>
-    <div class="x"><b>${esc(p.name)} · Withdraw paid</b><span>${esc(p.method || "")}${p.at ? " · " + new Date(p.at).toLocaleString() : ""}</span></div>
-    <b>${money(p.usd)}</b></div>
-    ${rows.length ? '<div class="muted proof-det">' + rows.join("<br>") + "</div>" : ""}</div>`;
-}
-function proofStep() {
-  clearTimeout(proofTimer);
-  const slot = $("proofSlot");
-  if (!slot || !proofFeed.length) return;
-  if (currentTab !== "home" || document.hidden) { proofTimer = setTimeout(proofStep, 1000); return; }
-  slot.classList.remove("show");
-  slot.innerHTML = proofCard(proofFeed[proofIdx % proofFeed.length]);
-  proofIdx++;
-  void slot.offsetWidth;                       // restart the fade-in
-  slot.classList.add("show");
-  proofTimer = setTimeout(() => {
-    slot.classList.remove("show");             // fade out (opacity 0) ...
-    proofTimer = setTimeout(proofStep, PROOF_FADE_MS);   // ... then the next payout comes in
-  }, PROOF_SHOW_MS);
-}
 async function loadProof() {
   try {
     const d = await api("/api/proof-feed");
-    clearTimeout(proofTimer);
-    proofFeed = d.feed || [];
-    proofIdx = 0;
-    if (!proofFeed.length) { $("proofList").innerHTML = '<div class="empty">No payouts yet.</div>'; return; }
-    $("proofList").innerHTML = '<div id="proofSlot" class="proof-slot"></div>';
-    proofStep();
-  } catch (e) { clearTimeout(proofTimer); $("proofList").innerHTML = ""; }
-}
-
-/* ---- Lucky Spin with a real wheel ---- */
-const WHEEL_COLORS = ["#047857", "#b45309", "#0f766e", "#a16207", "#15803d", "#c2410c", "#0e7490", "#4d7c0f"];
-let wheelAngle = 0, wheelKey = "";
-function buildWheel() {
-  if (!SP || !SP.prizes || !SP.prizes.length) return;
-  const key = SP.prizes.join(",");
-  if (key === wheelKey) return;
-  wheelKey = key;
-  const n = SP.prizes.length, seg = 360 / n, C = 100, R = 96;
-  const pt = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
-  let h = "";
-  SP.prizes.forEach((p, i) => {
-    const [x0, y0] = pt(i * seg, R), [x1, y1] = pt((i + 1) * seg, R), mid = i * seg + seg / 2;
-    h += `<path d="M${C} ${C} L${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${WHEEL_COLORS[i % WHEEL_COLORS.length]}" stroke="#fff" stroke-width="2"/>`;
-    h += `<g transform="rotate(${mid} ${C} ${C})"><text x="${C}" y="${C - 58}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width=".6">+${fmt(p)}</text></g>`;
-  });
-  h += `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#f5b942" stroke-width="4"/><circle cx="${C}" cy="${C}" r="13" fill="#fff" stroke="#f5b942" stroke-width="4"/>`;
-  $("wheelSvg").innerHTML = h;
-  setWheel(wheelAngle);
-}
-function setWheel(a) { wheelAngle = a; $("wheelSvg").style.transform = "rotate(" + a + "deg)"; }
-// spins freely while the server answers, then slows down and stops on the prize segment
-async function spinWheelTo(resultPromise) {
-  let idx = null, speed = 0, last = performance.now();
-  const t0 = last;
-  resultPromise.then(r => { idx = r; }, () => { idx = -1; });
-  await new Promise(res => {
-    const f = now => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
-      speed = Math.min(900, speed + 1300 * dt);
-      setWheel(wheelAngle + speed * dt);
-      if (idx !== null && now - t0 > 1500) res(); else requestAnimationFrame(f);
-    };
-    requestAnimationFrame(f);
-  });
-  if (idx < 0) return false;
-  const n = SP.prizes.length, seg = 360 / n;
-  const mod = ((wheelAngle % 360) + 360) % 360;
-  const want = (((360 - (idx * seg + seg / 2)) % 360) + 360) % 360;
-  const from = wheelAngle, target = from + 360 * 4 + ((want - mod + 360) % 360), dur = 3800, ts = performance.now();
-  await new Promise(res => {
-    const f = now => {
-      const p = Math.min(1, (now - ts) / dur), e = 1 - Math.pow(1 - p, 3);
-      setWheel(from + (target - from) * e);
-      if (p < 1) requestAnimationFrame(f); else res();
-    };
-    requestAnimationFrame(f);
-  });
-  return true;
+    $("proofList").innerHTML = d.feed.length ? d.feed.map(p => `<div class="card" style="padding:12px"><div class="line">
+      <span class="ib sm green">✅</span><div class="x"><b>${esc(p.name)}</b><span>${esc(p.method || "")} · ${p.at ? new Date(p.at).toLocaleDateString() : ""}</span></div><b>${money(p.usd)}</b></div></div>`).join("")
+      : '<div class="empty">No payouts yet.</div>';
+  } catch (e) { $("proofList").innerHTML = ""; }
 }
 
 function renderSpin() {
   if (!SP) return;
   $("spinCard").classList.toggle("hidden", !SP.enabled);
-  buildWheel();
-  let sub;
-  if (SP.free > 0) sub = SP.free + " free spin" + (SP.free > 1 ? "s" : "") + " ready!" + (SP.max_extra > 0 ? " (+" + SP.extra_left + " extra with ads)" : "");
-  else if (SP.available > 0) sub = SP.available + " extra spin(s) ready";
-  else if (SP.extra_left > 0) sub = "Watch an ad for an extra spin (" + SP.extra_left + " left today)";
-  else sub = "Come back tomorrow";
-  $("spinSub").textContent = sub;
+  $("spinSub").textContent = SP.free ? "Your free spin is ready!" : (SP.available > 0 ? SP.available + " extra spin(s) ready" : (SP.extra_left > 0 ? "Watch an ad for an extra spin (" + SP.extra_left + " left today)" : "Come back tomorrow"));
   $("spinBtn").textContent = SP.available > 0 ? "Spin now" : (SP.extra_left > 0 ? "Watch ad for extra spin" : "No spins left");
-  $("spinBtn").disabled = spinBusy || (SP.available <= 0 && SP.extra_left <= 0);
+  $("spinBtn").disabled = SP.available <= 0 && SP.extra_left <= 0;
 }
 async function loadSpin() { try { SP = await api("/api/spin"); renderSpin(); } catch (e) {} }
 $("spinBtn").onclick = async () => {
-  if (watching || spinBusy || !SP) return;
-  spinBusy = true;
+  if (watching || !SP) return;
   $("spinBtn").disabled = true;
   try {
-    if (SP.available <= 0) {                       // no spin left: an ad unlocks one extra spin
-      spinBusy = false; await watchAd(); spinBusy = true;
-      await loadSpin();
-      if (SP.available <= 0) return;
-    }
-    $("spinRes").textContent = "Spinning...";
-    const call = api("/api/spin", "POST");
-    let r = null;
-    const ok = await spinWheelTo(call.then(x => { r = x; return x.index || 0; }));
-    if (!ok || !r) { $("spinRes").textContent = ""; await call; return; }
-    $("spinRes").textContent = "You won +" + fmt(r.prize) + " points!";
+    if (SP.available <= 0) { await watchAd(); await loadSpin(); if (SP.available <= 0) return; }
+    $("spinRes").textContent = "🎡 Spinning...";
+    await sleep(1200);
+    const r = await api("/api/spin", "POST");
+    $("spinRes").textContent = "🎉 You won +" + fmt(r.prize) + " points!";
     toast("+" + fmt(r.prize) + " points", "ok");
     await refreshMe();
   } catch (e) { $("spinRes").textContent = ""; toast(e.message, "err"); }
-  finally { spinBusy = false; autoIdle = 0; await loadSpin(); }
+  finally { await loadSpin(); }
 };
+
+async function loadOffers() {
+  try {
+    const d = await api("/api/offers");
+    $("offerList").innerHTML = d.offers.length ? d.offers.map(o => `<div class="card"><div class="line">
+      <span class="ib pink">🔥</span>
+      <div class="x"><b>${esc(o.title)}${o.badge ? ' <span style="color:#f59e0b">· ' + esc(o.badge) + "</span>" : ""}</b><span>${esc(o.description || "")}</span><span style="display:block;color:#fbbf24;font-weight:700">+${fmt(o.reward)} points</span></div>
+      <button class="btn sm" data-off="${esc(o.id)}" style="width:auto;padding:10px 18px">Open</button></div></div>`).join("") : '<div class="empty">No offers right now.</div>';
+    $("offerList").querySelectorAll("[data-off]").forEach(b => b.onclick = () => openLink(d.offers.find(o => String(o.id) === b.dataset.off).url));
+  } catch (e) { $("offerList").innerHTML = ""; }
+}
+
+function renderPromoQuote() {
+  const st = (ME && ME.settings) || {}, p = st.promo_price_per_join ?? 10, sh = st.promo_user_share ?? 25, mj = st.promo_min_joins ?? 20;
+  const j = Math.floor(Number($("pm_joins").value) || 0);
+  $("pmInfo").textContent = "Pay " + fmt(p) + " points per join (min " + mj + " joins). Members earn " + fmt(p * sh / 100) + " points each.";
+  $("pmQuote").textContent = j > 0 ? "Total cost: " + fmt(j * p) + " points" : "";
+}
+$("pm_joins").oninput = renderPromoQuote;
+$("pmBtn").onclick = async () => {
+  const joins = Math.floor(Number($("pm_joins").value) || 0), chan = $("pm_chan").value.trim();
+  if (!(await confirmBox("Start the campaign for " + chan + " (" + joins + " joins)?"))) return;
+  $("pmBtn").disabled = true;
+  try {
+    const r = await api("/api/promote", "POST", { channel: chan, joins });
+    toast("Campaign started. -" + fmt(r.cost) + " points", "ok");
+    $("pm_chan").value = ""; $("pm_joins").value = "";
+    await refreshMe(); renderPromoQuote(); loadMyCampaigns();
+  } catch (e) { toast(e.message, "err"); }
+  $("pmBtn").disabled = false;
+};
+async function loadMyCampaigns() {
+  try {
+    const d = await api("/api/promote/mine");
+    $("pmMine").innerHTML = d.campaigns.map(c => `<div class="muted">${esc(c.channel)} · ${c.done} / ${c.max_users} joined</div>`).join("");
+  } catch (e) {}
+}
 
 /* ---- admin: More ---- */
 const _admSeg = admSeg;
@@ -1726,13 +1526,23 @@ $("segMore").onclick = () => admSeg("more");
 
 async function loadMore() {
   const s = ME.settings || {};
-  $("f_spin").value = s.spin_enabled ?? 1; $("f_spinf").value = s.spin_free ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
-   $("f_rem").value = s.remind_enabled ?? 1; $("f_ptr").value = s.adsgram_task_reward ?? 2; $("f_ptd").value = s.adsgram_task_daily ?? 10; $("f_ptq").value = s.partner_required ?? 1;
+  $("f_spin").value = s.spin_enabled ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
+  $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1;
+  try {
+    const b = await api("/api/admin/banners");
+    $("b_list").innerHTML = b.banners.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>${x.live ? "Live" : "Ended"} · ${x.clicks} clicks</span></div>
+      <button class="btn red sm" data-bdel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
+    $("b_list").querySelectorAll("[data-bdel]").forEach(el => el.onclick = async () => { try { await api("/api/admin/banners/" + encodeURIComponent(el.dataset.bdel) + "/delete", "POST"); loadMore(); } catch (e) { toast(e.message, "err"); } });
+    const o = await api("/api/admin/offers");
+    $("o_list").innerHTML = o.offers.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>+${fmt(x.reward)} · ${x.done} done</span></div>
+      <button class="btn red sm" data-odel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
+    $("o_list").querySelectorAll("[data-odel]").forEach(el => el.onclick = async () => { try { await api("/api/admin/offers/" + encodeURIComponent(el.dataset.odel) + "/delete", "POST"); loadMore(); } catch (e) { toast(e.message, "err"); } });
+  } catch (e) { toast(e.message, "err"); }
 }
 $("f_save").onclick = async () => {
   try {
-    await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_free: $("f_spinf").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
-      remind_enabled: $("f_rem").value, adsgram_task_reward: $("f_ptr").value, adsgram_task_daily: $("f_ptd").value, partner_required: $("f_ptq").value });
+    await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
+      promo_price_per_join: $("f_price").value, promo_user_share: $("f_share").value, promo_min_joins: $("f_minj").value, remind_enabled: $("f_rem").value });
     toast("Saved.", "ok"); await refreshMe();
   } catch (e) { toast(e.message, "err"); }
 };
@@ -1741,6 +1551,18 @@ $("f_remind").onclick = async () => {
   try { const r = await api("/api/admin/reminders/run", "POST"); toast(r.off ? "Reminders are off." : "Sent " + r.sent + ", remaining " + r.remaining, "ok"); }
   catch (e) { toast(e.message, "err"); }
   $("f_remind").disabled = false;
+};
+$("b_add").onclick = async () => {
+  try {
+    await api("/api/admin/banners", "POST", { title: $("b_title").value, text: $("b_text").value, url: $("b_url").value, days: Number($("b_days").value) });
+    ["b_title", "b_text", "b_url"].forEach(i => $(i).value = ""); toast("Banner added.", "ok"); loadMore();
+  } catch (e) { toast(e.message, "err"); }
+};
+$("o_add").onclick = async () => {
+  try {
+    await api("/api/admin/offers", "POST", { title: $("o_title").value, description: $("o_desc").value, url: $("o_url").value, reward: Number($("o_rew").value), badge: $("o_badge").value });
+    ["o_title", "o_desc", "o_url", "o_rew"].forEach(i => $(i).value = ""); toast("Offer added.", "ok"); loadMore();
+  } catch (e) { toast(e.message, "err"); }
 };
 $("pc_post").onclick = async () => {
   try { await api("/api/admin/promos/" + encodeURIComponent($("pc_code").value.trim().toUpperCase()) + "/post", "POST"); toast("Posted to the channel.", "ok"); }

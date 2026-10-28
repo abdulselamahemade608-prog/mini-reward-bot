@@ -2,22 +2,11 @@ import express from "express";
 import crypto from "crypto";
 import pg from "pg";
 import path from "path";
-import fs from "fs";
 import { ethers } from "ethers";
 import { fileURLToPath } from "url";
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Background work. On Vercel `waitUntil` keeps the function alive after the response was sent
-// (install it with:  npm i @vercel/functions ). Without the package this is plain fire-and-forget.
-let _waitUntil = null;
-try { ({ waitUntil: _waitUntil } = await import("@vercel/functions")); } catch { /* optional package */ }
-const bg = p => {
-    const pr = Promise.resolve(p).catch(e => console.error("background task:", e && e.message));
-    try { if (_waitUntil) _waitUntil(pr); } catch { /* ignore */ }
-    return pr;
-};
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -42,10 +31,6 @@ const APP_BUTTON_TEXT = process.env.APP_BUTTON_TEXT || "Adewa Eran";
 const ADMIN_ID = String(process.env.ADMIN_ID || "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const ADSGRAM_BLOCK_ID = String(process.env.ADSGRAM_BLOCK_ID || "52630");
-// optional Adsgram "int-..." (interstitial) block used for surprise ads; when empty the rewarded block is used
-// Adsgram "Task" block (partner tasks: visit a website / join a channel ...), e.g. "task-12345"
-const ADSGRAM_TASK_BLOCK_ID = String(process.env.ADSGRAM_TASK_BLOCK_ID || "").trim();
-const ADSGRAM_INTERSTITIAL_BLOCK_ID = String(process.env.ADSGRAM_INTERSTITIAL_BLOCK_ID || "").trim();
 const AD_COOLDOWN_SECONDS = Number(process.env.AD_COOLDOWN_SECONDS || 15);
 
 /* ---- BNB auto payment (native BNB on BNB Smart Chain) ---- */
@@ -59,25 +44,61 @@ const ERC20_ABI = [
     "function transfer(address to, uint256 amount) returns (bool)",
     "function balanceOf(address owner) view returns (uint256)"
 ];
+// BNB price in USD, used to convert points (point_value_usd) into BNB. Update it in Vercel env when the price changes.
+// Now only a LAST-RESORT fallback: the live price is fetched automatically (see getBnbPrice below).
+const BNB_PRICE_USD = Number(process.env.BNB_PRICE_USD || 0);
 const EXPLORER_TX = String(process.env.EXPLORER_TX_URL || "https://bscscan.com/tx/");
 const PAY_READY = !!(BSC_RPC_URL && PAYOUT_PRIVATE_KEY);
 
-// Hard safety caps that do not depend on the Settings in the database (0 = off).
-const MAX_SINGLE_PAYOUT_USD = Number(process.env.MAX_SINGLE_PAYOUT_USD ?? 50);     // one payout
-const HARD_DAILY_PAYOUT_USD = Number(process.env.HARD_DAILY_PAYOUT_USD ?? 500);    // all payouts of one day
-const RECEIPT_WAIT_MS = Number(process.env.RECEIPT_WAIT_MS || 20000);               // how long to wait for the blockchain confirmation
-const WITHDRAW_MAX_AUTH_AGE = 3600;                                                  // seconds: a withdraw needs a session opened in the last hour
-const PREMIUM_EMOJI = String(process.env.PREMIUM_EMOJI || "false").toLowerCase() === "true";
-const SETUP_KEY = String(process.env.SETUP_KEY || "");                              // key for /api/setup-webhook (falls back to WEBHOOK_SECRET)
-const PUBLIC_ERR = "Server error. Please try again.";
+/* ---- first-withdraw minimum + one-time deposit rule ---- */
+// 1) the FIRST withdrawal of a user only needs this much (USD / USDT value of the requested points)
+const FIRST_WITHDRAW_MIN_USD = Number(process.env.FIRST_WITHDRAW_MIN_USD || 0.2);
+// 2) after the first paid withdrawal the user must deposit this much USDT (BEP20) once, then can withdraw normally
+const DEPOSIT_REQUIRED_USD = Number(process.env.DEPOSIT_REQUIRED_USD || 0.5);
+// where users send the deposit (default = the payout wallet address)
+const DEPOSIT_ADDRESS_ENV = String(process.env.DEPOSIT_ADDRESS || "").trim();
+const DEPOSIT_MIN_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_MIN_CONFIRMATIONS || 3));
 
-// settings every normal user may see (the admin gets all of them)
-const PUBLIC_SETTING_KEYS = new Set([
-    "ad_reward", "invite_reward", "max_ads_per_day", "min_withdraw", "verify_ads", "daily_withdraw_limit",
-    "milestone_5", "milestone_10", "milestone_25", "withdraw_fee_percent", "point_value_usd", "auto_ad_seconds",
-    "withdraw_closed_until", "adsgram_task_reward", "adsgram_task_daily", "partner_required",
-    "spin_enabled", "spin_free", "spin_max_extra", "spin_scale"
-]);
+/* ===================== LIVE BNB PRICE (automatic) ===================== */
+// Tries several public price APIs one after another (some block certain server regions),
+// keeps the answer for 60 seconds, and rejects crazy values.
+const PRICE_TTL_MS = 60 * 1000;
+const PRICE_STALE_OK_MS = 15 * 60 * 1000;   // if every source fails, a price up to 15 min old is still used
+let priceCache = { value: 0, at: 0, source: "" };
+
+async function fetchJson(url) {
+    const r = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json" } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+}
+
+const PRICE_SOURCES = [
+    ["binance",       async () => Number((await fetchJson("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT")).price)],
+    ["coingecko",     async () => Number((await fetchJson("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd")).binancecoin.usd)],
+    ["cryptocompare", async () => Number((await fetchJson("https://min-api.cryptocompare.com/data/price?fsym=BNB&tsyms=USD")).USD)],
+    ["coinbase",      async () => Number((await fetchJson("https://api.coinbase.com/v2/prices/BNB-USD/spot")).data.amount)]
+];
+
+async function getBnbPrice() {
+    const now = Date.now();
+    if (priceCache.value && now - priceCache.at < PRICE_TTL_MS) return priceCache.value;
+
+    for (const [name, load] of PRICE_SOURCES) {
+        try {
+            const p = await load();
+            if (Number.isFinite(p) && p >= 10 && p <= 100000) {
+                priceCache = { value: p, at: Date.now(), source: name };
+                return p;
+            }
+            console.error("bnb price: bad value from", name, p);
+        } catch (e) {
+            console.error("bnb price:", name, e.message);
+        }
+    }
+    if (priceCache.value && now - priceCache.at < PRICE_STALE_OK_MS) return priceCache.value;
+    if (BNB_PRICE_USD > 0) return BNB_PRICE_USD;
+    throw new Error("BNB price is not available right now. Please try again in a minute.");
+}
 
 /* ===================== PAYOUT LIMITS (bot-wide) ===================== */
 // withdraw_hourly_limit : max number of withdrawal requests the whole bot accepts per rolling hour (0 = off)
@@ -147,7 +168,7 @@ function fmtWait(ms) {
 //  - only ONE withdrawal per account per day (rejected ones do not count)
 //  - plus the optional extra wait (hours) the admin sets in Settings
 async function nextWithdrawAt(db, telegramId, cooldownHours) {
-    const hrs = Math.max(0, Number(cooldownHours) || 0);   // extra wait (hours) from Settings; 0 = only the one-withdrawal-per-day rule
+    const hrs = 0;   // no hourly wait any more - only ONE withdrawal per day
     const r = await db.query(
         `SELECT MAX(created_at) AS t, date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}' AS d0
          FROM mr_withdrawals WHERE telegram_id = $1 AND status <> 'rejected'`,
@@ -163,32 +184,19 @@ async function nextWithdrawAt(db, telegramId, cooldownHours) {
 }
 
 // To withdraw, the user must have finished ALL of today's ads and ALL active tasks.
-// how many Adsgram partner tasks a user must finish today before he can withdraw (0 = not required / no partner block set)
-function partnerNeeded(st) {
-    if (!ADSGRAM_TASK_BLOCK_ID) return 0;
-    let need = Math.max(0, Math.floor(st.partner_required ?? 1));
-    const daily = Math.floor(st.adsgram_task_daily ?? 10);
-    if (daily > 0) need = Math.min(need, daily);
-    return need;
-}
-async function getWithdrawRequirements(db, telegramId, maxAds, partnerNeed = 0) {
+async function getWithdrawRequirements(db, telegramId, maxAds) {
     const max = Number.isFinite(Number(maxAds)) ? Number(maxAds) : 100;
     const r = await db.query(
         `SELECT
             (SELECT COUNT(*)::int FROM mr_ad_rewards
               WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS ads,
             (SELECT COUNT(*)::int FROM mr_tasks t
-              WHERE t.enabled = TRUE
-                AND NOT EXISTS (
-                  SELECT 1 FROM mr_task_claims c
-                  WHERE c.task_id = t.id AND c.telegram_id = $1
-                    AND (c.completed_at IS NOT NULL OR c.was_member = TRUE))      -- done, or already joined before (no reward)
-                AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims x WHERE x.task_id = t.id AND x.completed_at IS NOT NULL))) AS tasks,
-            (SELECT COUNT(*)::int FROM mr_partner_tasks p
-              WHERE p.telegram_id = $1 AND p.created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}') AS partner`,
+              WHERE t.enabled = TRUE AND NOT EXISTS (
+                SELECT 1 FROM mr_task_claims c
+                WHERE c.task_id = t.id AND c.telegram_id = $1 AND c.completed_at IS NOT NULL)) AS tasks`,
         [telegramId]
     );
-    return { adsToday: r.rows[0].ads, maxAds: max, tasksLeft: r.rows[0].tasks, partnerDone: r.rows[0].partner, partnerNeed: Math.max(0, Math.floor(partnerNeed || 0)) };
+    return { adsToday: r.rows[0].ads, maxAds: max, tasksLeft: r.rows[0].tasks };
 }
 
 // Tells the admin (once per day) that the daily payout budget is finished.
@@ -209,8 +217,8 @@ async function alertBudgetFull(used, limit) {
             disable_web_page_preview: true,
             text:
                 "\u26A0\uFE0F <b>Daily withdraw budget finished!</b>\n\n" +
-                `<b>Budget:</b> $${Number(limit).toFixed(2)} USDT\n` +
-                `<b>Used today:</b> $${Number(used).toFixed(2)} USDT\n\n` +
+                `\u{1F4B5} <b>Budget:</b> $${Number(limit).toFixed(2)} USDT\n` +
+                `\u{1F4B8} <b>Used today:</b> $${Number(used).toFixed(2)} USDT\n\n` +
                 "New withdraw requests are blocked until tomorrow, or until you raise the budget in Settings."
         });
     } catch (e) {
@@ -230,9 +238,7 @@ const EMOJI_STATUS = "6267186570034419608";  // status
 const EMOJI_PROOF = "5294338978130972025";   // proof
 
 // <tg-emoji> needs a normal emoji inside as fallback
-// Premium emoji are OFF by default (a wrong tag would make Telegram refuse the whole message).
-// Set PREMIUM_EMOJI=true in the environment to turn them on.
-const em = (id, fallback = "\u2B50") => PREMIUM_EMOJI ? `<tg-emoji emoji-id="${id}">${fallback || "\u2B50"}</tg-emoji>` : "";
+const em = (id, fallback = "\u{1F4B8}") => `<tg-emoji emoji-id="${id}">${fallback}</tg-emoji>`;
 
 // escape text for Telegram parse_mode: "HTML"
 const esc = s => String(s ?? "")
@@ -246,16 +252,10 @@ const stripTags = s => String(s).replace(/<[^>]+>/g, "")
 /* ========================== DATABASE ========================== */
 
 
-// SSL to the database. Default = the old behaviour (no certificate check).
-// For a strict check set DATABASE_SSL_STRICT=true (system CAs) and optionally DATABASE_CA (PEM text of your provider's CA).
-const DATABASE_SSL = String(process.env.DATABASE_SSL_STRICT || "").toLowerCase() === "true"
-    ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA ? { ca: process.env.DATABASE_CA } : {}) }
-    : { rejectUnauthorized: false };
-
 const pool = DATABASE_URL
     ? new Pool({
         connectionString: DATABASE_URL,
-        ssl: DATABASE_SSL,
+        ssl: { rejectUnauthorized: false },
         max: 4,
         idleTimeoutMillis: 10000,
         connectionTimeoutMillis: 10000
@@ -266,9 +266,6 @@ if (pool) {
     pool.on("error", e => console.error("pg pool error", e.message));
 }
 
-// Bump this number whenever you add something to the schema below: the tables are then created once,
-// and every later cold start only runs one cheap SELECT.
-const SCHEMA_VERSION = "2";
 let schemaPromise = null;
 
 async function ensureDatabase() {
@@ -276,10 +273,6 @@ async function ensureDatabase() {
 
     if (!schemaPromise) {
         schemaPromise = (async () => {
-            try {
-                const v = await pool.query(`SELECT value FROM mr_app_settings WHERE key = 'schema_version'`);
-                if (v.rows[0] && v.rows[0].value === SCHEMA_VERSION) return;
-            } catch (e) { /* tables do not exist yet: create them below */ }
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS mr_users (
                     telegram_id BIGINT PRIMARY KEY,
@@ -393,6 +386,17 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS admin_msg_id BIGINT;`);
             // fixed USD value of the request; the BNB amount is recalculated from it with the live price at payment time
             await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS usd_amount NUMERIC;`);
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS mr_deposits (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    tx_hash TEXT NOT NULL UNIQUE,
+                    from_address TEXT,
+                    amount NUMERIC NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            `);
+            await pool.query(`CREATE INDEX IF NOT EXISTS mr_deposits_user_idx ON mr_deposits(telegram_id);`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT TRUE;`);
             await pool.query(`ALTER TABLE mr_referrals ALTER COLUMN verified SET DEFAULT FALSE;`);
             await pool.query(`ALTER TABLE mr_referrals ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;`);
@@ -472,19 +476,11 @@ async function ensureDatabase() {
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS max_users INTEGER NOT NULL DEFAULT 0`);
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS sponsored BOOLEAN NOT NULL DEFAULT FALSE`);
             await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS sponsor_owner BIGINT`);
-            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS left_at TIMESTAMPTZ`);
-            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS penalty NUMERIC NOT NULL DEFAULT 0`);
-            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS last_check TIMESTAMPTZ`);
-            await pool.query(`ALTER TABLE mr_task_claims ADD COLUMN IF NOT EXISTS was_member BOOLEAN NOT NULL DEFAULT FALSE`);
-            await pool.query(`ALTER TABLE mr_tasks ADD COLUMN IF NOT EXISTS announce_pending BOOLEAN NOT NULL DEFAULT FALSE`);
-            await pool.query(`CREATE TABLE IF NOT EXISTS mr_partner_tasks (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, provider TEXT NOT NULL DEFAULT 'adsgram', reward NUMERIC NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_partner_tasks_user ON mr_partner_tasks(telegram_id, created_at)`);
-            await pool.query(`ALTER TABLE mr_partner_tasks ADD COLUMN IF NOT EXISTS task_key TEXT`);
-            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS mr_partner_tasks_once ON mr_partner_tasks(telegram_id, task_key) WHERE task_key IS NOT NULL`);
-            await pool.query(`CREATE TABLE IF NOT EXISTS mr_task_msgs (task_id BIGINT NOT NULL, chat_id BIGINT NOT NULL, message_id BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (task_id, chat_id))`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_spins (id BIGSERIAL PRIMARY KEY, telegram_id BIGINT NOT NULL, prize NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`CREATE INDEX IF NOT EXISTS mr_spins_user ON mr_spins(telegram_id, created_at)`);
             await pool.query(`CREATE TABLE IF NOT EXISTS mr_banners (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, text TEXT DEFAULT '', url TEXT NOT NULL, expires_at TIMESTAMPTZ, enabled BOOLEAN NOT NULL DEFAULT TRUE, clicks INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+            await pool.query(`CREATE TABLE IF NOT EXISTS mr_offers (id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT '', url TEXT NOT NULL, reward NUMERIC NOT NULL DEFAULT 0, badge TEXT DEFAULT '', enabled BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+            await pool.query(`CREATE TABLE IF NOT EXISTS mr_offer_events (txid TEXT PRIMARY KEY, offer_id BIGINT, telegram_id BIGINT NOT NULL, reward NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
             await pool.query(`
                 INSERT INTO mr_app_settings(key, value)
                 VALUES ('spin_enabled','1'),('spin_max_extra','3'),('spin_scale','1'),
@@ -508,21 +504,6 @@ async function ensureDatabase() {
                     (3,'3rd Place Reward','Third leaderboard reward')
                 ON CONFLICT(position) DO NOTHING;
             `);
-            // signed payout transaction (saved BEFORE it is broadcast, so a payout can never be sent twice)
-            await pool.query(`ALTER TABLE mr_withdrawals ADD COLUMN IF NOT EXISTS raw_tx TEXT;`);
-            // indexes for the queries that run on every request
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_ad_rewards_user_time ON mr_ad_rewards(telegram_id, created_at)`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_withdrawals_user_status ON mr_withdrawals(telegram_id, status, created_at)`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_withdrawals_status_time ON mr_withdrawals(status, created_at)`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_withdrawals_address ON mr_withdrawals(LOWER(address))`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_users_points_active ON mr_users(points DESC) WHERE is_banned = FALSE`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_task_claims_user ON mr_task_claims(telegram_id)`);
-            await pool.query(`CREATE INDEX IF NOT EXISTS mr_referrals_inviter ON mr_referrals(inviter_id)`);
-            await pool.query(
-                `INSERT INTO mr_app_settings(key, value) VALUES('schema_version', $1)
-                 ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-                [SCHEMA_VERSION]
-            );
         })().catch(err => {
             schemaPromise = null;
             throw err;
@@ -569,8 +550,7 @@ app.get("/api/health", async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("/api/health", error.message);
-        res.status(500).json({ ok: false, database: false, error: PUBLIC_ERR });
+        res.status(500).json({ ok: false, database: false, error: error.message });
     }
 });
 
@@ -615,7 +595,7 @@ function validateTelegramInitData(initData) {
     }
     if (!user.id) throw new Error("Telegram user ID is missing.");
 
-    return { user, startParam: params.get("start_param") || "", authDate };
+    return { user, startParam: params.get("start_param") || "" };
 }
 
 function getInitData(req) {
@@ -628,44 +608,15 @@ function getInitData(req) {
     return "";
 }
 
-// small in-memory rate limiter (per server instance)
-const rateBuckets = new Map();
-function rateAllow(key, max, windowMs) {
-    const now = Date.now();
-    let b = rateBuckets.get(key);
-    if (!b || now - b.at >= windowMs) { b = { at: now, n: 0 }; rateBuckets.set(key, b); }
-    b.n++;
-    if (rateBuckets.size > 20000) {
-        for (const [k, v] of rateBuckets) if (now - v.at > 120000) rateBuckets.delete(k);
-    }
-    return b.n <= max;
-}
-
-// the admin sees the real error text, everybody else gets a generic message
-function publicError(e, req) {
-    const isAdmin = ADMIN_ID && req && req.telegramUser && String(req.telegramUser.id) === ADMIN_ID;
-    return isAdmin ? String((e && e.message) || e) : PUBLIC_ERR;
-}
-
 function authenticate(req, res, next) {
-    let result;
     try {
-        result = validateTelegramInitData(getInitData(req));
+        const result = validateTelegramInitData(getInitData(req));
+        req.telegramUser = result.user;
+        req.startParam = result.startParam;
+        next();
     } catch (error) {
-        return res.status(401).json({ ok: false, error: error.message });
+        res.status(401).json({ ok: false, error: error.message });
     }
-    req.telegramUser = result.user;
-    req.startParam = result.startParam;
-    req.initAuthDate = result.authDate;
-
-    const uid = String(result.user.id);
-    if (!ADMIN_ID || uid !== ADMIN_ID) {
-        const isMe = String(req.originalUrl || "").split("?")[0] === "/api/me";
-        if (!rateAllow("all:" + uid, 120, 60000) || (isMe && !rateAllow("me:" + uid, 30, 60000))) {
-            return res.status(429).json({ ok: false, error: "Too many requests. Please slow down." });
-        }
-    }
-    next();
 }
 
 /* ========================== TELEGRAM API ========================== */
@@ -698,26 +649,9 @@ async function checkChannel(telegramId, channel) {
     }
 }
 
-const CHANNEL_CACHE_MS = 90 * 1000;
-const chanCache = new Map();
-async function checkAllChannels(telegramId, opts = {}) {
+async function checkAllChannels(telegramId) {
     if (!REQUIRED_CHANNELS.length) return [];
-    const key = String(telegramId);
-    const hit = chanCache.get(key);
-    if (!opts.fresh && hit && Date.now() - hit.at < CHANNEL_CACHE_MS) return hit.channels;
-
-    const channels = await Promise.all(REQUIRED_CHANNELS.map(c => checkChannel(telegramId, c)));
-    // only a positive answer is cached, so a user who just joined is never held back
-    if (channels.length && channels.every(x => x.joined)) {
-        chanCache.set(key, { at: Date.now(), channels });
-        if (chanCache.size > 5000) {
-            const now = Date.now();
-            for (const [k, v] of chanCache) if (now - v.at > CHANNEL_CACHE_MS) chanCache.delete(k);
-        }
-    } else {
-        chanCache.delete(key);
-    }
-    return channels;
+    return Promise.all(REQUIRED_CHANNELS.map(c => checkChannel(telegramId, c)));
 }
 
 const allJoinedOf = channels => channels.length === 0 || channels.every(x => x.joined);
@@ -771,7 +705,7 @@ const banHead = type =>
     type === "vpn" ? "VPN/Proxy detected." : type === "multi" ? "Multiple accounts detected." : "";
 
 const banDm = type =>
-    "" + (banHead(type) ? banHead(type) + "\n\n" : "") + "Your account has been permanently banned from Adewa.";
+    "\u{1F6AB} " + (banHead(type) ? banHead(type) + "\n\n" : "") + "Your account has been permanently banned from Adewa.";
 
 const banApiText = type =>
     (banHead(type) ? banHead(type) + " " : "") + "Your account has been permanently banned.";
@@ -829,13 +763,11 @@ async function detectMultiAccount(id, ipHash, deviceHash, firstSeen) {
             [ipHash, id, since, deviceHash]
         );
         if (i.rows.length) {
-            // same IP but a different device: many real people share one IP (mobile networks, home Wi-Fi),
-            // so this is only a flag for the admin to review, never an automatic ban
-            return { detected: false, flagged: true, reason: "Same IP address as another account (different device)." };
+            return { detected: true, reason: "Multiple Telegram accounts detected from the same IP address." };
         }
     }
 
-    return { detected: false, flagged: false, reason: "" };
+    return { detected: false, reason: "" };
 }
 
 async function saveFraud(tgUser, f) {
@@ -955,19 +887,14 @@ async function securityGate(req, tgUser) {
         }
         if (ADMIN_ID) {
             const who = [tgUser.first_name, tgUser.username ? "@" + tgUser.username : ""].filter(Boolean).join(" ");
-            await trySend(ADMIN_ID, `Auto-ban: ${who} (ID ${id})\nReason: ${reason}\n\nWrong? Send /unban ${id}`);
+            await trySend(ADMIN_ID, `\u{1F6AB} Auto-ban: ${who} (ID ${id})\nReason: ${reason}\n\nWrong? Send /unban ${id}`);
         }
         return { ok: false, reason, message: banApiText(type) };
     }
 
-    const newlyFlagged = !!multi.flagged && (!row || Number(row.risk_score) < 50);
     await saveFraud(tgUser, {
-        ipHash, deviceHash, vpn: false, proxy: false, risk: multi.flagged ? 50 : 0, status: "verified", reason: ""
+        ipHash, deviceHash, vpn: false, proxy: false, risk: 0, status: "verified", reason: ""
     });
-    if (newlyFlagged && ADMIN_ID) {
-        const who = [tgUser.first_name, tgUser.username ? "@" + tgUser.username : ""].filter(Boolean).join(" ");
-        bg(trySend(ADMIN_ID, `Review needed: ${who} (ID ${id}) uses the same IP as another account but a different device.\nNot banned. If it is a cheater: /ban ${id}`));
-    }
 
     if (!row || !row.verification_message_sent) {
         if (await trySend(id, "\u2705 Your verification is successfully.")) {
@@ -975,22 +902,6 @@ async function securityGate(req, tgUser) {
         }
     }
     return { ok: true };
-}
-
-// Runs the security gate (cached for 10 minutes per user) on the endpoints that give or pay out points,
-// so nobody can skip the VPN / multi-account checks by calling them directly without /api/me.
-async function requireGate(req, res, next) {
-    try {
-        await requireDatabase();
-        const gate = await securityGate(req, req.telegramUser);
-        if (!gate.ok) {
-            return res.status(403).json({ ok: false, status: "banned", reason: gate.reason, error: gate.message });
-        }
-        next();
-    } catch (error) {
-        console.error("requireGate", error.message);
-        res.status(500).json({ ok: false, error: PUBLIC_ERR });
-    }
 }
 
 // /ban <id|@username> [reason]   and   /unban <id|@username>   (admin only, private chat with the bot)
@@ -1213,9 +1124,9 @@ async function tryVerifyReferral(userId, joined) {
     }
 
     if (paid) {
-        bg(notifyUser(inviterId, `Your friend is verified. You earned ${reward} points!`));
+        notifyUser(inviterId, `Your friend is verified. You earned ${reward} points!`);
         for (const b of bonuses) {
-            bg(notifyUser(inviterId, `Milestone reached: ${b.m} verified friends! Bonus +${b.bonus} points.`));
+            notifyUser(inviterId, `Milestone reached: ${b.m} verified friends! Bonus +${b.bonus} points.`);
         }
     }
 }
@@ -1242,17 +1153,7 @@ app.get("/api/me", authenticate, async (req, res) => {
         }
 
         await createOrUpdateUser(req.telegramUser, referral);
-        bg(pool.query(`UPDATE mr_users SET last_active = NOW() WHERE telegram_id = $1`, [telegramId]));
-
-        // finish pending task announcements / delete announcements of finished tasks (at most once a minute)
-        if (Date.now() - lastTaskSweep > 60000) {
-            lastTaskSweep = Date.now();
-            bg(sweepTaskMessages(4000));
-        }
-
-        // if this user left a channel he promoted-joined, take the reward back (checked at most every 5 minutes per user)
-        try { await penalizeLeavers(telegramId, 8, 5 * 60 * 1000); }
-        catch (e) { console.error("penalizeLeavers", e.message); }
+        pool.query(`UPDATE mr_users SET last_active = NOW() WHERE telegram_id = $1`, [telegramId]).catch(() => {});
 
         try {
             await processReferral(telegramId);
@@ -1284,46 +1185,53 @@ app.get("/api/me", authenticate, async (req, res) => {
             return res.status(403).json({ ok: false, error: "Your account is banned." });
         }
 
+        const rankResult = await pool.query(
+            `SELECT COUNT(*) + 1 AS rank FROM mr_users WHERE is_banned = FALSE AND points > $1`,
+            [user.points]
+        );
+
         const sRes = await pool.query(`SELECT key, value FROM mr_app_settings`);
         const settings = {};
         for (const r of sRes.rows) settings[r.key] = Number(r.value);
 
-        // the rest does not depend on each other, so it runs in parallel
-        const [rankResult, todayRes, limits, withdrawNextAt, withdrawReq, partner] = await Promise.all([
-            pool.query(
-                `SELECT COUNT(*) + 1 AS rank FROM mr_users WHERE is_banned = FALSE AND points > $1`,
-                [user.points]
-            ),
-            pool.query(
-                `SELECT COUNT(*)::int AS c FROM mr_ad_rewards WHERE telegram_id = $1 AND created_at >= ${DAY_START}`,
-                [telegramId]
-            ),
-            getPayoutLimits(pool, settings).catch(e => { console.error("limits", e.message); return null; }),
-            nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours).catch(e => { console.error("withdrawNextAt", e.message); return 0; }),
-            getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day, partnerNeeded(settings)).catch(e => { console.error("withdrawReq", e.message); return null; }),
-            pool.query(
-                `SELECT COUNT(*) FILTER (WHERE created_at >= ${DAY_START})::int AS today,
-                        COALESCE(SUM(reward) FILTER (WHERE created_at >= ${DAY_START}), 0) AS points,
-                        COUNT(*)::int AS total
-                 FROM mr_partner_tasks WHERE telegram_id = $1`, [telegramId]
-            ).then(pr => ({ today: pr.rows[0].today, points: Number(pr.rows[0].points), total: pr.rows[0].total }))
-             .catch(e => { console.error("partner stats", e.message); return { today: 0, points: 0, total: 0 }; })
-        ]);
-        const bnbPrice = null;   // payouts are USDT, the app still reads this field
+        const todayRes = await pool.query(
+            `SELECT COUNT(*)::int AS c FROM mr_ad_rewards
+             WHERE telegram_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`,
+            [telegramId]
+        );
 
-        // normal users only get the settings the app really shows; the admin gets everything
-        const isAdminUser = !!ADMIN_ID && telegramId === ADMIN_ID;
-        const publicSettings = {};
-        for (const [k, v] of Object.entries(settings)) {
-            if (isAdminUser || PUBLIC_SETTING_KEYS.has(k)) publicSettings[k] = v;
-        }
+        // live BNB price (cached 60s) + current payout limits, shown in the app
+        const bnbPrice = null;   // payouts are USDT now, no BNB price needed
+        let limits = null;
+        try { limits = await getPayoutLimits(pool, settings); } catch (e) { console.error("limits", e.message); }
+
+        let withdrawNextAt = 0;
+        try { withdrawNextAt = await nextWithdrawAt(pool, telegramId, settings.withdraw_cooldown_hours); }
+        catch (e) { console.error("withdrawNextAt", e.message); }
+        let withdrawReq = null;
+        try { withdrawReq = await getWithdrawRequirements(pool, telegramId, settings.max_ads_per_day); }
+        catch (e) { console.error("withdrawReq", e.message); }
+
+        let withdrawGate = null;
+        try {
+            const g = await getWithdrawGate(pool, telegramId);
+            withdrawGate = {
+                first: g.isFirst,
+                deposit_done: g.depositDone,
+                need_deposit: g.needDeposit,
+                first_min_points: firstMinPoints(settings.point_value_usd),
+                first_min_usd: FIRST_WITHDRAW_MIN_USD,
+                deposit_required_usd: DEPOSIT_REQUIRED_USD,
+                deposit_address: getDepositAddress()
+            };
+        } catch (e) { console.error("withdrawGate", e.message); }
 
         res.json({
             ok: true,
-            settings: publicSettings,
-            partner,
+            settings,
             withdraw_next_at: withdrawNextAt,
             withdraw_req: withdrawReq,
+            withdraw_gate: withdrawGate,
             today_ads: todayRes.rows[0].c,
             user: {
                 telegram_id: user.telegram_id,
@@ -1343,14 +1251,14 @@ app.get("/api/me", authenticate, async (req, res) => {
             },
             channels,
             allJoined,
-            adsgram: { blockId: ADSGRAM_BLOCK_ID, interBlockId: ADSGRAM_INTERSTITIAL_BLOCK_ID, taskBlockId: ADSGRAM_TASK_BLOCK_ID },
+            adsgram: { blockId: ADSGRAM_BLOCK_ID },
             monetag: { zoneId: MONETAG_ZONE_ID },
             payout: { symbol: TOKEN_SYMBOL, ready: PAY_READY, explorer: EXPLORER_TX, bnb_price: bnbPrice, limits },
             bot: { username: BOT_USERNAME }
         });
     } catch (error) {
         console.error("/api/me", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -1358,28 +1266,22 @@ app.get("/api/me", authenticate, async (req, res) => {
 
 app.get("/api/channels", authenticate, async (req, res) => {
     try {
-        const channels = await checkAllChannels(String(req.telegramUser.id), { fresh: true });
+        const channels = await checkAllChannels(String(req.telegramUser.id));
         res.json({ ok: true, channels, allJoined: allJoinedOf(channels) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
 /* =========================== AD REWARD =========================== */
 
-app.post("/api/ad-reward", authenticate, requireGate, async (req, res) => {
+app.post("/api/ad-reward", authenticate, async (req, res) => {
     try {
         await requireDatabase();
 
         const telegramId = String(req.telegramUser.id);
         const provider = req.body?.provider === "monetag" ? "monetag" : "adsgram";
         const strict = provider === "monetag" ? STRICT_MONETAG : STRICT_ADS;
-
-        // FAIL CLOSED: without the provider's secret there is no server-side proof that an ad was watched,
-        // so nothing is paid (before, the client could pick the provider and claim free points)
-        if (!strict) {
-            return res.status(503).json({ ok: false, error: "Ad rewards are temporarily unavailable." });
-        }
 
         if (provider === "monetag" && !MONETAG_ZONE_ID) {
             return res.status(400).json({ ok: false, error: "Monetag is not configured." });
@@ -1520,7 +1422,7 @@ app.post("/api/ad-reward", authenticate, requireGate, async (req, res) => {
         });
     } catch (error) {
         console.error("/api/ad-reward", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -1561,61 +1463,6 @@ app.get("/api/adsgram-reward", async (req, res) => {
         res.status(r.code).json(r.body);
     } catch (error) {
         console.error("/api/adsgram-reward", error.message);
-        res.status(500).json({ ok: false });
-    }
-});
-
-// Adsgram TASK reward URL (set it in the Adsgram dashboard for your task block):
-//   https://YOUR-APP/api/adsgram-task-reward?userid=[userId]&secret=YOUR_ADSGRAM_SECRET
-// Adsgram calls it from its server when the user finished a partner task (visited the website, joined the channel ...).
-app.get("/api/adsgram-task-reward", async (req, res) => {
-    try {
-        if (!ADSGRAM_SECRET) return res.status(503).json({ ok: false, error: "ADSGRAM_SECRET is not set." });
-        if (!safeSecretEqual(req.query.secret, ADSGRAM_SECRET)) return res.status(403).json({ ok: false });
-        const userId = String(req.query.userid ?? req.query.userId ?? "").trim();
-        if (!/^\d{3,15}$/.test(userId)) return res.status(400).json({ ok: false, error: "Bad userid." });
-        // the id of the partner task, if Adsgram sends one (put &taskid=[taskId] in the reward URL when available).
-        // one task id is paid only once per user, so the same task can never pay twice.
-        const taskKey = String(req.query.taskid ?? req.query.task_id ?? req.query.sourceid ?? "").trim().slice(0, 100) || null;
-        await requireDatabase();
-
-        const st = await settingsMap();
-        const reward = Number(st.adsgram_task_reward ?? 2), daily = Math.floor(st.adsgram_task_daily ?? 10);
-        if (!(reward > 0)) return res.json({ ok: true, ignored: "reward is 0" });
-
-        const client = await pool.connect();
-        let given = false, why = null;
-        try {
-            await client.query("BEGIN");
-            const u = await client.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1 FOR UPDATE`, [userId]);
-            if (!u.rows.length || u.rows[0].is_banned) { await client.query("ROLLBACK"); return res.status(403).json({ ok: false, error: "User not allowed." }); }
-
-            // same task reported again -> ignore
-            if (taskKey) {
-                const dup = await client.query(`SELECT 1 FROM mr_partner_tasks WHERE telegram_id = $1 AND task_key = $2`, [userId, taskKey]);
-                if (dup.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "task already rewarded" }); }
-            }
-            // two rewards within 20 seconds for one user = the same task fired twice -> only the first one counts
-            const burst = await client.query(`SELECT 1 FROM mr_partner_tasks WHERE telegram_id = $1 AND created_at > NOW() - INTERVAL '20 seconds' LIMIT 1`, [userId]);
-            if (burst.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "duplicate within 20s" }); }
-
-            if (daily > 0) {
-                const c = await client.query(`SELECT COUNT(*)::int AS c FROM mr_partner_tasks WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [userId]);
-                if (c.rows[0].c >= daily) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "daily limit" }); }
-            }
-            const ins = await client.query(
-                `INSERT INTO mr_partner_tasks(telegram_id, provider, reward, task_key) VALUES($1,'adsgram',$2,$3)
-                 ON CONFLICT DO NOTHING RETURNING id`, [userId, reward, taskKey]);
-            if (!ins.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: "task already rewarded" }); }
-            await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [userId, reward]);
-            await client.query("COMMIT");
-            given = true;
-        } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
-        finally { client.release(); }
-        if (given) bg(notifyUser(userId, `Partner task completed! +${reward} points were added.`));
-        res.json({ ok: true, reward });
-    } catch (error) {
-        console.error("/api/adsgram-task-reward", error.message);
         res.status(500).json({ ok: false });
     }
 });
@@ -1671,7 +1518,7 @@ app.get("/api/leaderboard", authenticate, async (req, res) => {
             }))
         });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -1686,7 +1533,7 @@ app.get("/api/rewards", authenticate, async (req, res) => {
         );
         res.json({ ok: true, rewards: result.rows });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -1734,7 +1581,7 @@ app.post("/api/admin/settings", authenticate, requireAdmin, async (req, res) => 
 
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -1765,9 +1612,36 @@ app.post("/api/admin/reward", authenticate, requireAdmin, async (req, res) => {
 
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
+
+/* ===================== DEPOSIT GATE ===================== */
+
+function getDepositAddress() {
+    if (DEPOSIT_ADDRESS_ENV && ethers.isAddress(DEPOSIT_ADDRESS_ENV)) return ethers.getAddress(DEPOSIT_ADDRESS_ENV.toLowerCase());
+    if (PAYOUT_PRIVATE_KEY) {
+        try { return new ethers.Wallet(PAYOUT_PRIVATE_KEY).address; } catch (e) { /* ignore */ }
+    }
+    return "";
+}
+
+// first = the user has no paid withdrawal yet; needDeposit = first withdrawal done but no verified deposit yet
+async function getWithdrawGate(db, telegramId) {
+    const paid = await db.query(
+        `SELECT 1 FROM mr_withdrawals WHERE telegram_id = $1 AND status = 'approved' LIMIT 1`, [telegramId]
+    );
+    const dep = await db.query(`SELECT 1 FROM mr_deposits WHERE telegram_id = $1 LIMIT 1`, [telegramId]);
+    const isFirst = !paid.rows.length;
+    const depositDone = dep.rows.length > 0;
+    return { isFirst, depositDone, needDeposit: !isFirst && !depositDone };
+}
+
+// the minimum (in points) for the very first withdrawal
+function firstMinPoints(rate) {
+    const r = Number(rate) > 0 ? Number(rate) : 0.01;
+    return Math.ceil((FIRST_WITHDRAW_MIN_USD / r) * 100 - 1e-9) / 100;
+}
 
 /* ===================== WITHDRAW (BNB AUTO PAY) ===================== */
 
@@ -1783,11 +1657,10 @@ function getPayer() {
 }
 
 // Sends USDT (BEP20 token transfer). The wallet also needs a little BNB for the gas fee.
-// The transaction is SIGNED first, its hash and raw bytes are saved in the database (hooks.onPrepared),
-// and only then it is broadcast. If the function dies at any point, the very same signed transaction
-// (same nonce) can be re-broadcast, so one request can never be paid twice.
 // A DB advisory lock makes sure two payouts never use the same nonce.
-async function sendPayout(to, tokenAmount, hooks = {}) {
+// onSent(hash) is called right after the transaction is broadcast, so the hash is saved
+// in the database immediately (even if the serverless function is stopped afterwards).
+async function sendPayout(to, tokenAmount, onSent) {
     const { wallet, provider } = getPayer();
     const token = new ethers.Contract(USDT_CONTRACT, ERC20_ABI, wallet);
     const lock = await pool.connect();
@@ -1805,50 +1678,19 @@ async function sendPayout(to, tokenAmount, hooks = {}) {
             throw new Error("Transfer would fail: " + (e.shortMessage || e.message));
         }
         const feeData = await provider.getFeeData();
-        const gasPrice = feeData.gasPrice;
-        if (!gasPrice) throw new Error("Could not read the gas price.");
         const bnbBal = await provider.getBalance(wallet.address);
-        if (bnbBal < gasLimit * gasPrice) {
+        if (bnbBal < gasLimit * (feeData.gasPrice || 0n)) {
             throw new Error("Payout wallet has not enough BNB for the gas fee.");
         }
 
-        const nonce = await provider.getTransactionCount(wallet.address, "pending");
-        const signed = await wallet.signTransaction({
-            to: USDT_CONTRACT,
-            data: token.interface.encodeFunctionData("transfer", [to, amt]),
-            value: 0n, nonce, gasLimit, gasPrice, chainId: BSC_CHAIN_ID, type: 0
-        });
-        const hash = ethers.keccak256(signed);
-
-        // MUST be saved before anything is sent to the network
-        await hooks.onPrepared(hash, signed);
-
-        try {
-            await provider.broadcastTransaction(signed);
-        } catch (e) {
-            // maybe the network already knows it ("already known") - only if it really does not, the payout was NOT sent
-            const known = await provider.getTransaction(hash).catch(() => null);
-            if (!known) {
-                if (hooks.onUnsent) await hooks.onUnsent().catch(() => {});
-                throw new Error("Broadcast failed: " + (e.shortMessage || e.message));
-            }
+        const tx = await token.transfer(to, amt, { gasLimit });
+        if (typeof onSent === "function") {
+            try { await onSent(tx.hash); } catch (e) { console.error("onSent", e.message); }
         }
-        return hash;
+        return tx.hash;
     } finally {
         await lock.query("SELECT pg_advisory_unlock(778899)").catch(() => {});
         lock.release();
-    }
-}
-
-// "success" | "failed" (reverted on-chain, nothing was paid) | "pending" (no receipt yet)
-async function waitForReceipt(hash, ms) {
-    const { provider } = getPayer();
-    try {
-        const rc = await provider.waitForTransaction(hash, 1, ms);
-        if (!rc) return "pending";
-        return rc.status === 1 ? "success" : "failed";
-    } catch (e) {
-        return "pending";
     }
 }
 
@@ -1904,26 +1746,26 @@ function requestLines(w, name, opts = {}) {
         ? `<a href="tg://user?id=${esc(w.telegram_id)}">${esc(name)}</a>`
         : esc(name);
     return (
-        `${em(EMOJI_USER_ID, "")} <b>User:</b> ${nameHtml}\n` +
-        `${em(EMOJI_AMOUNT, "")} <b>Amount:</b> $${fmtUsd(m.finalUsd)} ${TOKEN_SYMBOL} (after $${fmtFeeUsd(m.feeUsd)} fee)\n` +
-        `<b>Gateway:</b> ${TOKEN_SYMBOL} BEP20\n` +
-        `${em(EMOJI_ADDRESS, "")} <b>Address:</b> <code>${esc(addr)}</code>`
+        `${em(EMOJI_USER_ID, "\u{1F464}")} <b>User:</b> ${nameHtml}\n` +
+        `${em(EMOJI_AMOUNT, "\u{1F4B5}")} <b>Amount:</b> $${fmtUsd(m.finalUsd)} ${TOKEN_SYMBOL} (after $${fmtFeeUsd(m.feeUsd)} fee)\n` +
+        `\u{1FA99} <b>Gateway:</b> ${TOKEN_SYMBOL} BEP20\n` +
+        `${em(EMOJI_ADDRESS, "\u{1F4E6}")} <b>Address:</b> <code>${esc(addr)}</code>`
     );
 }
 
 // message the ADMIN gets for every withdraw request
 function buildAdminRequestHtml(w, status, name) {
     let t = `${em(EMOJI_NOTI, "\u26A1")} <b>Withdrawal Request!</b>\n\n` + requestLines(w, name, { link: true });
-    if (BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "")} <b>App:</b> @${esc(BOT_USERNAME)}`;
-    t += `\n\n-----------\n${em(EMOJI_STATUS, "")} <b>Status:</b> <i>${esc(status)}</i>`;
-    if (w.tx_hash) t += `\n\n<a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
+    if (BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "\u{1F680}")} <b>App:</b> @${esc(BOT_USERNAME)}`;
+    t += `\n\n-----------\n${em(EMOJI_STATUS, "\u{1F4B8}")} <b>Status:</b> <i>${esc(status)}</i>`;
+    if (w.tx_hash) t += `\n\n\u{1F517} <a href="${esc(EXPLORER_TX + w.tx_hash)}">View Transaction</a>`;
     return t;
 }
 
 // "Withdrawal Successful!" - for the user (with App link) and for the proof channel (masked, no App link)
 function buildSuccessHtml(w, name, opts = {}) {
     let t = `${em(EMOJI_NOTI, "\u26A1")} <b>Withdrawal Successful!</b>\n\n` + requestLines(w, name, { mask: !!opts.mask });
-    if (opts.forUser && BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "")} <b>App:</b> ${esc(appLink())}`;
+    if (opts.forUser && BOT_USERNAME) t += `\n\n${em(EMOJI_PROOF, "\u{1F680}")} <b>App:</b> ${esc(appLink())}`;
     return t;
 }
 
@@ -1940,7 +1782,7 @@ async function sendWithCheckout(chatId, text, txHash) {
         console.error("sendWithCheckout (styled)", e.message);
         await telegram("sendMessage", {
             ...base,
-            reply_markup: { inline_keyboard: [[{ text: "Check out", url }]] }
+            reply_markup: { inline_keyboard: [[{ text: "\u{1F517} Check out", url }]] }
         });
     }
 }
@@ -2004,16 +1846,14 @@ async function syncAdminMessage(id, approve) {
     }
 }
 
-// Claims a request ('pending', or a 'processing' one that is stuck), makes sure the payout transaction
-// exists exactly once, waits for the blockchain confirmation, then marks it approved.
+// Claims a request ('pending', or a 'processing' one that has been stuck for 3+ minutes),
+// sends the payout, then marks it approved.
 async function approveWithdrawal(id, adminId) {
-    // stuck = 3+ minutes without any transaction, or 20+ seconds when the transaction was already sent (re-check it)
     const c = await pool.query(
         `UPDATE mr_withdrawals SET status = 'processing', processing_at = NOW()
          WHERE id = $1
            AND (status = 'pending'
-                OR (status = 'processing' AND (processing_at IS NULL
-                    OR processing_at < NOW() - (CASE WHEN tx_hash IS NULL THEN INTERVAL '3 minutes' ELSE INTERVAL '20 seconds' END))))
+                OR (status = 'processing' AND (processing_at IS NULL OR processing_at < NOW() - INTERVAL '3 minutes')))
          RETURNING *`,
         [id]
     );
@@ -2022,68 +1862,29 @@ async function approveWithdrawal(id, adminId) {
     }
     const row = c.rows[0];
 
+    // if an earlier attempt already broadcast the transaction, do not pay twice
     let txHash = row.tx_hash || null;
-    try {
-        if (txHash) {
-            // an earlier attempt already signed this payout: never create a second one, only re-send the same signed transaction
-            if (row.raw_tx) {
-                const { provider } = getPayer();
-                await provider.broadcastTransaction(row.raw_tx).catch(() => {});   // "already known" etc. is fine
-            }
-        } else {
+    if (!txHash) {
+        try {
             // USDT is 1:1 with USD: pay exactly the USD value saved with the request
             if (row.usd_amount === null || row.usd_amount === undefined) {
                 throw new Error("This old request has no USDT value saved. Please reject it.");
             }
             const fresh = Math.floor(Number(row.usd_amount) * 1e8) / 1e8;
             if (!(fresh > 0)) throw new Error("Amount is too small to pay out.");
-
-            // hard safety caps (they do not depend on the Settings, so a stolen admin account cannot empty the wallet)
-            if (MAX_SINGLE_PAYOUT_USD > 0 && fresh > MAX_SINGLE_PAYOUT_USD) {
-                throw new Error("Amount is above the safety cap per payout ($" + MAX_SINGLE_PAYOUT_USD + ").");
-            }
-            if (HARD_DAILY_PAYOUT_USD > 0) {
-                const d = await pool.query(
-                    `SELECT COALESCE(SUM(usd_amount), 0) AS s FROM mr_withdrawals
-                     WHERE id <> $1 AND (status = 'approved' OR (status = 'processing' AND tx_hash IS NOT NULL))
-                       AND COALESCE(processed_at, processing_at) >= ${DAY_START}`,
-                    [id]
-                );
-                if (Number(d.rows[0].s) + fresh > HARD_DAILY_PAYOUT_USD + 1e-9) {
-                    throw new Error("The daily safety cap for payouts ($" + HARD_DAILY_PAYOUT_USD + ") is reached.");
-                }
-            }
-
             await pool.query(`UPDATE mr_withdrawals SET token_amount = $2 WHERE id = $1`, [id, fresh]);
             row.token_amount = fresh;
-            txHash = await sendPayout(row.address, fresh, {
-                onPrepared: (h, raw) => pool.query(`UPDATE mr_withdrawals SET tx_hash = $2, raw_tx = $3 WHERE id = $1`, [id, h, raw]),
-                onUnsent: () => pool.query(`UPDATE mr_withdrawals SET tx_hash = NULL, raw_tx = NULL WHERE id = $1`, [id])
+            txHash = await sendPayout(row.address, Number(row.token_amount), async h => {
+                await pool.query(`UPDATE mr_withdrawals SET tx_hash = $2 WHERE id = $1`, [id, h]);
             });
+        } catch (e) {
+            console.error("payout failed", e.message);
+            await pool.query(
+                `UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1 AND tx_hash IS NULL`,
+                [id]
+            ).catch(() => {});
+            return { ok: false, error: "Payment failed: " + e.message };
         }
-    } catch (e) {
-        console.error("payout failed", e.message);
-        await pool.query(
-            `UPDATE mr_withdrawals SET status = 'pending' WHERE id = $1 AND tx_hash IS NULL`,
-            [id]
-        ).catch(() => {});
-        return { ok: false, error: "Payment failed: " + e.message };
-    }
-
-    // do NOT mark it paid before the blockchain confirms it
-    const state = await waitForReceipt(txHash, RECEIPT_WAIT_MS);
-    if (state === "failed") {
-        await pool.query(
-            `UPDATE mr_withdrawals SET status = 'pending', tx_hash = NULL, raw_tx = NULL WHERE id = $1`,
-            [id]
-        ).catch(() => {});
-        return { ok: false, error: "The transaction failed on the blockchain. Nothing was paid. Check the payout wallet, then approve again." };
-    }
-    if (state === "pending") {
-        return {
-            ok: false,
-            error: "The payment was sent but is not confirmed yet (" + shortAddr(txHash) + "). Do NOT pay it again: wait a minute and press Approve again to finish it."
-        };
     }
 
     await pool.query(
@@ -2221,14 +2022,9 @@ async function handleAdminCallback(cb) {
     }
 }
 
-app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
+app.post("/api/withdraw", authenticate, async (req, res) => {
     try {
         await requireDatabase();
-
-        // a withdrawal needs a fresh session (the Telegram data is only valid for one hour here)
-        if (Math.floor(Date.now() / 1000) - Number(req.initAuthDate || 0) > WITHDRAW_MAX_AUTH_AGE) {
-            return res.status(401).json({ ok: false, error: "Your session is too old for a withdrawal. Please close the app and open it again." });
-        }
 
         const telegramId = String(req.telegramUser.id);
         const amount = Number(req.body?.amount);
@@ -2275,7 +2071,7 @@ app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
         }
 
         // must finish ALL of today's ads and ALL tasks first
-        const reqs = await getWithdrawRequirements(pool, telegramId, S.max_ads_per_day, partnerNeeded(S));
+        const reqs = await getWithdrawRequirements(pool, telegramId, S.max_ads_per_day);
         if (reqs.maxAds > 0 && reqs.adsToday < reqs.maxAds) {
             return res.status(400).json({
                 ok: false,
@@ -2288,15 +2084,25 @@ app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
                 error: `Complete all tasks first: ${reqs.tasksLeft} task(s) left.`
             });
         }
-        if (reqs.partnerNeed > 0 && reqs.partnerDone < reqs.partnerNeed) {
-            return res.status(400).json({
+
+        let minWithdraw = Number.isFinite(S.min_withdraw) ? S.min_withdraw : 100;
+        const gate = await getWithdrawGate(pool, telegramId);
+        if (gate.needDeposit) {
+            return res.status(403).json({
                 ok: false,
-                error: `Complete the Partner tasks first: ${reqs.partnerDone} / ${reqs.partnerNeed} done today.`
+                error: `Deposit ${DEPOSIT_REQUIRED_USD} ${TOKEN_SYMBOL} (BEP20) once to unlock your next withdrawals. Open the Withdraw card and verify your deposit.`
             });
         }
-
-        const minWithdraw = Number.isFinite(S.min_withdraw) ? S.min_withdraw : 100;
-        if (amount < minWithdraw) {
+        if (gate.isFirst) {
+            // first withdrawal: lower minimum (FIRST_WITHDRAW_MIN_USD)
+            minWithdraw = firstMinPoints(S.point_value_usd);
+            if (amount < minWithdraw) {
+                return res.status(400).json({
+                    ok: false,
+                    error: `Minimum for your first withdrawal is ${minWithdraw} points ($${FIRST_WITHDRAW_MIN_USD}).`
+                });
+            }
+        } else if (amount < minWithdraw) {
             return res.status(400).json({ ok: false, error: `Minimum withdrawal is ${minWithdraw}.` });
         }
 
@@ -2354,17 +2160,6 @@ app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
                         ? "Today's payout budget is finished. Please try again tomorrow."
                         : "Not enough payout budget left today for this amount. Try a smaller amount or come back tomorrow."
                 });
-            }
-
-            // one wallet address = one account (checked inside the lock, so two requests cannot slip through together)
-            const dupAddr = await client.query(
-                `SELECT 1 FROM mr_withdrawals
-                 WHERE LOWER(address) = LOWER($1) AND telegram_id <> $2 AND status <> 'rejected' LIMIT 1`,
-                [address, telegramId]
-            );
-            if (dupAddr.rows.length) {
-                await client.query("ROLLBACK");
-                return res.status(400).json({ ok: false, error: "This wallet address is already used by another account." });
             }
 
             const u = await client.query(
@@ -2441,7 +2236,7 @@ app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
                             { text: "\u274C Reject", callback_data: `wd:reject:${wid}`, style: "danger" }
                         ],
                         [
-                            { text: "Open App", web_app: { url: APP_URL }, style: "primary" }
+                            { text: "\u{1F4F1} Open App", web_app: { url: APP_URL }, style: "primary" }
                         ]
                     ]
                 }
@@ -2491,7 +2286,94 @@ app.post("/api/withdraw", authenticate, requireGate, async (req, res) => {
         });
     } catch (error) {
         console.error("/api/withdraw", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
+    }
+});
+
+/* ---- deposit: the user sends USDT (BEP20) to the bot address, then sends the TX hash; the server checks the blockchain ---- */
+app.post("/api/deposit/verify", authenticate, async (req, res) => {
+    try {
+        await requireDatabase();
+        if (!PAY_READY) {
+            return res.status(503).json({ ok: false, error: "Deposits are temporarily unavailable." });
+        }
+        const telegramId = String(req.telegramUser.id);
+        const hash = String(req.body?.tx_hash || "").trim().toLowerCase();
+        if (!/^0x[0-9a-f]{64}$/.test(hash)) {
+            return res.status(400).json({ ok: false, error: "Enter a valid transaction hash (0x + 64 characters)." });
+        }
+
+        const u = await pool.query(`SELECT is_banned FROM mr_users WHERE telegram_id = $1`, [telegramId]);
+        if (!u.rows.length) return res.status(404).json({ ok: false, error: "User not found." });
+        if (u.rows[0].is_banned) return res.status(403).json({ ok: false, error: "Your account is banned." });
+
+        const already = await pool.query(`SELECT telegram_id FROM mr_deposits WHERE tx_hash = $1`, [hash]);
+        if (already.rows.length) {
+            return res.status(409).json({ ok: false, error: "This transaction was already used." });
+        }
+
+        const toAddr = getDepositAddress().toLowerCase();
+        if (!toAddr) return res.status(503).json({ ok: false, error: "Deposit address is not configured." });
+
+        const { provider } = getPayer();
+        const receipt = await provider.getTransactionReceipt(hash);
+        if (!receipt) {
+            return res.status(404).json({ ok: false, error: "Transaction not found yet. Wait a minute and try again." });
+        }
+        if (receipt.status !== 1) {
+            return res.status(400).json({ ok: false, error: "This transaction failed on the blockchain." });
+        }
+        const head = await provider.getBlockNumber();
+        const conf = head - receipt.blockNumber + 1;
+        if (conf < DEPOSIT_MIN_CONFIRMATIONS) {
+            return res.status(400).json({
+                ok: false,
+                error: `Waiting for confirmations (${Math.max(conf, 0)}/${DEPOSIT_MIN_CONFIRMATIONS}). Try again in a minute.`
+            });
+        }
+
+        const iface = new ethers.Interface(["event Transfer(address indexed from, address indexed to, uint256 value)"]);
+        let total = 0n;
+        let fromAddr = "";
+        for (const log of receipt.logs) {
+            if (String(log.address).toLowerCase() !== USDT_CONTRACT.toLowerCase()) continue;
+            let parsed = null;
+            try { parsed = iface.parseLog({ topics: [...log.topics], data: log.data }); } catch (e) { parsed = null; }
+            if (!parsed || parsed.name !== "Transfer") continue;
+            if (String(parsed.args.to).toLowerCase() !== toAddr) continue;
+            total += parsed.args.value;
+            fromAddr = String(parsed.args.from);
+        }
+        const need = ethers.parseUnits(DEPOSIT_REQUIRED_USD.toFixed(8), TOKEN_DECIMALS);
+        if (total < need) {
+            return res.status(400).json({
+                ok: false,
+                error: `No deposit of at least ${DEPOSIT_REQUIRED_USD} ${TOKEN_SYMBOL} (BEP20) to the deposit address was found in this transaction.`
+            });
+        }
+
+        const amountUsd = Number(ethers.formatUnits(total, TOKEN_DECIMALS));
+        const ins = await pool.query(
+            `INSERT INTO mr_deposits(telegram_id, tx_hash, from_address, amount)
+             VALUES($1,$2,$3,$4) ON CONFLICT (tx_hash) DO NOTHING RETURNING id`,
+            [telegramId, hash, fromAddr, amountUsd]
+        );
+        if (!ins.rows.length) {
+            return res.status(409).json({ ok: false, error: "This transaction was already used." });
+        }
+
+        if (ADMIN_ID) {
+            telegram("sendMessage", {
+                chat_id: Number(ADMIN_ID),
+                text: `\u{1F4B0} Deposit verified\n\nUser: ${telegramId}\nAmount: ${amountUsd} ${TOKEN_SYMBOL}\nTX: ${EXPLORER_TX}${hash}`,
+                disable_web_page_preview: true
+            }).catch(e => console.error("notify deposit", e.message));
+        }
+
+        res.json({ ok: true, amount: amountUsd, message: "Deposit verified. You can withdraw now." });
+    } catch (error) {
+        console.error("/api/deposit/verify", error);
+        res.status(500).json({ ok: false, error: "Could not check the transaction. Try again in a minute." });
     }
 });
 
@@ -2512,7 +2394,7 @@ app.get("/api/withdrawals", authenticate, async (req, res) => {
             }))
         });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2547,7 +2429,7 @@ app.get("/api/admin/withdrawals", authenticate, requireAdmin, async (req, res) =
             }))
         });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2560,7 +2442,7 @@ app.post("/api/admin/withdrawals/:id/approve", authenticate, requireAdmin, async
         res.status(r.ok ? 200 : 400).json(r);
     } catch (error) {
         console.error("/api/admin/withdrawals/approve", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2574,7 +2456,7 @@ app.post("/api/admin/withdrawals/:id/reject", authenticate, requireAdmin, async 
         res.status(r.ok ? 200 : 400).json(r);
     } catch (error) {
         console.error("/api/admin/withdrawals/reject", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2600,7 +2482,7 @@ app.get("/api/referrals", authenticate, async (req, res) => {
         );
         res.json({ ok: true, friends: r.rows, claimed: cl.rows.map(x => x.milestone) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2608,7 +2490,7 @@ app.get("/api/referrals", authenticate, async (req, res) => {
 
 const PROMO_RE = /^[A-Z0-9_-]{3,32}$/;
 
-app.post("/api/promo/redeem", authenticate, requireGate, async (req, res) => {
+app.post("/api/promo/redeem", authenticate, async (req, res) => {
     try {
         await requireDatabase();
         const telegramId = String(req.telegramUser.id);
@@ -2667,7 +2549,7 @@ app.post("/api/promo/redeem", authenticate, requireGate, async (req, res) => {
         res.json({ ok: true, reward });
     } catch (error) {
         console.error("/api/promo/redeem", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2680,7 +2562,7 @@ app.get("/api/admin/promos", authenticate, requireAdmin, async (req, res) => {
         );
         res.json({ ok: true, promos: r.rows.map(p => ({ ...p, reward: Number(p.reward) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2712,7 +2594,7 @@ app.post("/api/admin/promos", authenticate, requireAdmin, async (req, res) => {
         }
         res.json({ ok: true, code });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2725,7 +2607,7 @@ app.post("/api/admin/promos/:code/delete", authenticate, requireAdmin, async (re
         await pool.query(`DELETE FROM mr_promo_codes WHERE code = $1`, [code]);
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2752,7 +2634,7 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
         for (const k of ["paid_total", "paid_today", "pending_amount", "budget_used"]) x[k] = Number(x[k]);
         res.json({ ok: true, stats: x });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2778,7 +2660,7 @@ app.get("/api/admin/users", authenticate, requireAdmin, async (req, res) => {
         }
         res.json({ ok: true, users: r.rows.map(u => ({ ...u, points: Number(u.points) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2801,7 +2683,7 @@ app.post("/api/admin/users/:id/ban", authenticate, requireAdmin, async (req, res
         );
         res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2832,7 +2714,7 @@ app.post("/api/admin/users/:id/points", authenticate, requireAdmin, async (req, 
         );
         res.json({ ok: true, points: Number(r.rows[0].points) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2886,7 +2768,7 @@ app.post("/api/admin/broadcast", authenticate, requireAdmin, async (req, res) =>
         res.json({ ok: true, id: String(id), ...out });
     } catch (error) {
         console.error("/api/admin/broadcast", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2900,7 +2782,7 @@ app.post("/api/admin/broadcast/:id/continue", authenticate, requireAdmin, async 
         res.json({ ok: true, id: String(b.rows[0].id), ...out });
     } catch (error) {
         console.error("/api/admin/broadcast/continue", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -2950,13 +2832,6 @@ app.post("/api/telegram-webhook", async (req, res) => {
     try {
         const cb = req.body?.callback_query;
         if (cb) await handleAdminCallback(cb);
-
-        // a member left / was removed from a promoted channel -> take the reward back
-        const cmu = req.body?.chat_member;
-        if (cmu && cmu.new_chat_member && ["left", "kicked"].includes(cmu.new_chat_member.status)) {
-            try { await penalizeLeftMember(cmu.chat, cmu.new_chat_member.user); }
-            catch (e) { console.error("chat_member", e.message); }
-        }
 
         const msg = req.body?.message;
 
@@ -3015,14 +2890,14 @@ app.get("/api/setup-webhook", async (req, res) => {
         if (!WEBHOOK_SECRET) {
             return res.status(503).json({ ok: false, error: "Set the WEBHOOK_SECRET environment variable first." });
         }
-        if (!safeSecretEqual(req.query.key, SETUP_KEY || WEBHOOK_SECRET)) {
+        if (req.query.key !== WEBHOOK_SECRET) {
             return res.status(403).json({ ok: false, error: "Wrong key." });
         }
         const url = APP_URL + "/api/telegram-webhook";
         await telegram("setWebhook", {
             url,
             secret_token: WEBHOOK_SECRET,
-            allowed_updates: ["message", "callback_query", "chat_member"],
+            allowed_updates: ["message", "callback_query"],
             drop_pending_updates: true
         });
         await telegram("setChatMenuButton", {
@@ -3050,8 +2925,7 @@ app.get("/api/tasks", authenticate, async (req, res) => {
         const r = await pool.query(
             `SELECT t.id, t.title, t.description, t.url, t.channel, t.reward, t.sponsored, t.max_users,
                     (c.completed_at IS NOT NULL) AS completed,
-                    (c.started_at IS NOT NULL) AS started,
-                    COALESCE(c.was_member, FALSE) AS was_member
+                    (c.started_at IS NOT NULL) AS started
              FROM mr_tasks t
              LEFT JOIN mr_task_claims c ON c.task_id = t.id AND c.telegram_id = $1
              WHERE t.enabled = TRUE
@@ -3061,11 +2935,11 @@ app.get("/api/tasks", authenticate, async (req, res) => {
         );
         res.json({ ok: true, tasks: r.rows.map(t => ({ ...t, reward: Number(t.reward) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
-app.post("/api/tasks/:id/start", authenticate, requireGate, async (req, res) => {
+app.post("/api/tasks/:id/start", authenticate, async (req, res) => {
     try {
         await requireDatabase();
         if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
@@ -3074,26 +2948,21 @@ app.post("/api/tasks/:id/start", authenticate, requireGate, async (req, res) => 
         if (!allJoinedOf(await checkAllChannels(telegramId))) {
             return res.status(403).json({ ok: false, error: "Join all required channels first." });
         }
-        const t = await pool.query(`SELECT id, channel FROM mr_tasks WHERE id = $1 AND enabled = TRUE`, [req.params.id]);
+        const t = await pool.query(`SELECT id FROM mr_tasks WHERE id = $1 AND enabled = TRUE`, [req.params.id]);
         if (!t.rows.length) return res.status(404).json({ ok: false, error: "Task not found." });
 
-        // a user who was already in the channel BEFORE starting the task gets no reward (only real new members are paid)
-        let wasMember = false;
-        if (t.rows[0].channel) wasMember = (await checkChannel(telegramId, t.rows[0].channel)).joined;
-
-        const ins = await pool.query(
-            `INSERT INTO mr_task_claims(task_id, telegram_id, was_member) VALUES($1,$2,$3)
-             ON CONFLICT(task_id, telegram_id) DO UPDATE SET task_id = EXCLUDED.task_id
-             RETURNING was_member`,
-            [req.params.id, telegramId, wasMember]
+        await pool.query(
+            `INSERT INTO mr_task_claims(task_id, telegram_id) VALUES($1,$2)
+             ON CONFLICT(task_id, telegram_id) DO NOTHING`,
+            [req.params.id, telegramId]
         );
-        res.json({ ok: true, already_member: !!ins.rows[0].was_member });
+        res.json({ ok: true });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
-app.post("/api/tasks/:id/claim", authenticate, requireGate, async (req, res) => {
+app.post("/api/tasks/:id/claim", authenticate, async (req, res) => {
     try {
         await requireDatabase();
         if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
@@ -3117,15 +2986,12 @@ app.post("/api/tasks/:id/claim", authenticate, requireGate, async (req, res) => 
         }
 
         const cr = await pool.query(
-            `SELECT completed_at, was_member, EXTRACT(EPOCH FROM (NOW() - started_at)) AS secs
+            `SELECT completed_at, EXTRACT(EPOCH FROM (NOW() - started_at)) AS secs
              FROM mr_task_claims WHERE task_id = $1 AND telegram_id = $2`,
             [task.id, telegramId]
         );
         if (!cr.rows.length) return res.status(400).json({ ok: false, error: "Start the task first." });
         if (cr.rows[0].completed_at) return res.status(409).json({ ok: false, error: "Task already completed." });
-        if (cr.rows[0].was_member) {
-            return res.status(400).json({ ok: false, error: "You were already a member of this channel before starting this task, so it gives no reward." });
-        }
 
         if (task.channel) {
             const chk = await checkChannel(telegramId, task.channel);
@@ -3159,17 +3025,9 @@ app.post("/api/tasks/:id/claim", authenticate, requireGate, async (req, res) => 
         }
 
         res.json({ ok: true, reward: Number(task.reward) });
-
-        // the task got all the users it needs -> delete the announcement message from every chat
-        if (task.max_users > 0) {
-            try {
-                const cnt = await pool.query(`SELECT COUNT(*)::int AS c FROM mr_task_claims WHERE task_id = $1 AND completed_at IS NOT NULL`, [task.id]);
-                if (cnt.rows[0].c >= task.max_users) bg(cleanupTaskMessages(task.id, 6000));
-            } catch (e) { console.error("cleanupTaskMessages", e.message); }
-        }
     } catch (error) {
         console.error("/api/tasks/claim", error);
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -3183,7 +3041,7 @@ app.get("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
         );
         res.json({ ok: true, tasks: r.rows.map(t => ({ ...t, reward: Number(t.reward) })) });
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -3210,15 +3068,13 @@ app.post("/api/admin/tasks", authenticate, requireAdmin, async (req, res) => {
             return res.status(400).json({ ok: false, error: "Reward must be greater than 0." });
         }
 
-        const ins = await pool.query(
-            `INSERT INTO mr_tasks(title, description, url, channel, reward, max_users, announce_pending) VALUES($1,$2,$3,$4,$5,$6,TRUE) RETURNING id`,
+        await pool.query(
+            `INSERT INTO mr_tasks(title, description, url, channel, reward, max_users) VALUES($1,$2,$3,$4,$5,$6)`,
             [title, description, url, channel || null, reward, maxUsers]
         );
         res.json({ ok: true });
-        // tell everybody about the new task (the cron sweep finishes the rest if time runs out)
-        bg(announceTask(ins.rows[0].id, 6000));
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
@@ -3239,25 +3095,25 @@ app.post("/api/admin/tasks/:id/delete", authenticate, requireAdmin, async (req, 
             client.release();
         }
         res.json({ ok: true });
-        bg(cleanupTaskMessages(req.params.id, 6000));
     } catch (error) {
-        res.status(500).json({ ok: false, error: publicError(error, req) });
+        res.status(500).json({ ok: false, error: error.message });
     }
 });
 
 /* ====================================================================
    GROWTH FEATURES: reminder bot, proof feed, Lucky Spin, banner slot,
-   sponsored / self-serve channel promotion, promo-code post
+   sponsored / self-serve channel promotion, offerwall, promo-code post
    ==================================================================== */
 
+const OFFER_SECRET = String(process.env.OFFER_SECRET || "");
 const CRON_SECRET = String(process.env.CRON_SECRET || "");
 const SPIN_PRIZES = [{ p: 0.5, w: 40 }, { p: 1, w: 30 }, { p: 2, w: 18 }, { p: 5, w: 9 }, { p: 10, w: 3 }];
 const DAY_START = `date_trunc('day', NOW() AT TIME ZONE '${DAY_TZ}') AT TIME ZONE '${DAY_TZ}'`;
-const FEATURE_KEYS = ["spin_enabled", "spin_free", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled", "adsgram_task_reward", "adsgram_task_daily", "partner_required"];
+const FEATURE_KEYS = ["spin_enabled", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled"];
 
 const wrap = fn => async (req, res) => {
     try { await fn(req, res); }
-    catch (e) { console.error(req.path, e.message); if (!res.headersSent) res.status(500).json({ ok: false, error: publicError(e, req) }); }
+    catch (e) { console.error(req.path, e.message); if (!res.headersSent) res.status(500).json({ ok: false, error: e.message }); }
 };
 
 async function settingsMap() {
@@ -3301,8 +3157,8 @@ async function runReminders() {
         const jobs = [];
         for (const u of b.rows) {
             let text = null;
-            if (Number(u.ads) >= maxAds) text = "You have watched all of today's ads! \nCome back tomorrow, new ads and points are waiting for you.";
-            else if (!u.last_active || new Date(u.last_active) < new Date(dayStart)) text = "You have not checked in today! \nOpen the app, watch an ad and keep earning points.";
+            if (Number(u.ads) >= maxAds) text = "ማስታወቂያዎችህ ተሞልተዋል፣ ተመልሰህ ና! 🎯\nነገ አዲስ ማስታወቂያዎች እና ነጥቦች ይጠብቁሃል።";
+            else if (!u.last_active || new Date(u.last_active) < new Date(dayStart)) text = "ዛሬ check-in አላደረግክም! ⏰\nገብተህ ማስታወቂያ ተመልከት፣ ነጥብህን አትጣ።";
             if (text) jobs.push(telegram("sendMessage", { chat_id: Number(u.telegram_id), text, reply_markup: markup }).then(() => sent++, () => {}));
         }
         await Promise.all(jobs);
@@ -3316,15 +3172,10 @@ async function runReminders() {
 // Vercel cron / external cron:  /api/cron/reminders?key=WEBHOOK_SECRET   (or  Authorization: Bearer CRON_SECRET)
 app.get("/api/cron/reminders", wrap(async (req, res) => {
     const bearer = String(req.headers.authorization || "");
-    // with CRON_SECRET set, only it is accepted (the old WEBHOOK_SECRET key keeps working until you set CRON_SECRET)
-    const ok = CRON_SECRET
-        ? (safeSecretEqual(req.query.key, CRON_SECRET) || safeSecretEqual(bearer, "Bearer " + CRON_SECRET))
-        : !!(WEBHOOK_SECRET && safeSecretEqual(req.query.key, WEBHOOK_SECRET));
+    const ok = (WEBHOOK_SECRET && safeSecretEqual(req.query.key, WEBHOOK_SECRET)) ||
+               (CRON_SECRET && safeSecretEqual(bearer, "Bearer " + CRON_SECRET));
     if (!ok) return res.status(403).json({ ok: false, error: "Wrong key." });
-    let swept = 0;
-    try { swept = await penalizeLeavers(null, 40, 0); } catch (e) { console.error("sweep", e.message); }
-    try { await sweepTaskMessages(8000); } catch (e) { console.error("sweepTaskMessages", e.message); }
-    res.json({ ok: true, penalized: swept, ...(await runReminders()) });
+    res.json({ ok: true, ...(await runReminders()) });
 }));
 app.post("/api/admin/reminders/run", authenticate, requireAdmin, wrap(async (req, res) => {
     res.json({ ok: true, ...(await runReminders()) });
@@ -3335,26 +3186,11 @@ app.post("/api/admin/reminders/run", authenticate, requireAdmin, wrap(async (req
 app.get("/api/proof-feed", authenticate, wrap(async (req, res) => {
     await requireDatabase();
     const r = await pool.query(
-        `SELECT w.method, w.amount, w.fee, w.final_amount, w.address, w.tx_hash,
-                COALESCE(w.usd_amount, w.token_amount, 0) AS usd, w.token_amount, w.processed_at, u.first_name, u.username
+        `SELECT w.method, COALESCE(w.usd_amount, w.token_amount, 0) AS usd, w.processed_at, u.first_name, u.username
          FROM mr_withdrawals w LEFT JOIN mr_users u ON u.telegram_id = w.telegram_id
          WHERE w.status = 'approved' ORDER BY w.processed_at DESC NULLS LAST LIMIT 15`);
     const mask = s => { s = String(s || "User"); return s.slice(0, 2) + "***"; };
-    const short = (s, a, b) => { s = String(s || ""); return s.length > a + b + 3 ? s.slice(0, a) + "..." + s.slice(-b) : s; };
-    res.json({
-        ok: true,
-        feed: r.rows.map(x => ({
-            name: mask(x.first_name || x.username),
-            usd: Number(x.usd),
-            method: x.method,
-            points: x.amount === null ? null : Number(x.amount),
-            fee: x.fee === null ? null : Number(x.fee),
-            final: x.final_amount === null ? null : Number(x.final_amount),
-            wallet: short(x.address, 6, 4),
-            tx: short(x.tx_hash, 8, 6),
-            at: x.processed_at
-        }))
-    });
+    res.json({ ok: true, feed: r.rows.map(x => ({ name: mask(x.first_name || x.username), usd: Number(x.usd), method: x.method, at: x.processed_at })) });
 }));
 
 /* ---------------------- 3) LUCKY SPIN ---------------------- */
@@ -3362,12 +3198,11 @@ app.get("/api/proof-feed", authenticate, wrap(async (req, res) => {
 async function spinInfo(q, id, st) {
     const u = await q.query(`SELECT COUNT(*)::int AS c FROM mr_spins WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [id]);
     const a = await q.query(`SELECT COUNT(*)::int AS c FROM mr_ad_rewards WHERE telegram_id = $1 AND created_at >= ${DAY_START}`, [id]);
-    const freeTotal = Math.max(0, Math.floor(st.spin_free ?? 1));      // admin: free spins per day
     const used = u.rows[0].c, ads = a.rows[0].c, maxX = Math.floor(st.spin_max_extra ?? 3);
-    const extraUsed = Math.max(0, used - freeTotal);
-    const free = Math.max(0, freeTotal - used);   // free spins left, extra spins are unlocked by watching ads
+    const extraUsed = Math.max(0, used - 1);
+    const free = used < 1 ? 1 : 0;   // one free spin per day, extra spins are unlocked by watching ads
     return {
-        enabled: (st.spin_enabled ?? 1) > 0, used, free, free_total: freeTotal, max_extra: maxX,
+        enabled: (st.spin_enabled ?? 1) > 0, used, free,
         available: free + Math.max(0, Math.min(maxX, ads) - extraUsed),
         extra_left: Math.max(0, maxX - extraUsed),
         prizes: SPIN_PRIZES.map(x => Number((x.p * (st.spin_scale ?? 1)).toFixed(4)))
@@ -3379,7 +3214,7 @@ app.get("/api/spin", authenticate, wrap(async (req, res) => {
     res.json({ ok: true, ...(await spinInfo(pool, String(req.telegramUser.id), await settingsMap())) });
 }));
 
-app.post("/api/spin", authenticate, requireGate, wrap(async (req, res) => {
+app.post("/api/spin", authenticate, wrap(async (req, res) => {
     const id = await activeUser(req, res);
     if (!id) return;
     const st = await settingsMap();
@@ -3392,158 +3227,165 @@ app.post("/api/spin", authenticate, requireGate, wrap(async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(429).json({ ok: false, error: info.enabled ? "No spins left. Watch an ad for an extra spin." : "Lucky Spin is off." });
         }
-        let n = crypto.randomInt(SPIN_PRIZES.reduce((s, x) => s + x.w, 0)), prize = SPIN_PRIZES[0].p, index = 0;
-        for (let i = 0; i < SPIN_PRIZES.length; i++) { const x = SPIN_PRIZES[i]; if (n < x.w) { prize = x.p; index = i; break; } n -= x.w; }
+        let n = crypto.randomInt(SPIN_PRIZES.reduce((s, x) => s + x.w, 0)), prize = SPIN_PRIZES[0].p;
+        for (const x of SPIN_PRIZES) { if (n < x.w) { prize = x.p; break; } n -= x.w; }
         prize = Number((prize * (st.spin_scale ?? 1)).toFixed(4));
         await client.query(`INSERT INTO mr_spins(telegram_id, prize) VALUES($1,$2)`, [id, prize]);
         await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [id, prize]);
         await client.query("COMMIT");
-        res.json({ ok: true, prize, index });
+        res.json({ ok: true, prize });
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
 }));
 
-/* ---------------------- 4) (banner slot removed) ---------------------- */
+/* ---------------------- 4) BANNER / FEATURED SLOT ---------------------- */
 
-/* ------- 6) (self-serve channel promotion removed) ------- */
-
-/* ------- 6a) NEW TASK ANNOUNCEMENT (sent to every user, deleted when the task is full) ------- */
-
-let lastTaskSweep = 0;
-const taskFull = async t => t.max_users > 0 && (await pool.query(
-    `SELECT COUNT(*)::int AS c FROM mr_task_claims WHERE task_id = $1 AND completed_at IS NOT NULL`, [t.id])).rows[0].c >= t.max_users;
-
-// sends the "new task" message (with a red/danger inline button) to every user who did not get it yet
-async function announceTask(taskId, budgetMs = 5000) {
+app.get("/api/banners", authenticate, wrap(async (req, res) => {
     await requireDatabase();
-    const t0 = Date.now();
-    const tr = await pool.query(`SELECT id, title, reward, sponsor_owner, max_users, enabled FROM mr_tasks WHERE id = $1`, [taskId]);
-    if (!tr.rows.length) return 0;
-    const t = tr.rows[0];
-    if (!t.enabled || await taskFull(t)) {
-        await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
-        return 0;
-    }
-    const text = `New task available!\n\n${t.title}\nReward: +${Number(t.reward)} points\n\nTap the button below and complete it before it is full.`;
-    const reply_markup = { inline_keyboard: [[{ text: "Do task now", web_app: { url: APP_URL }, style: "danger" }]] };
-    let sent = 0;
-    while (Date.now() - t0 < budgetMs) {
-        const batch = await pool.query(
-            `SELECT u.telegram_id FROM mr_users u
-             WHERE u.is_banned = FALSE
-               AND ($2::bigint IS NULL OR u.telegram_id <> $2::bigint)
-               AND NOT EXISTS (SELECT 1 FROM mr_task_msgs m WHERE m.task_id = $1 AND m.chat_id = u.telegram_id)
-             ORDER BY u.telegram_id LIMIT 25`, [taskId, t.sponsor_owner || null]);
-        if (!batch.rows.length) {
-            await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
-            break;
-        }
-        const ids = batch.rows.map(r => String(r.telegram_id));
-        const results = await Promise.allSettled(ids.map(uid =>
-            telegram("sendMessage", { chat_id: Number(uid), text, reply_markup, disable_web_page_preview: true })));
-        const msgIds = results.map(r => r.status === "fulfilled" ? Number(r.value.message_id) || 0 : 0);   // 0 = could not send (blocked), never retried
-        sent += msgIds.filter(Boolean).length;
-        await pool.query(
-            `INSERT INTO mr_task_msgs(task_id, chat_id, message_id)
-             SELECT $1, x.c, x.m FROM UNNEST($2::bigint[], $3::bigint[]) AS x(c, m) ON CONFLICT DO NOTHING`,
-            [taskId, ids, msgIds]);
-        await sleep(1100);
-    }
-    return sent;
-}
-
-// deletes the announcement of a finished / removed task from every chat
-async function cleanupTaskMessages(taskId, budgetMs = 6000) {
+    const r = await pool.query(`SELECT id, title, text, url FROM mr_banners WHERE enabled = TRUE AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY id DESC LIMIT 3`);
+    res.json({ ok: true, banners: r.rows });
+}));
+app.post("/api/banners/:id/click", authenticate, wrap(async (req, res) => {
+    if (!isId(req.params.id)) return res.status(400).json({ ok: false });
     await requireDatabase();
-    const t0 = Date.now();
-    await pool.query(`UPDATE mr_tasks SET announce_pending = FALSE WHERE id = $1`, [taskId]);
-    while (Date.now() - t0 < budgetMs) {
-        const r = await pool.query(`SELECT chat_id, message_id FROM mr_task_msgs WHERE task_id = $1 ORDER BY chat_id LIMIT 30`, [taskId]);
-        if (!r.rows.length) return true;
-        await Promise.allSettled(r.rows.filter(x => Number(x.message_id) > 0).map(x =>
-            telegram("deleteMessage", { chat_id: Number(x.chat_id), message_id: Number(x.message_id) })));
-        await pool.query(`DELETE FROM mr_task_msgs WHERE task_id = $1 AND chat_id = ANY($2::bigint[])`, [taskId, r.rows.map(x => String(x.chat_id))]);
-        await sleep(1000);
-    }
-    return false;
-}
-
-// safety net (cron / lazy): delete messages of finished tasks, continue unfinished announcements
-async function sweepTaskMessages(budgetMs = 6000) {
+    await pool.query(`UPDATE mr_banners SET clicks = clicks + 1 WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+}));
+app.get("/api/admin/banners", authenticate, requireAdmin, wrap(async (req, res) => {
     await requireDatabase();
-    const t0 = Date.now(), left = () => Math.max(0, budgetMs - (Date.now() - t0));
-    const done = await pool.query(
-        `SELECT DISTINCT m.task_id FROM mr_task_msgs m LEFT JOIN mr_tasks t ON t.id = m.task_id
-         WHERE t.id IS NULL OR t.enabled = FALSE
-            OR (t.max_users > 0 AND (SELECT COUNT(*) FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL) >= t.max_users)
-         LIMIT 5`);
-    for (const row of done.rows) { if (!left()) return; await cleanupTaskMessages(row.task_id, left()); }
-    const pend = await pool.query(`SELECT id FROM mr_tasks WHERE announce_pending = TRUE AND enabled = TRUE ORDER BY id LIMIT 3`);
-    for (const row of pend.rows) { if (!left()) return; await announceTask(row.id, left()); }
-}
+    const r = await pool.query(`SELECT id, title, text, url, expires_at, clicks, (enabled AND (expires_at IS NULL OR expires_at > NOW())) AS live FROM mr_banners ORDER BY id DESC LIMIT 50`);
+    res.json({ ok: true, banners: r.rows });
+}));
+app.post("/api/admin/banners", authenticate, requireAdmin, wrap(async (req, res) => {
+    await requireDatabase();
+    const title = String(req.body?.title || "").trim().slice(0, 80), text = String(req.body?.text || "").trim().slice(0, 160);
+    const url = String(req.body?.url || "").trim(), days = Number(req.body?.days || 0);
+    if (!title) return res.status(400).json({ ok: false, error: "Title is required." });
+    if (!/^https?:\/\/\S+$/i.test(url)) return res.status(400).json({ ok: false, error: "Link must start with http:// or https://" });
+    if (!Number.isFinite(days) || days < 0 || days > 365) return res.status(400).json({ ok: false, error: "Days must be 0-365 (0 = no end)." });
+    await pool.query(`INSERT INTO mr_banners(title, text, url, expires_at) VALUES($1,$2,$3, CASE WHEN $4::numeric > 0 THEN NOW() + ($4::numeric * INTERVAL '1 day') ELSE NULL END)`, [title, text, url, days]);
+    res.json({ ok: true });
+}));
+app.post("/api/admin/banners/:id/delete", authenticate, requireAdmin, wrap(async (req, res) => {
+    if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+    await requireDatabase();
+    await pool.query(`DELETE FROM mr_banners WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+}));
 
-/* ------- 6b) CHANNEL LEFT -> POINTS TAKEN BACK (promoted channels only) ------- */
+/* ---------------------- 5) OFFERWALL / CPA OFFERS ---------------------- */
 
-// takes the task reward back from one claim (once) and re-opens the task, so the user can
-// complete it again (and earn the reward again) after he joins the channel again
-async function applyLeavePenalty(claimId) {
+const offerUrl = (u, id) => String(u).split("{userid}").join(encodeURIComponent(id));
+
+app.get("/api/offers", authenticate, wrap(async (req, res) => {
+    await requireDatabase();
+    const id = String(req.telegramUser.id);
+    const r = await pool.query(`SELECT id, title, description, url, reward, badge FROM mr_offers WHERE enabled = TRUE ORDER BY reward DESC LIMIT 30`);
+    res.json({ ok: true, offers: r.rows.map(o => ({ ...o, reward: Number(o.reward), url: offerUrl(o.url, id) })) });
+}));
+
+// provider postback:  /api/offer-postback?secret=OFFER_SECRET&userid={userid}&txid={txid}&offer={offerId}&amount={points, optional}
+app.get("/api/offer-postback", wrap(async (req, res) => {
+    if (!OFFER_SECRET) return res.status(503).json({ ok: false, error: "OFFER_SECRET is not set." });
+    if (!safeSecretEqual(req.query.secret, OFFER_SECRET)) return res.status(403).json({ ok: false });
+    await requireDatabase();
+    const uid = String(req.query.userid || ""), txid = String(req.query.txid || "").slice(0, 120), offer = String(req.query.offer || "");
+    if (!isId(uid) || !txid) return res.status(400).json({ ok: false, error: "userid and txid are required." });
+    let reward = Number(req.query.amount);
+    if (!Number.isFinite(reward) || reward <= 0) {
+        const o = isId(offer) ? await pool.query(`SELECT reward FROM mr_offers WHERE id = $1`, [offer]) : { rows: [] };
+        reward = o.rows.length ? Number(o.rows[0].reward) : 0;
+    }
+    if (!(reward > 0) || reward > 100000) return res.status(400).json({ ok: false, error: "Invalid reward." });
     const client = await pool.connect();
-    let info = null;
     try {
         await client.query("BEGIN");
-        const c = await client.query(
-            `SELECT c.telegram_id, t.reward, t.channel
-             FROM mr_task_claims c JOIN mr_tasks t ON t.id = c.task_id
-             WHERE c.id = $1 AND c.completed_at IS NOT NULL FOR UPDATE OF c`, [claimId]);
-        if (!c.rows.length) { await client.query("ROLLBACK"); return false; }
-        const { telegram_id, reward, channel } = c.rows[0];
-        const u = await client.query(`SELECT points FROM mr_users WHERE telegram_id = $1 FOR UPDATE`, [telegram_id]);
-        const take = u.rows.length ? Math.min(Number(reward), Math.max(0, Number(u.rows[0].points))) : 0;
-        if (take > 0) await client.query(`UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1`, [telegram_id, take]);
-        await client.query(`DELETE FROM mr_task_claims WHERE id = $1`, [claimId]);   // task is open again
+        const u = await client.query(`SELECT 1 FROM mr_users WHERE telegram_id = $1 AND is_banned = FALSE`, [uid]);
+        const ins = u.rows.length ? await client.query(
+            `INSERT INTO mr_offer_events(txid, offer_id, telegram_id, reward) VALUES($1,$2,$3,$4) ON CONFLICT(txid) DO NOTHING RETURNING txid`,
+            [txid, isId(offer) ? offer : null, uid, reward]) : { rows: [] };
+        if (!ins.rows.length) { await client.query("ROLLBACK"); return res.json({ ok: true, ignored: true }); }
+        await client.query(`UPDATE mr_users SET points = points + $2, updated_at = NOW() WHERE telegram_id = $1`, [uid, reward]);
         await client.query("COMMIT");
-        info = { telegram_id, channel, take };
     } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
     finally { client.release(); }
-    if (info) bg(notifyUser(info.telegram_id, `You left ${info.channel}. -${info.take} points were taken back.\n\nIf you join ${info.channel} again, you can complete this task again and earn the reward.`));
-    return true;
-}
+    notifyUser(uid, `🎉 Offer completed! +${reward} points added.`);
+    res.json({ ok: true });
+}));
 
-// checks the promoted-channel claims (one user, or everybody oldest-checked first) and penalizes the ones who left
-async function penalizeLeavers(telegramId, limit, minAgeMs) {
+app.get("/api/admin/offers", authenticate, requireAdmin, wrap(async (req, res) => {
     await requireDatabase();
-    const params = [Math.max(1, limit | 0), Math.max(0, Math.floor((minAgeMs || 0) / 1000))];
-    let who = "";
-    if (telegramId) { params.push(String(telegramId)); who = "AND c.telegram_id = $3"; }
-    const r = await pool.query(
-        `SELECT c.id, c.telegram_id, t.channel
-         FROM mr_task_claims c JOIN mr_tasks t ON t.id = c.task_id
-         WHERE t.sponsor_owner IS NOT NULL AND t.channel IS NOT NULL AND t.channel <> ''
-           AND c.completed_at IS NOT NULL AND c.left_at IS NULL
-           AND (c.last_check IS NULL OR c.last_check < NOW() - ($2::int * INTERVAL '1 second')) ${who}
-         ORDER BY c.last_check NULLS FIRST, c.id LIMIT $1`, params);
-    if (!r.rows.length) return 0;
-    await pool.query(`UPDATE mr_task_claims SET last_check = NOW() WHERE id = ANY($1::bigint[])`, [r.rows.map(x => x.id)]);
-    let n = 0;
-    await Promise.all(r.rows.map(async row => {
-        const chk = await checkChannel(row.telegram_id, row.channel);
-        // only a clear "left" / "kicked" counts - API errors never cost anybody points
-        if (["left", "kicked"].includes(chk.status) && await applyLeavePenalty(row.id)) n++;
-    }));
-    return n;
-}
+    const r = await pool.query(`SELECT o.id, o.title, o.url, o.reward, o.badge, (SELECT COUNT(*)::int FROM mr_offer_events e WHERE e.offer_id = o.id) AS done FROM mr_offers o ORDER BY o.id DESC LIMIT 50`);
+    res.json({ ok: true, offers: r.rows.map(o => ({ ...o, reward: Number(o.reward) })) });
+}));
+app.post("/api/admin/offers", authenticate, requireAdmin, wrap(async (req, res) => {
+    await requireDatabase();
+    const title = String(req.body?.title || "").trim().slice(0, 80), description = String(req.body?.description || "").trim().slice(0, 200);
+    const url = String(req.body?.url || "").trim(), badge = String(req.body?.badge || "").trim().slice(0, 20), reward = Number(req.body?.reward);
+    if (!title) return res.status(400).json({ ok: false, error: "Title is required." });
+    if (!/^https?:\/\/\S+$/i.test(url)) return res.status(400).json({ ok: false, error: "Link must start with http:// or https://" });
+    if (!Number.isFinite(reward) || reward <= 0 || reward > 100000) return res.status(400).json({ ok: false, error: "Reward must be greater than 0." });
+    await pool.query(`INSERT INTO mr_offers(title, description, url, reward, badge) VALUES($1,$2,$3,$4,$5)`, [title, description, url, reward, badge]);
+    res.json({ ok: true });
+}));
+app.post("/api/admin/offers/:id/delete", authenticate, requireAdmin, wrap(async (req, res) => {
+    if (!isId(req.params.id)) return res.status(400).json({ ok: false, error: "Invalid id." });
+    await requireDatabase();
+    await pool.query(`DELETE FROM mr_offers WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+}));
 
-// instant version, called from the Telegram chat_member update
-async function penalizeLeftMember(chat, user) {
-    if (!chat || !user || user.is_bot || !chat.username) return;
+/* ------- 6) SELF-SERVE CHANNEL PROMOTION (owners pay with points, a task is created automatically) ------- */
+
+let BOT_ID = null;
+
+app.post("/api/promote", authenticate, wrap(async (req, res) => {
+    const id = await activeUser(req, res);
+    if (!id) return;
+    const st = await settingsMap();
+    const channel = String(req.body?.channel || "").trim();
+    const joins = Math.floor(Number(req.body?.joins));
+    const minJ = Math.max(1, Math.floor(st.promo_min_joins ?? 20));
+    if (!/^@[A-Za-z0-9_]{4,}$/.test(channel)) return res.status(400).json({ ok: false, error: "Channel must look like @channelname." });
+    if (!Number.isFinite(joins) || joins < minJ || joins > 5000) return res.status(400).json({ ok: false, error: `Joins must be between ${minJ} and 5000.` });
+    const price = st.promo_price_per_join ?? 10, share = Math.min(100, st.promo_user_share ?? 25);
+    const cost = Number((joins * price).toFixed(4)), userReward = Number((price * share / 100).toFixed(4));
+    if (!(price > 0) || !(userReward > 0)) return res.status(400).json({ ok: false, error: "Promotion is not available right now." });
+
+    // the bot must be an admin of the channel, otherwise joins cannot be verified
+    try {
+        if (!BOT_ID) BOT_ID = (await telegram("getMe")).id;
+        const m = await telegram("getChatMember", { chat_id: channel, user_id: BOT_ID });
+        if (!["administrator", "creator"].includes(m.status)) throw new Error("not admin");
+    } catch (e) {
+        return res.status(400).json({ ok: false, error: "Add the bot as an admin of your channel first, then try again." });
+    }
+    const dup = await pool.query(
+        `SELECT 1 FROM mr_tasks t WHERE t.channel = $1 AND t.enabled = TRUE AND (t.max_users = 0 OR t.max_users > (SELECT COUNT(*) FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL)) LIMIT 1`, [channel]);
+    if (dup.rows.length) return res.status(409).json({ ok: false, error: "This channel already has an active campaign." });
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const pay = await client.query(`UPDATE mr_users SET points = points - $2, updated_at = NOW() WHERE telegram_id = $1 AND points >= $2 RETURNING points`, [id, cost]);
+        if (!pay.rows.length) { await client.query("ROLLBACK"); return res.status(400).json({ ok: false, error: `You need ${cost} points for this campaign.` }); }
+        await client.query(
+            `INSERT INTO mr_tasks(title, description, url, channel, reward, sponsored, max_users, sponsor_owner)
+             VALUES($1,'Sponsored',$2,$3,$4,TRUE,$5,$6)`,
+            ["Join " + channel, "https://t.me/" + channel.slice(1), channel, userReward, joins, id]);
+        await client.query("COMMIT");
+        res.json({ ok: true, cost, joins, reward: userReward });
+    } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; }
+    finally { client.release(); }
+}));
+
+app.get("/api/promote/mine", authenticate, wrap(async (req, res) => {
     await requireDatabase();
     const r = await pool.query(
-        `SELECT c.id FROM mr_task_claims c JOIN mr_tasks t ON t.id = c.task_id
-         WHERE t.sponsor_owner IS NOT NULL AND LOWER(t.channel) = LOWER($1)
-           AND c.telegram_id = $2 AND c.completed_at IS NOT NULL AND c.left_at IS NULL`,
-        ["@" + chat.username, String(user.id)]);
-    for (const row of r.rows) await applyLeavePenalty(row.id);
-}
+        `SELECT t.id, t.channel, t.max_users, (SELECT COUNT(*)::int FROM mr_task_claims c WHERE c.task_id = t.id AND c.completed_at IS NOT NULL) AS done
+         FROM mr_tasks t WHERE t.sponsor_owner = $1 ORDER BY t.id DESC LIMIT 20`, [String(req.telegramUser.id)]);
+    res.json({ ok: true, campaigns: r.rows });
+}));
 
 /* ---------------------- 7) POST A PROMO CODE TO THE CHANNEL ---------------------- */
 
@@ -3557,7 +3399,7 @@ app.post("/api/admin/promos/:code/post", authenticate, requireAdmin, wrap(async 
     const link = appLink();
     await telegram("sendMessage", {
         chat_id: PROOF_CHANNEL, parse_mode: "HTML",
-        text: `<b>New promo code!</b>\n\nCode: <code>${esc(code)}</code>\nReward: <b>+${esc(Number(p.rows[0].reward))} points</b>\nLimited to the first <b>${left}</b> users.\n\nOpen the app → Earn → Promo code.`,
+        text: `🎁 <b>New promo code!</b>\n\nCode: <code>${esc(code)}</code>\nReward: <b>+${esc(Number(p.rows[0].reward))} points</b>\nLimited to the first <b>${left}</b> users.\n\nOpen the app → Earn → Promo code.`,
         ...(link ? { reply_markup: { inline_keyboard: [[{ text: APP_BUTTON_TEXT, url: link }]] } } : {})
     });
     res.json({ ok: true });
@@ -3582,12 +3424,12 @@ app.use("/api", (req, res) => {
     res.status(404).json({ ok: false, error: "API route not found." });
 });
 
-// Only index.html (below) and an optional "public" folder are served. The project folder itself
-// (server.js, package.json, ...) is never served, whatever way the path is written.
-const PUBLIC_DIR = path.join(__dirname, "public");
-if (fs.existsSync(PUBLIC_DIR)) {
-    app.use(express.static(PUBLIC_DIR, { index: false, dotfiles: "deny" }));
-}
+const BLOCKED_FILES = new Set(["/server.js", "/package.json", "/package-lock.json", "/vercel.json"]);
+const staticFiles = express.static(__dirname, { index: false, dotfiles: "deny" });
+app.use((req, res, next) => {
+    if (BLOCKED_FILES.has(req.path.toLowerCase())) return res.status(404).end();
+    staticFiles(req, res, next);
+});
 
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
