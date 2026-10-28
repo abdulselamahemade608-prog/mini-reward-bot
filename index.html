@@ -2,1615 +2,821 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>Reward Mini App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Adewa Eran</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-<!-- Monetag SDK (zone 11984693) -->
-<script src="https://libtl.com/sdk.js" data-zone="11984693" data-sdk="show_11984693"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
-  --bg:#070b16;--card:#0f1730;--card2:#16213f;--line:#22305a;
-  --text:#f1f5ff;--muted:#8b9bc2;
-  --blue:#3b82f6;--cyan:#06b6d4;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--purple:#8b5cf6;--pink:#ec4899;
+  --bg:#0e1120;--card:#171b30;--card2:#1e2340;--line:#2a3052;--txt:#eef0fa;--mut:#8f97bd;
+  --acc:#6c7bff;--acc2:#a45cff;--ok:#2ecc8f;--bad:#ff5b6e;--warn:#ffb648;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
 }
-html,body{background:var(--bg)}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);min-height:100vh;
-  padding:16px 16px calc(104px + env(safe-area-inset-bottom));
-  background:
-    radial-gradient(520px 320px at 90% -5%,rgba(59,130,246,.22),transparent 70%),
-    radial-gradient(480px 300px at -10% 20%,rgba(139,92,246,.18),transparent 70%),var(--bg);
-  background-attachment:fixed}
-.hidden{display:none!important}
-svg{display:block}
-
-/* icons */
-.ib{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;box-shadow:0 6px 16px rgba(0,0,0,.35)}
-.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.ib.sm{width:32px;height:32px;border-radius:10px}.ib.sm svg{width:18px;height:18px}
-.blue{background:linear-gradient(135deg,#3b82f6,#06b6d4)}
-.green{background:linear-gradient(135deg,#22c55e,#10b981)}
-.orange{background:linear-gradient(135deg,#f59e0b,#f97316)}
-.purple{background:linear-gradient(135deg,#8b5cf6,#6366f1)}
-.pink{background:linear-gradient(135deg,#ec4899,#f43f5e)}
-.teal{background:linear-gradient(135deg,#14b8a6,#0ea5e9)}
-.redg{background:linear-gradient(135deg,#ef4444,#f97316)}
-
-/* splash */
-#splash{position:fixed;inset:0;z-index:200;background:radial-gradient(600px 400px at 50% 40%,#16275a,#070b16 70%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .6s,transform .6s}
-#splash.out{opacity:0;transform:scale(1.06);pointer-events:none}
-.logo{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
-.logo .ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#3b82f6;border-right-color:#8b5cf6;animation:spin 1.4s linear infinite}
-.logo .ring.r2{inset:12px;border-top-color:#06b6d4;border-right-color:#ec4899;animation-duration:2s;animation-direction:reverse}
-.logo .core{width:68px;height:68px;border-radius:22px;display:flex;align-items:center;justify-content:center;color:#fff;
-  background:linear-gradient(135deg,#3b82f6,#8b5cf6);box-shadow:0 0 40px rgba(99,102,241,.7);animation:pulse 1.6s ease-in-out infinite}
-.logo .core svg{width:36px;height:36px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.sp-t1{font-size:15px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;animation:fadeUp .8s .2s both}
-.sp-t2{font-size:28px;font-weight:800;text-align:center;padding:0 24px;animation:fadeUp .8s .5s both;
-  background:linear-gradient(90deg,#fff,#9db8ff);-webkit-background-clip:text;background-clip:text;color:transparent;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar{width:160px;height:5px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;animation:fadeUp .8s .8s both}
-.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899);animation:load 1.8s .6s ease-out forwards}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes load{to{width:100%}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes shine{0%{transform:translateX(-120%)}100%{transform:translateX(220%)}}
-
-/* toast */
-.toast{position:fixed;top:calc(12px + env(safe-area-inset-top));left:14px;right:14px;z-index:150;padding:13px 16px;border-radius:14px;
-  font-size:14px;font-weight:600;background:#2a2a40;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:fadeIn .25s both}
-.toast.ok{background:#0f3d28;color:#7dffb0;border:1px solid #1f7a4d}
-.toast.err{background:#451a1a;color:#ffb0b0;border:1px solid #8a2d2d}
-
-/* layout */
-.view{animation:fadeIn .35s both}
-.head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.15)}
-.head .t{font-size:13px;color:var(--muted)}
-.head .n{font-size:18px;font-weight:700;max-width:52vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);padding:7px 12px;border-radius:30px;font-size:13px;font-weight:700}
-h2{font-size:18px;margin:22px 0 12px;display:flex;align-items:center;gap:10px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:12px}
-.balance{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:14px;
-  background:linear-gradient(135deg,#1d4ed8 0%,#6d28d9 60%,#be185d 120%);box-shadow:0 16px 40px rgba(76,29,149,.45)}
-.balance::after{content:"";position:absolute;top:0;bottom:0;width:60px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);animation:shine 4s infinite}
-.balance small{opacity:.85;font-size:13px;letter-spacing:.5px}
-.balance .big{font-size:44px;font-weight:800;margin:4px 0 16px;letter-spacing:-1px}
-.bnbline{margin:-10px 0 16px;font-size:14px;font-weight:700}
-.bnbline .sub{font-size:12px;font-weight:500;opacity:.8;margin-top:3px}
-.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fbbf24;border-radius:14px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.6;white-space:pre-line}
-/* withdraw receipt card */
-#modal .sheet.rcpt{padding:0;overflow:hidden}
-.rc-top{padding:24px 18px 20px;text-align:center;background:linear-gradient(135deg,#16a34a 0%,#0d9488 55%,#0ea5e9 100%);position:relative}
-.rc-top::after{content:"";position:absolute;top:0;bottom:0;width:70px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.25),transparent);animation:shine 3.5s infinite}
-.rc-ic{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;animation:pop .55s both;box-shadow:0 0 0 8px rgba(255,255,255,.12)}
-.rc-ic svg{width:32px;height:32px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-.rc-t{font-size:19px;font-weight:800;color:#fff}
-.rc-s{font-size:13px;color:rgba(255,255,255,.9);margin-top:4px}
-.rc-amt{text-align:center;padding:20px 16px 8px}
-.rc-amt small{display:block;color:var(--muted);font-size:12px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:4px}
-.rc-amt b{font-size:36px;font-weight:800;color:#4ade80;letter-spacing:-.5px}
-.rc-amt i{font-size:15px;font-style:normal;color:var(--muted);margin-left:4px;font-weight:700}
-.rc-rows{margin:12px 18px 0;border-top:2px dashed #2b3b6b;padding-top:6px}
-.rc-rows div{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,.06)}
-.rc-rows div:last-child{border-bottom:0}
-.rc-rows span{color:var(--muted);flex:none}
-.rc-rows b{text-align:right;word-break:break-word;max-width:64%}
-.rc-rows .pend{background:rgba(245,158,11,.18);color:#fbbf24;padding:3px 10px;border-radius:20px;font-size:12px}
-.rc-foot{padding:16px 18px calc(18px + env(safe-area-inset-bottom))}
-@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
-.row2{display:flex;gap:10px}
-.row2>*{flex:1}
-.btn{border:0;border-radius:16px;padding:15px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
-  background:linear-gradient(135deg,#3b82f6,#6366f1);box-shadow:0 8px 20px rgba(59,130,246,.35);transition:transform .12s,opacity .2s;width:100%}
-.btn:active{transform:scale(.97)}
-.btn:disabled{opacity:.5}
-.btn svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.btn.glass{background:rgba(255,255,255,.16);box-shadow:none;backdrop-filter:blur(6px)}
-.btn.green{background:linear-gradient(135deg,#22c55e,#10b981);box-shadow:0 8px 20px rgba(34,197,94,.3)}
-.btn.red{background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 8px 20px rgba(239,68,68,.3)}
-.btn.dark{background:var(--card2);box-shadow:none;border:1px solid var(--line)}
-.btn.sm{padding:11px;font-size:14px;border-radius:13px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:13px 10px;text-align:center}
-.stat .ib{margin:0 auto 8px}
-.stat .v{font-size:18px;font-weight:800}
-.stat .l{font-size:12px;color:var(--muted);margin-top:2px}
-.line{display:flex;align-items:center;gap:12px}
-.line .x{flex:1;min-width:0}
-.line .x b{display:block;font-size:15px}
-.line .x span{font-size:13px;color:var(--muted)}
-.rankn{width:30px;text-align:center;font-weight:800;color:var(--amber)}
-.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.progress{height:10px;background:var(--card2);border-radius:10px;overflow:hidden;margin:10px 0 6px}
-.progress i{display:block;height:100%;border-radius:10px;background:linear-gradient(90deg,#22c55e,#06b6d4);transition:width .6s}
-.muted{color:var(--muted);font-size:13px}
-.linkbox{background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:13px;font-size:13px;word-break:break-all;margin:12px 0;color:#bcd0ff}
-.receipt{white-space:pre-wrap;word-break:break-word;background:var(--card2);border:1px dashed #3a4c80;border-radius:14px;padding:14px;
-  font-family:inherit;font-size:14px;line-height:1.6;color:#e6edff;max-height:55vh;overflow:auto}
-label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
-input,select,textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px;color:var(--text);font-size:15px;outline:none}
-input:focus,select:focus,textarea:focus{border-color:var(--blue)}
-.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
-.chip{padding:8px 14px;border-radius:30px;background:var(--card2);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
-.chip.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent}
-.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
-.badge.pending{background:rgba(245,158,11,.18);color:#fbbf24}
-.badge.processing{background:rgba(59,130,246,.18);color:#60a5fa}
-.badge.approved{background:rgba(34,197,94,.18);color:#4ade80}
-.badge.rejected{background:rgba(239,68,68,.18);color:#f87171}
-.empty{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px}
-.txlink{color:#7dc4ff;font-weight:600;text-decoration:underline;cursor:pointer}
-
-.av{position:relative;width:46px;height:46px;border-radius:50%;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;
-  font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:2px solid rgba(255,255,255,.12)}
-.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.mini span{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--card2);color:var(--muted)}
-.mini span.ok{background:rgba(34,197,94,.16);color:#4ade80}
-.seg{overflow-x:auto;gap:4px;scrollbar-width:none}
-.seg::-webkit-scrollbar{display:none}
-.seg button{flex:none;padding:10px 14px;white-space:nowrap}
-textarea{resize:vertical;min-height:110px;font-family:inherit}
-.ms{display:flex;align-items:center;gap:12px}
-/* gate */
-.gate{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto;
-  background:radial-gradient(520px 380px at 50% 10%,rgba(99,102,241,.35),transparent 70%),var(--bg)}
-.gate-in{width:100%;max-width:440px;text-align:center;animation:fadeIn .5s both}
-.gate-in .ib{width:76px;height:76px;border-radius:26px;margin:0 auto 18px}
-.gate-in .ib svg{width:40px;height:40px}
-.gate-in h1{font-size:24px;margin-bottom:8px}
-.gate-in p{color:var(--muted);font-size:15px;margin-bottom:22px}
-.gate-in .card{text-align:left}
-.task-done{opacity:.6}
-/* nav */
-nav{position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:flex;padding:7px;border-radius:26px;
-  background:rgba(15,23,48,.88);backdrop-filter:blur(16px);border:1px solid var(--line);box-shadow:0 12px 36px rgba(0,0,0,.55)}
-nav button{flex:1;background:none;border:0;color:var(--muted);padding:6px 2px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:20px;transition:all .2s}
-nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-nav button.active{color:#fff;background:linear-gradient(135deg,rgba(59,130,246,.35),rgba(139,92,246,.35))}
-nav button.active svg{stroke:#8ec5ff}
-
-/* modal */
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:120;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s both}
-#modal .sheet{width:100%;max-width:520px;background:var(--card);border-radius:26px 26px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));border:1px solid var(--line)}
-.seg{display:flex;background:var(--card2);border-radius:16px;padding:4px;margin-bottom:14px}
-.seg button{flex:1;border:0;background:none;color:var(--muted);padding:10px;border-radius:12px;font-weight:700;font-size:14px}
-.seg button.on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{padding-top:var(--safe-t)}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--acc)}
+#app{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px;position:sticky;top:0;background:var(--bg);z-index:5}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden;flex:none}
+.av img{width:100%;height:100%;object-fit:cover}
+.hname{flex:1;min-width:0}
+.hname b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hname small{color:var(--mut)}
+.pill{background:var(--card2);border:1px solid var(--line);padding:6px 12px;border-radius:99px;font-weight:700;white-space:nowrap}
+.iconbtn{background:var(--card2);border:1px solid var(--line);width:38px;height:38px;border-radius:12px;font-size:18px;cursor:pointer}
+main{flex:1;padding:4px 14px calc(88px + var(--safe-b))}
+nav{position:fixed;left:0;right:0;bottom:0;background:#12162a;border-top:1px solid var(--line);padding-bottom:var(--safe-b);z-index:6}
+nav div{max-width:520px;margin:0 auto;display:flex}
+nav button{flex:1;background:none;border:0;padding:9px 0 8px;color:var(--mut);font-size:11px;cursor:pointer}
+nav button i{display:block;font-style:normal;font-size:20px}
+nav button.on{color:var(--txt)}
+nav button.on i{filter:drop-shadow(0 0 6px var(--acc))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+.card h3{margin:0 0 8px;font-size:15px}
+.hero{background:linear-gradient(135deg,#3b46c9,#8a4bd8);border:0}
+.hero small{opacity:.8}
+.big{font-size:34px;font-weight:800;line-height:1.1}
+.row{display:flex;align-items:center;gap:10px}
+.sp{flex:1;min-width:0}
+.mut{color:var(--mut)}.sm{font-size:12.5px}
+.btn{background:linear-gradient(135deg,var(--acc),var(--acc2));border:0;border-radius:12px;padding:11px 16px;font-weight:700;cursor:pointer;color:#fff}
+.btn.full{width:100%}
+.btn.ghost{background:var(--card2);border:1px solid var(--line)}
+.btn.ok{background:var(--ok);color:#06251a}
+.btn.bad{background:var(--bad)}
+.btn.small{padding:7px 12px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:default}
+input,textarea,select{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin:4px 0;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--acc)}
+label{display:block;font-size:12.5px;color:var(--mut);margin-top:8px}
+.bar{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:99px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--card2)}
+.tag.ok{background:#12372b;color:var(--ok)}.tag.bad{background:#3d1a22;color:var(--bad)}.tag.warn{background:#3d2f12;color:var(--warn)}
+.item{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.rk{width:30px;text-align:center;font-weight:800;color:var(--mut)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:6px 0;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;background:var(--card2);border:1px solid var(--line);border-radius:99px;padding:6px 13px;color:var(--mut);cursor:pointer;font-size:13px}
+.tabs button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.center{text-align:center;padding:60px 20px}
+.center .em{font-size:54px}
+.spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:r 0.8s linear infinite;margin:30px auto}
+@keyframes r{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;top:calc(14px + var(--safe-t));transform:translateX(-50%) translateY(-90px);background:#222849;border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:50;max-width:90%;text-align:center;transition:transform .25s}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--ok)}#toast.err{border-color:var(--bad)}
+.modal{position:fixed;inset:0;background:rgba(5,7,15,.75);display:flex;align-items:center;justify-content:center;padding:20px;z-index:40}
+.modal .card{width:100%;max-width:400px;margin:0}
+.slot{font-size:46px;text-align:center;padding:8px 0;font-weight:800}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all;font-size:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--card2);border-radius:12px;padding:10px}
+.stat b{display:block;font-size:19px}
 </style>
 </head>
 <body>
-
-<!-- Welcome splash -->
-<div id="splash">
-  <div class="logo">
-    <div class="ring"></div><div class="ring r2"></div>
-    <div class="core"><svg viewBox="0 0 24 24"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg></div>
-  </div>
-  <div class="sp-t1" id="spT1">Welcome</div>
-  <div class="sp-t2" id="spName">Reward Hub</div>
-  <div class="bar"><i></i></div>
-</div>
-
-<div id="toast" class="toast hidden"></div>
-<div id="modal" class="hidden"></div>
-
-<div id="gate" class="gate hidden">
-  <div class="gate-in">
-    <span class="ib purple" id="gIc"></span>
-    <h1>Verification required</h1>
-    <p>Join all required channels to continue.</p>
-    <div id="channelList"></div>
-    <button class="btn dark" id="checkBtn" style="margin-top:6px"></button>
-  </div>
-</div>
-
-<main id="app" class="hidden">
-
-  <!-- HOME -->
-  <section id="v-home" class="view">
-    <div class="head">
-      <img id="hAvatar" class="avatar" alt="">
-      <div><div class="t">Welcome back</div><div class="n" id="hName">User</div></div>
-      <div class="pill"><span class="ib sm orange" id="hRankIc"></span><span id="hRank">#-</span></div>
-    </div>
-
-    <div id="bannerBox"></div>
-
-    <div class="balance">
-      <small>TOTAL BALANCE</small>
-      <div class="big" id="hPoints">0</div>
-      <div class="bnbline"><div id="hBnbBal">&nbsp;</div><div class="sub" id="hBnbRate"></div></div>
-      <div class="row2">
-        <button class="btn glass" id="hWithdraw"></button>
-        <button class="btn glass" id="hInvite"></button>
-      </div>
-    </div>
-
-    <div class="stats">
-      <div class="stat"><span class="ib blue" id="s1"></span><div class="v" id="hAds">0</div><div class="l">Ads watched</div></div>
-      <div class="stat"><span class="ib green" id="s2"></span><div class="v" id="hInv">0</div><div class="l">Invites</div></div>
-      <div class="stat"><span class="ib orange" id="s3"></span><div class="v" id="hToday">0</div><div class="l">Today</div></div>
-    </div>
-
-    <div class="card" style="margin-top:14px">
-      <div class="line">
-        <span class="ib pink" id="hAdIc"></span>
-        <div class="x"><b>Watch an ad</b><span id="hAdSub">Earn points instantly</span></div>
-      </div>
-      <button class="btn" id="hWatch" style="margin-top:14px"></button>
-    </div>
-
-    <div class="card" id="spinCard" style="margin-top:14px">
-      <div class="line">
-        <span class="ib pink">🎡</span>
-        <div class="x"><b>Lucky Spin</b><span id="spinSub">1 free spin every day</span></div>
-      </div>
-      <div id="spinRes" class="muted" style="margin-top:10px;font-weight:700"></div>
-      <button class="btn" id="spinBtn" style="margin-top:12px">Spin</button>
-    </div>
-
-    <h2><span class="ib sm green">✅</span>Recent payouts</h2>
-    <div id="proofList"></div>
-
-    <h2><span class="ib sm purple" id="topIc"></span>Top earners</h2>
-    <div id="topList"></div>
-  </section>
-
-  <!-- EARN -->
-  <section id="v-earn" class="view hidden">
-    <h2 style="margin-top:6px"><span class="ib sm green" id="eIc"></span>Earn points</h2>
-
-    <div class="card">
-      <div class="line">
-        <span class="ib blue" id="eAdIc"></span>
-        <div class="x"><b>Watch ads</b><span id="eAdSub">-</span></div>
-      </div>
-      <div class="progress"><i id="eBar" style="width:0"></i></div>
-      <div class="muted" id="eProg">0 / 0 today</div>
-      <button class="btn" id="eWatch" style="margin-top:14px"></button>
-    </div>
-
-    <div class="card">
-      <div class="line"><span class="ib purple" id="prIc"></span><div class="x"><b>Promo code</b><span>Enter a code to get points</span></div></div>
-      <div class="row2" style="margin-top:12px;align-items:stretch">
-        <input id="promoIn" type="text" placeholder="CODE" autocapitalize="characters" autocomplete="off" maxlength="32">
-        <button class="btn green" id="promoBtn" style="flex:none;width:auto;padding:0 20px"></button>
-      </div>
-    </div>
-
-    <h2><span class="ib sm pink">🔥</span>Offerwall</h2>
-    <div id="offerList"></div>
-
-    <h2><span class="ib sm blue">📣</span>Promote your channel</h2>
-    <div class="card">
-      <div class="muted" id="pmInfo">Get real members. Pay with your points, a task is created automatically.</div>
-      <label>Channel (bot must be admin)</label><input id="pm_chan" type="text" placeholder="@yourchannel">
-      <label>Number of joins</label><input id="pm_joins" type="number" min="1" step="1" placeholder="100">
-      <div class="muted" id="pmQuote" style="margin-top:8px"></div>
-      <button class="btn green" id="pmBtn" style="margin-top:12px">Start campaign</button>
-      <div id="pmMine" style="margin-top:10px"></div>
-    </div>
-
-    <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
-    <div id="taskList"></div>
-  </section>
-
-  <!-- INVITE -->
-  <section id="v-invite" class="view hidden">
-    <h2 style="margin-top:6px"><span class="ib sm green" id="iIc"></span>Invite friends</h2>
-    <div class="card">
-      <div class="muted">Share your personal link. You earn <b id="iReward" style="color:#fff">0</b> points for each friend who joins the required channels and watches <b id="iNeed" style="color:#fff">1</b> ad(s).</div>
-      <div class="linkbox" id="refLink">-</div>
-      <div class="row2">
-        <button class="btn" id="shareBtn"></button>
-        <button class="btn dark" id="copyBtn"></button>
-      </div>
-    </div>
-    <div class="stats">
-      <div class="stat"><span class="ib blue" id="i1"></span><div class="v" id="iInv">0</div><div class="l">Friends invited</div></div>
-      <div class="stat"><span class="ib green" id="i3"></span><div class="v" id="iVer">0</div><div class="l">Verified</div></div>
-      <div class="stat"><span class="ib orange" id="i2"></span><div class="v" id="iPts">0</div><div class="l">Your points</div></div>
-    </div>
-
-    <h2><span class="ib sm orange" id="msIc"></span>Bonus milestones</h2>
-    <div id="mileList"></div>
-
-    <h2><span class="ib sm purple" id="frIc"></span>Your friends</h2>
-    <div id="friendList"></div>
-  </section>
-
-  <!-- PROFILE -->
-  <section id="v-profile" class="view hidden">
-    <div class="head">
-      <img id="pAvatar" class="avatar" alt="">
-      <div><div class="n" id="pName">User</div><div class="t" id="pId">ID</div></div>
-    </div>
-
-    <div class="stats">
-      <div class="stat"><span class="ib blue" id="p1"></span><div class="v" id="pAds">0</div><div class="l">Ads</div></div>
-      <div class="stat"><span class="ib green" id="p2"></span><div class="v" id="pInv">0</div><div class="l">Invites</div></div>
-      <div class="stat"><span class="ib orange" id="p3"></span><div class="v" id="pRank">#-</div><div class="l">Rank</div></div>
-    </div>
-
-    <h2><span class="ib sm teal" id="wIc"></span>Withdraw (BEP20)</h2>
-    <div class="card" id="wCard">
-      <div class="line" style="margin-bottom:6px">
-        <div class="x"><span>Available balance</span><b style="font-size:24px" id="wBal">0</b></div>
-        <div class="muted" id="wMin">Min -</div>
-      </div>
-      <div class="muted" id="wRate" style="margin-bottom:4px"></div>
-      <div class="notice hidden" id="wNotice"></div>
-      <div class="muted" id="wLimits" style="margin-bottom:4px"></div>
-      <div class="notice hidden" id="wDeposit" style="margin-top:6px">
-        <div id="wDepTxt"></div>
-        <div style="margin-top:8px;word-break:break-all;user-select:all;font-family:monospace;font-size:12px" id="wDepAddr"></div>
-        <button class="btn glass" id="wDepCopy" style="margin-top:8px">Copy address</button>
-        <input id="wDepTx" type="text" placeholder="Transaction hash (0x...)" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:10px">
-        <button class="btn green" id="wDepBtn" style="margin-top:10px">Verify deposit</button>
-      </div>
-      <label>BEP20 wallet address</label>
-      <input id="wAddr" type="text" placeholder="0x..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="42">
-      <div class="muted" style="margin-top:6px">BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.</div>
-      <label>Amount (points)</label>
-      <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
-      <div class="muted" id="wFee" style="margin-top:8px"></div>
-      <button class="btn green" id="wBtn" style="margin-top:14px"></button>
-    </div>
-
-    <h2><span class="ib sm purple" id="hisIc"></span>Withdrawal history</h2>
-    <div id="wHist"></div>
-
-    <div class="card" style="margin-top:6px">
-      <div class="line">
-        <span class="ib teal" id="supIc"></span>
-        <div class="x"><b>Need help?</b><span>For any question or promotion, contact admin.</span></div>
-      </div>
-      <button class="btn dark" id="supportBtn" style="margin-top:14px"></button>
-    </div>
-
-    <button class="btn dark hidden" id="adminBtn" style="margin-top:16px"></button>
-  </section>
-
-  <!-- ADMIN -->
-  <section id="v-admin" class="view hidden">
-    <div class="line" style="margin-bottom:14px">
-      <button class="ib sm purple" id="adminBack" style="border:0"></button>
-      <div class="x"><b style="font-size:18px">Admin panel</b></div>
-    </div>
-    <div class="seg">
-      <button id="segStats" class="on">Dashboard</button>
-      <button id="segReq">Payments</button>
-      <button id="segUsers">Users</button>
-      <button id="segTask">Tasks</button>
-      <button id="segPromo">Promo</button>
-      <button id="segBcast">Broadcast</button>
-      <button id="segSet">Settings</button>
-      <button id="segMore">More</button>
-    </div>
-
-    <div id="admStats" class="hidden">
-      <div class="stats" id="statGrid"></div>
-    </div>
-
-    <div id="admUsers" class="hidden">
-      <div class="row2" style="align-items:stretch;margin-bottom:12px">
-        <input id="uQ" type="text" placeholder="Search: ID, @username or name" autocomplete="off">
-        <button class="btn" id="uSearch" style="flex:none;width:auto;padding:0 18px"></button>
-      </div>
-      <div id="userList"></div>
-    </div>
-
-    <div id="admPromo" class="hidden">
-      <div class="card">
-        <label style="margin-top:0">Code (leave empty to auto-generate)</label><input id="pr_code" type="text" maxlength="32" autocapitalize="characters" placeholder="WELCOME10">
-        <label>Points per person</label><input id="pr_rew" type="number" step="any" min="0" placeholder="10">
-        <label>Number of people who can use it</label><input id="pr_max" type="number" min="1" placeholder="100">
-        <button class="btn green" id="pCreate" style="margin-top:16px"></button>
-      </div>
-      <div id="promoList"></div>
-    </div>
-
-    <div id="admBcast" class="hidden">
-      <div class="card">
-        <label style="margin-top:0">Message to all users (sent by the bot)</label>
-        <textarea id="bText" maxlength="1000" placeholder="Write your message..."></textarea>
-        <button class="btn" id="bSend" style="margin-top:14px"></button>
-        <div class="muted" id="bStatus" style="margin-top:10px"></div>
-      </div>
-    </div>
-
-    <div id="admReq" class="hidden">
-      <div class="chips" id="admFilter" style="margin-bottom:12px">
-        <span class="chip on" data-s="pending">Pending</span>
-        <span class="chip" data-s="approved">Paid</span>
-        <span class="chip" data-s="rejected">Rejected</span>
-      </div>
-      <div id="admList"></div>
-    </div>
-
-    <div id="admTask" class="hidden">
-      <div class="card">
-        <label style="margin-top:0">Task title</label><input id="t_title" type="text" maxlength="80" placeholder="Join our channel">
-        <label>Description (optional)</label><input id="t_desc" type="text" maxlength="200" placeholder="Short instruction">
-        <label>Link</label><input id="t_url" type="url" placeholder="https://t.me/yourchannel">
-        <label>Channel to verify (optional)</label><input id="t_chan" type="text" placeholder="@yourchannel (bot must be admin)">
-        <label>Reward (points)</label><input id="t_rew" type="number" step="any" min="0" placeholder="5">
-        <label>User slots (0 = unlimited, task hides when full)</label><input id="t_max" type="number" step="1" min="0" placeholder="0">
-        <button class="btn green" id="addTask" style="margin-top:16px"></button>
-      </div>
-      <div id="admTaskList"></div>
-    </div>
-
-    <div id="admMore" class="hidden">
-      <div class="card">
-        <b>Growth settings</b>
-        <label>Lucky Spin on (1/0)</label><input id="f_spin" type="number" min="0" step="1">
-        <label>Max extra spins per day (unlocked by ads)</label><input id="f_spinx" type="number" min="0" step="1">
-        <label>Spin prize multiplier (x)</label><input id="f_spins" type="number" min="0" step="any">
-        <label>Channel promotion: price per join (points)</label><input id="f_price" type="number" min="0" step="any">
-        <label>Share paid to the user per join (%)</label><input id="f_share" type="number" min="0" max="100" step="any">
-        <label>Minimum joins per campaign</label><input id="f_minj" type="number" min="1" step="1">
-        <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
-        <button class="btn green" id="f_save" style="margin-top:14px">Save</button>
-        <button class="btn dark" id="f_remind" style="margin-top:8px">Send reminders now</button>
-      </div>
-      <div class="card">
-        <b>Banner / featured slot</b>
-        <label>Title</label><input id="b_title" type="text" maxlength="80">
-        <label>Text (optional)</label><input id="b_text" type="text" maxlength="160">
-        <label>Link</label><input id="b_url" type="text" placeholder="https://...">
-        <label>Days (0 = no end)</label><input id="b_days" type="number" min="0" step="1" value="7">
-        <button class="btn" id="b_add" style="margin-top:12px">Add banner</button>
-        <div id="b_list" style="margin-top:10px"></div>
-      </div>
-      <div class="card">
-        <b>Offerwall / CPA offers</b>
-        <div class="muted">Use {userid} in the link. Postback: /api/offer-postback?secret=OFFER_SECRET&amp;userid={userid}&amp;txid={txid}&amp;offer=ID</div>
-        <label>Title</label><input id="o_title" type="text" maxlength="80">
-        <label>Description</label><input id="o_desc" type="text" maxlength="200">
-        <label>Link</label><input id="o_url" type="text" placeholder="https://...?sub={userid}">
-        <label>Reward (points)</label><input id="o_rew" type="number" min="0" step="any">
-        <label>Badge (e.g. High pay)</label><input id="o_badge" type="text" maxlength="20" value="High pay">
-        <button class="btn" id="o_add" style="margin-top:12px">Add offer</button>
-        <div id="o_list" style="margin-top:10px"></div>
-      </div>
-      <div class="card">
-        <b>Post a promo code to the channel</b>
-        <label>Code</label><input id="pc_code" type="text" autocapitalize="characters">
-        <button class="btn dark" id="pc_post" style="margin-top:12px">Post to channel</button>
-      </div>
-    </div>
-
-    <div id="admSet" class="hidden">
-      <div class="card">
-        <label style="margin-top:0">Ad reward (points)</label><input id="a_ad" type="number" step="any" min="0">
-        <label>Invite reward (points)</label><input id="a_inv" type="number" step="any" min="0">
-        <label>Daily ads limit</label><input id="a_max" type="number" min="0">
-        <label>Surprise ad every N seconds (0 = off, min 10)</label><input id="a_auto" type="number" min="0" step="1">
-        <label>Minimum withdrawal (points)</label><input id="a_min" type="number" step="any" min="0">
-        <label>Value of 1 point in USD (e.g. 0.01)</label><input id="a_pv" type="number" step="any" min="0">
-        <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
-        <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
-        <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
-                <label>Daily withdraw bot budget in USDT, all users together (0 = no limit). The bot messages you when it is finished.</label><input id="a_bud" type="number" min="0" step="any">
-        <label>Withdraw closed until this day (leave empty = open)</label>
-        <div class="row2" style="align-items:stretch">
-          <input id="a_closed" type="date">
-          <button class="btn dark sm" id="a_open" type="button" style="flex:none;width:auto;padding:0 16px">Open now</button>
-        </div>
-        <label>Bonus: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
-        <label>Bonus: 10 verified friends</label><input id="a_m10" type="number" step="any" min="0">
-        <label>Bonus: 25 verified friends</label><input id="a_m25" type="number" step="any" min="0">
-        <button class="btn green" id="saveSettings" style="margin-top:16px"></button>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<nav id="nav" class="hidden">
-  <button data-tab="home" class="active"></button>
-  <button data-tab="earn"></button>
-  <button data-tab="invite"></button>
-  <button data-tab="profile"></button>
-</nav>
+<div id="app"></div>
+<div id="toast"></div>
 
 <script>
-/* =====================================================
-   CONFIG
-===================================================== */
-// fallback only: the real Adsgram block id comes from the server (/api/me -> adsgram.blockId)
-// so the app and the server always use the same block.
-const ADSGRAM_BLOCK_FALLBACK = "52630";
-const ADSGRAM_INTERSTITIAL_ID = "";        // optional "int-..." block for surprise ads
-const MONETAG_ZONE = "11984693";           // Monetag zone id
-
+/* ============================ BASICS ============================ */
 const tg = window.Telegram && window.Telegram.WebApp;
-if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#070b16"); tg.setBackgroundColor && tg.setBackgroundColor("#070b16"); } catch (e) {} }
-const INIT_DATA = tg ? tg.initData : "";
-
-// device id (used by the server to detect multiple accounts on one device)
-let DEVICE_ID = "";
-try {
-  DEVICE_ID = localStorage.getItem("device_installation_id") || "";
-  if (!DEVICE_ID) {
-    DEVICE_ID = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
-    localStorage.setItem("device_installation_id", DEVICE_ID);
-  }
-} catch (e) {}
-
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
-// BNB amounts can be very small, so show up to 8 decimals (no trailing zeros)
-const fmtCrypto = n => {
-  const x = Number(n || 0);
-  if (!x) return "0";
-  let t = x.toFixed(8).replace(/0+$/, "");
-  if (t.endsWith(".")) t = t.slice(0, -1);
-  return t;
-};
+if (tg) {
+  tg.ready(); tg.expand();
+  try { tg.setHeaderColor("#0e1120"); tg.setBackgroundColor("#0e1120"); tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+}
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (n, d = 2) => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: d });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const shortAddr = a => String(a || "").slice(0, 6) + "..." + String(a || "").slice(-4);
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-/* ---------------- icons ---------------- */
-const P = {
-  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/>',
-  play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/>',
-  users:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.5 0 4.5 2 4.5 4.5"/>',
-  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
-  wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2.5"/>',
-  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
-  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-  x:'<path d="M6 6l12 12M18 6L6 18"/>',
-  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  coin:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',
-  trophy:'<path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 6H4c0 3 1.5 4.5 4 5M16 6h4c0 3-1.5 4.5-4 5M12 13v4M8.5 20h7M10 17h4"/>',
-  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
-  share:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
-  back:'<path d="M15 5l-7 7 7 7"/>',
-  bolt:'<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>',
-  send:'<path d="M4 12l16-8-6 16-3-7z"/>',
-  list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
-  refresh:'<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
-  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z"/>',
-  star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>'
-};
-const svg = n => `<svg viewBox="0 0 24 24">${P[n] || ""}</svg>`;
-function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
-function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text + "</span>"; }
+const deviceId = (() => {
+  try {
+    let d = localStorage.getItem("dev_id");
+    if (!d) { d = uid(); localStorage.setItem("dev_id", d); }
+    return d;
+  } catch (e) { return uid(); }
+})();
 
-[["gIc","shield"],["prIc","gift"],["msIc","gift"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
- ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i3","shield"],["frIc","users"],["i2","coin"],
- ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
-setBtn("checkBtn","refresh","Check membership");
-setBtn("hWithdraw","wallet","Withdraw");
-setBtn("hInvite","users","Invite");
-setBtn("hWatch","play","Watch ad &amp; earn");
-setBtn("eWatch","play","Watch ad &amp; earn");
-setBtn("supportBtn","send","Contact admin");
-setBtn("addTask","check","Add task");
-setBtn("promoBtn","check","Redeem");
-setBtn("uSearch","refresh","Search");
-setBtn("pCreate","check","Create code");
-setBtn("bSend","send","Send to everyone");
-setBtn("shareBtn","share","Share");
-setBtn("copyBtn","copy","Copy");
-setBtn("wBtn","send","Withdraw now");
-setBtn("adminBtn","shield","Admin panel");
-setBtn("saveSettings","check","Save settings");
-const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invite"], profile:["user","Profile"] };
-document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
-
-/* ---------------- state / helpers ---------------- */
-let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null;
-let watching = false, autoBusy = false;
-let admStatus = "pending", currentTab = "home";
-const SUPPORT_BOT = "Adewa_eran_support_bot";
-const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
-
-let toastTimer;
 function toast(msg, type) {
-  const t = $("toast");
-  t.textContent = msg; t.className = "toast " + (type || "");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add("hidden"), 3200);
+  const t = $("#toast");
+  t.className = "show " + (type || "");
+  t.textContent = msg;
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => { t.className = ""; }, 3200);
 }
+function haptic(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred(type); } catch (e) {} }
 
-async function api(path, method, body) {
-  const res = await fetch(path, {
-    method: method || "GET",
-    headers: { "Content-Type": "application/json", "x-telegram-init-data": INIT_DATA, "x-device": DEVICE_ID },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  let data = {};
-  try { data = await res.json(); } catch (e) {}
-  if (!res.ok || data.ok === false) {
-    const err = new Error(data.error || ("Request failed (" + res.status + ")"));
-    err.pending = !!data.pending;
-    err.banned = data.status === "banned";
-    throw err;
+async function api(path, body, method) {
+  const init = { method: method || (body !== undefined ? "POST" : "GET"), headers: { "x-telegram-init-data": (tg && tg.initData) || "", "x-device": deviceId } };
+  if (body !== undefined) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(body); }
+  try {
+    const r = await fetch("/api" + path, init);
+    const j = await r.json().catch(() => ({ ok: false, error: "Bad server reply." }));
+    j.httpStatus = r.status;
+    return j;
+  } catch (e) {
+    return { ok: false, error: "Network error. Check your connection." };
   }
-  return data;
-}
-
-// asks the admin to confirm an action (Telegram native popup, or the browser confirm as fallback)
-function confirmBox(message) {
-  return new Promise(resolve => {
-    if (tg && typeof tg.showConfirm === "function") {
-      try { tg.showConfirm(message, ok => resolve(!!ok)); return; } catch (e) {}
-    }
-    resolve(window.confirm(message));
-  });
-}
-
-function countUp(el, to) {
-  const from = Number(el.dataset.v || 0);
-  el.dataset.v = to;
-  const start = performance.now(), dur = 700;
-  function step(t) {
-    const k = Math.min(1, (t - start) / dur), e = 1 - Math.pow(1 - k, 3);
-    el.textContent = fmt(from + (to - from) * e);
-    if (k < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-const nameOf = u => [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "User");
-const fmtDay = d => d ? new Date(d).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "";
-const fmtDate = d => d ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-const sym = () => (ME && ME.payout && ME.payout.symbol) || "USDT";
-const explorer = () => (ME && ME.payout && ME.payout.explorer) || "https://bscscan.com/tx/";
-
-/* ---------------- BNB value + payout limits ---------------- */
-const bnbPrice = () => Number((ME && ME.payout && ME.payout.bnb_price) || 0);
-// BNB value of one point = (USD value of a point) / (BNB price)
-function bnbPerPoint() {
-  const price = bnbPrice(), rate = Number(((ME && ME.settings) || {}).point_value_usd ?? 0.01);
-  return price > 0 ? rate / price : 0;
-}
-function renderBnb() {
-  const rate = Number(((ME && ME.settings) || {}).point_value_usd ?? 0.01);
-  if (!(rate > 0)) { $("hBnbBal").innerHTML = "&nbsp;"; $("hBnbRate").textContent = ""; return; }
-  $("hBnbBal").textContent = "\u2248 $" + (ME.user.points * rate).toFixed(2) + " " + sym();
-  $("hBnbRate").textContent = "1 " + sym() + " = " + fmt(Math.round(1 / rate)) + " points \u00B7 1 point = $" + rate;
-}
-// text shown when withdrawing is closed by the admin or the user must wait
-function withdrawNoticeText() {
-  const st = (ME && ME.settings) || {};
-  const closed = Number(st.withdraw_closed_until || 0) * 1000;
-  if (closed > Date.now()) return "\u26D4 Withdraw requests are closed for today. They open on " + fmtDay(closed) + ".";
-  const parts = [];
-  const gate = ME && ME.withdraw_gate;
-  if (gate && gate.need_deposit) parts.push("\u{1F4B3} Deposit " + gate.deposit_required_usd + " " + sym() + " (BEP20) once to unlock your next withdrawals.");
-  const next = Number((ME && ME.withdraw_next_at) || 0);
-  if (next > Date.now()) parts.push("\u23F3 Only one withdraw request per day. You can send the next one on " + fmtDay(next) + ".");
-  const req = ME && ME.withdraw_req;
-  if (req) {
-    if (req.maxAds > 0 && req.adsToday < req.maxAds) parts.push("\u{1F4FA} Watch all of today's ads first: " + req.adsToday + " / " + req.maxAds + " done.");
-    if (req.tasksLeft > 0) parts.push("\u{1F4DD} Complete all tasks first: " + req.tasksLeft + " left.");
-  }
-  return parts.join("\n");
-}
-function renderNotice() {
-  const t = withdrawNoticeText(), el = $("wNotice");
-  el.textContent = t;
-  el.classList.toggle("hidden", !t);
-  renderDeposit();
-}
-function renderDeposit() {
-  const g = ME && ME.withdraw_gate, box = $("wDeposit");
-  if (!g || !g.need_deposit || !g.deposit_address) { box.classList.add("hidden"); return; }
-  $("wDepTxt").textContent = "1) Send at least " + g.deposit_required_usd + " " + sym() + " (BEP20 / BNB Smart Chain) to this address.\n2) Paste the transaction hash below and tap Verify.";
-  $("wDepAddr").textContent = g.deposit_address;
-  box.classList.remove("hidden");
-}
-function renderLimits() {
-  const L = ME && ME.payout && ME.payout.limits, el = $("wLimits");
-  if (!L) { el.textContent = ""; return; }
-  const parts = [];
-  if (L.budget && L.budget.limit > 0) {
-    parts.push(L.budget.full
-      ? "\u26A0\uFE0F Today's payout budget is finished. Try again tomorrow."
-      : "Today's payout budget left: " + fmtCrypto(L.budget.left) + " of " + fmtCrypto(L.budget.limit) + " " + sym());
-  }
-  el.innerHTML = parts.map(x => "<div>" + esc(x) + "</div>").join("");
-}
-
-/* ---------------- render ---------------- */
-function render() {
-  const u = ME.user, st = ME.settings || {};
-  const name = nameOf(u);
-
-  ["hAvatar","pAvatar"].forEach(id => { if (u.photo_url) $(id).src = u.photo_url; else $(id).removeAttribute("src"); });
-  $("hName").textContent = name; $("pName").textContent = name;
-  $("pId").textContent = "ID: " + u.telegram_id;
-  $("hRank").textContent = "#" + u.rank; $("pRank").textContent = "#" + u.rank;
-  countUp($("hPoints"), u.points);
-  $("hAds").textContent = u.total_ads; $("pAds").textContent = u.total_ads;
-  $("hInv").textContent = u.total_invites; $("pInv").textContent = u.total_invites;
-  $("hToday").textContent = ME.today_ads;
-  $("iNeed").textContent = (ME.settings || {}).verify_ads ?? 1;
-  $("iPts").textContent = fmt(u.points);
-  $("wBal").textContent = fmt(u.points);
-
-  const adR = st.ad_reward ?? 1, invR = st.invite_reward ?? 1, max = st.max_ads_per_day ?? 100, minW = st.min_withdraw ?? 100;
-  $("hAdSub").textContent = "+" + fmt(adR) + " points per ad";
-  $("eAdSub").textContent = "+" + fmt(adR) + " points per ad";
-  $("iReward").textContent = fmt(invR);
-  $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
-  $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
-  updateFee();
-  const gate = ME.withdraw_gate;
-  if (gate && gate.first) {
-    $("wMin").textContent = "First withdrawal min " + fmt(gate.first_min_points) + " ($" + gate.first_min_usd + ")";
-  } else {
-    $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
-  }
-  $("wRate").textContent = "1 point = " + (st.point_value_usd ?? 0.01) + " USD · paid in " + sym() + " (BEP20)";
-
-  renderBnb();
-  renderLimits();
-  renderNotice();
-
-  $("refLink").textContent = BOT_USERNAME ? "https://t.me/" + BOT_USERNAME + "?start=" + u.telegram_id : "Bot username is not configured";
-
-  const ab = $("adminBtn");
-  ab.classList.toggle("hidden", !u.is_admin);
-
-  scheduleAuto();
-  applyGate();
-}
-
-function applyGate() {
-  const ok = !!(ME && ME.allJoined);
-  $("gate").classList.toggle("hidden", ok);
-  $("app").classList.toggle("hidden", !ok);
-  $("nav").classList.toggle("hidden", !ok);
-  if (ok) return;
-  $("channelList").innerHTML = (ME.channels || []).map(c => {
-    const h = String(c.channel).replace(/^@/, "");
-    const hint = c.error ? "Bot must be admin in this channel" : (c.joined ? "Joined" : "Not joined yet");
-    return `<div class="card" style="padding:13px"><div class="line">
-      <span class="ib sm ${c.joined ? "green" : "purple"}">${svg(c.joined ? "check" : "send")}</span>
-      <div class="x"><b class="ellip">${esc(c.channel)}</b><span>${esc(hint)}</span></div>
-      ${c.joined ? statusBadge("approved") : `<button class="btn sm" data-j="${esc(h)}" style="width:auto;padding:10px 18px">Join</button>`}
-    </div></div>`;
-  }).join("");
-  $("channelList").querySelectorAll("button[data-j]").forEach(b => b.onclick = () => openLink("https://t.me/" + b.dataset.j));
 }
 
 function openLink(url) {
-  if (tg && /^https:\/\/t\.me\//i.test(url) && tg.openTelegramLink) tg.openTelegramLink(url);
+  if (!url) return;
+  if (/^https?:\/\/t\.me\//i.test(url) && tg && tg.openTelegramLink) tg.openTelegramLink(url);
   else if (tg && tg.openLink) tg.openLink(url);
   else window.open(url, "_blank");
 }
-$("supportBtn").onclick = () => openLink("https://t.me/" + SUPPORT_BOT);
-
-async function refreshMe() {
-  const d = await api("/api/me");
-  ME = d; BOT_USERNAME = (d.bot && d.bot.username) || "";
-  render();
-}
-
-async function loadTop() {
-  try {
-    const d = await api("/api/leaderboard");
-    const my = String(ME.user.telegram_id);
-    const list = d.leaderboard.slice(0, 5);
-    $("topList").innerHTML = list.length ? list.map(u => `
-      <div class="card" style="padding:12px;${String(u.telegram_id) === my ? "border-color:#3b82f6" : ""}">
-        <div class="line"><div class="rankn">${u.rank}</div>
-        <div class="x"><b class="ellip">${esc(nameOf(u))}</b><span>${u.ads} ads · ${u.invites} invites</span></div>
-        <b>${fmt(u.points)}</b></div></div>`).join("") : '<div class="empty">No users yet.</div>';
-  } catch (e) { $("topList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-
-/* =====================================================
-   ADS: Adsgram + Monetag in turns
-===================================================== */
-const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
-const WATCH_BTNS = ["hWatch", "eWatch"];
-function setWatchBusy(b) { watching = b; WATCH_BTNS.forEach(i => $(i).disabled = b); }
-
-const other = p => (p === "adsgram" ? "monetag" : "adsgram");
-function getTurn(key) { try { return localStorage.getItem(key) === "monetag" ? "monetag" : "adsgram"; } catch (e) { return "adsgram"; } }
-function setTurn(key, p) { try { localStorage.setItem(key, p); } catch (e) {} }
-
-// the block id comes from the server so app and server always match
-const adsgramBlock = () => String((ME && ME.adsgram && ME.adsgram.blockId) || ADSGRAM_BLOCK_FALLBACK);
-
-function getCtrl() {
-  const block = adsgramBlock();
-  if (adController && adControllerBlock === block) return adController;
-  if (!window.Adsgram) return null;
-  try { adController = window.Adsgram.init({ blockId: block }); adControllerBlock = block; } catch (e) { return null; }
-  return adController;
-}
-function getInter() {
-  if (interCtrl) return interCtrl;
-  if (!ADSGRAM_INTERSTITIAL_ID || !window.Adsgram) return null;
-  try { interCtrl = window.Adsgram.init({ blockId: ADSGRAM_INTERSTITIAL_ID }); } catch (e) { return null; }
-  return interCtrl;
-}
-const monetagFn = () => { const f = window["show_" + MONETAG_ZONE]; return typeof f === "function" ? f : null; };
-
-// returns "done" | "skipped" | "noad"
-async function showProvider(p) {
-  if (p === "adsgram") {
-    const c = getCtrl();
-    if (!c) return "noad";
-    try {
-      const r = await c.show();
-      return r && r.done ? "done" : "skipped";
-    } catch (e) {
-      return e && e.error === false ? "skipped" : "noad";
-    }
-  }
-  const f = monetagFn();
-  if (!f) return "noad";
-  try {
-    await f({ ymid: String(ME.user.telegram_id) });
-    return "done";
-  } catch (e) { return "noad"; }
-}
-
-async function claimAdReward(provider) {
-  let d = null;
-  for (let i = 0; i < 40; i++) {
-    try { d = await api("/api/ad-reward", "POST", { rewardKey: newKey(), provider }); break; }
-    catch (e) { if (!e.pending || i === 39) throw e; if (i === 2) toast("Confirming your ad..."); await sleep(600); }
-  }
-  toast("+" + fmt(d.reward) + " points", "ok");
-  await refreshMe();
-}
-
-async function watchAd() {
-  if (watching || autoBusy) return;
-  if (ME && !ME.allJoined) return toast("Join all required channels first.", "err");
-  setWatchBusy(true);
-  try {
-    const first = getTurn("adTurn");
-    let used = null, result = "noad";
-    for (const p of [first, other(first)]) {          // whichever is ready is shown
-      const r = await showProvider(p);
-      if (r === "noad") continue;
-      used = p; result = r; break;
-    }
-    if (result === "noad") return toast("Ads not ready. Try again in a moment.", "err");
-    setTurn("adTurn", other(used));                    // next time the other network goes first
-    if (result === "skipped") return toast("Ad was not completed.");
-    await claimAdReward(used);
-  } catch (e) {
-    toast((e && (e.description || e.message)) || "Ad error", "err");
-  } finally {
-    setWatchBusy(false);
-  }
-}
-$("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
-
-/* ---------------- surprise ads (admin sets the seconds) ---------------- */
-let autoTimer = null, autoSec = 0;
-function scheduleAuto() {
-  const s = Number(((ME && ME.settings) || {}).auto_ad_seconds || 0);
-  if (s === autoSec) return;
-  autoSec = s;
-  clearInterval(autoTimer); autoTimer = null;
-  if (s >= 10) autoTimer = setInterval(showAutoAd, s * 1000);
-}
-async function showAutoAd() {
-  if (autoBusy || watching || document.hidden) return;
-  if (!ME || !ME.allJoined) return;
-  if (!$("modal").classList.contains("hidden")) return;
-  autoBusy = true;
-  try {
-    const first = getTurn("autoTurn");
-    for (const p of [first, other(first)]) {
-      let r = "noad";
-      if (p === "adsgram") {
-        const c = getInter();
-        if (c) { try { const x = await c.show(); r = x && x.done ? "done" : "skipped"; } catch (e) { r = e && e.error === false ? "skipped" : "noad"; } }
-      } else {
-        const f = monetagFn();
-        if (f) { try { await f(); r = "done"; } catch (e) { r = "noad"; } }   // no ymid -> never gives points
-      }
-      if (r !== "noad") { setTurn("autoTurn", other(p)); break; }
-    }
-  } finally { autoBusy = false; }
-}
-// pick up changes made by the admin
-setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy) refreshMe().catch(() => {}); }, 60000);
-
-/* ---------------- invite ---------------- */
-$("shareBtn").onclick = () => {
-  const link = $("refLink").textContent;
-  if (!link.startsWith("http")) return toast("Bot username is not configured.", "err");
-  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent("Join and earn rewards!");
-  if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
-};
-$("copyBtn").onclick = async () => {
-  try { await navigator.clipboard.writeText($("refLink").textContent); toast("Link copied", "ok"); }
-  catch (e) { toast("Copy failed.", "err"); }
-};
-$("hInvite").onclick = () => showTab("invite");
-$("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
-
-/* ---------------- withdraw (BEP20, admin approves, then auto payment) ---------------- */
-function updateFee() {
-  const st = (ME && ME.settings) || {};
-  const pct = st.withdraw_fee_percent ?? 25;
-  const rate = st.point_value_usd ?? 0.01;
-  const amt = Number($("wAmt").value) || 0;
-  const fee = Math.round(amt * pct) / 100;
-  const fin = amt - fee;
-  $("wFee").textContent = "Service fee " + pct + "%" +
-    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " " + sym() +
-      (bnbPrice() > 0 ? " ≈ " + fmtCrypto(fin * rate / bnbPrice()) + " " + sym() : "") : "");
-}
-$("wAmt").addEventListener("input", updateFee);
-
-function showReceipt(d) {
-  const modal = $("modal");
-  const r = d && d.receipt_data;
-  const usd = n => { n = Number(n || 0); return "$" + (n >= 1 ? n.toFixed(2) : n.toFixed(4)); };
-  const feeTxt = n => { n = Number(n || 0); return "-$" + (n >= 0.01 ? n.toFixed(2) : n.toFixed(4)); };
-  if (!r) {
-    modal.innerHTML = `<div class="sheet"><pre class="receipt">${esc((d && d.receipt) || "Your Withdraw request received")}</pre>
-      <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
-  } else {
-    modal.innerHTML = `<div class="sheet rcpt">
-      <div class="rc-top">
-        <div class="rc-ic">${svg("check")}</div>
-        <div class="rc-t">Your Withdraw request received</div>
-        <div class="rc-s">Waiting for admin approval</div>
-      </div>
-      <div class="rc-amt"><small>After fee amount</small><b>${usd(r.final_usd)}</b><i>${esc(r.symbol)}</i></div>
-      <div class="rc-rows">
-        <div><span>User account</span><b>${esc(r.name)}</b></div>
-        <div><span>Amount</span><b>${usd(r.requested_usd)} ${esc(r.symbol)}</b></div>
-        <div><span>Service fee</span><b>${feeTxt(r.fee_usd)}</b></div>
-        <div><span>Gateway</span><b>${esc(r.gateway)}</b></div>
-        <div><span>Request</span><b>#${esc(r.id)}</b></div>
-        <div><span>Status</span><b class="pend">Pending</b></div>
-      </div>
-      <div class="rc-foot"><button class="btn green" id="mReceiptOk">OK</button></div></div>`;
-  }
-  modal.classList.remove("hidden");
-  $("mReceiptOk").onclick = () => modal.classList.add("hidden");
-  modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
-}
-
-$("wBtn").onclick = async () => {
-  const addr = $("wAddr").value.trim();
-  const amount = Number($("wAmt").value);
-
-  if (!ADDR_RE.test(addr)) return toast("Enter a valid BEP20 address (0x + 40 characters).", "err");
-  if (!Number.isFinite(amount) || amount <= 0) return toast("Enter a valid amount.", "err");
-  const blocked = withdrawNoticeText();
-  if (blocked) return toast(blocked, "err");
-
-  const btn = $("wBtn"); btn.disabled = true;
-  try {
-    const d = await api("/api/withdraw", "POST", { amount, address: addr });
-    $("wAmt").value = ""; updateFee();
-    showReceipt(d);
-    await refreshMe(); loadHistory();
-  } catch (e) { toast(e.message, "err"); }
-  btn.disabled = false;
-};
-
-$("wDepCopy").onclick = async () => {
-  try { await navigator.clipboard.writeText($("wDepAddr").textContent); toast("Address copied", "ok"); }
-  catch (e) { toast("Press and hold the address to copy it.", "err"); }
-};
-$("wDepBtn").onclick = async () => {
-  const tx = $("wDepTx").value.trim();
-  if (!/^0x[a-fA-F0-9]{64}$/.test(tx)) return toast("Enter a valid transaction hash (0x + 64 characters).", "err");
-  const btn = $("wDepBtn"); btn.disabled = true;
-  try {
-    const d = await api("/api/deposit/verify", "POST", { tx_hash: tx });
-    $("wDepTx").value = "";
-    toast(d.message || "Deposit verified.", "ok");
-    await refreshMe();
-  } catch (e) { toast(e.message, "err"); }
-  btn.disabled = false;
-};
-
-function statusBadge(s) {
-  return `<span class="badge ${s}">${s[0].toUpperCase() + s.slice(1)}</span>`;
-}
-const statusLabel = s => s === "approved" ? "Paid" : s === "rejected" ? "Failed" : s === "processing" ? "Processing" : "Pending";
-const badgeOf = s => `<span class="badge ${s}">${statusLabel(s)}</span>`;
-
-async function loadHistory() {
-  try {
-    const d = await api("/api/withdrawals");
-    $("wHist").innerHTML = d.withdrawals.length ? d.withdrawals.map(w => {
-      const ic = w.status === "approved" ? ["check","green"] : w.status === "rejected" ? ["x","redg"] : ["clock","orange"];
-      const tx = w.tx_hash ? ` · <span class="txlink" data-tx="${esc(w.tx_hash)}">View tx</span>` : "";
-      return `<div class="card" style="padding:13px"><div class="line">
-        <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
-        <div class="x"><b>${fmt(w.amount)} pts · BEP20</b><span>${esc(shortAddr(w.address))} · ${fmtCrypto(w.token_amount)} ${esc(sym())} · ${fmtDate(w.created_at)}${tx}</span></div>
-        ${badgeOf(w.status)}</div></div>`;
-    }).join("") : '<div class="empty">No withdrawals yet.</div>';
-    $("wHist").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
-  } catch (e) { $("wHist").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-
-/* ---------------- admin ---------------- */
-$("adminBtn").onclick = () => { openAdmin(); };
-$("adminBack").onclick = () => showTab("profile");
-function admSeg(name) {
-  [["segStats","admStats","stats"],["segReq","admReq","req"],["segUsers","admUsers","users"],["segTask","admTask","task"],
-   ["segPromo","admPromo","promo"],["segBcast","admBcast","bcast"],["segSet","admSet","set"]].forEach(a => {
-    $(a[0]).classList.toggle("on", a[2] === name);
-    $(a[1]).classList.toggle("hidden", a[2] !== name);
+function confirmBox(msg) {
+  return new Promise(res => {
+    if (tg && tg.showConfirm) tg.showConfirm(msg, ok => res(!!ok));
+    else res(window.confirm(msg));
   });
-  if (name === "stats") loadStats();
-  if (name === "req") loadAdmin();
-  if (name === "users") loadUsers();
-  if (name === "task") loadAdminTasks();
-  if (name === "promo") loadPromos();
-  if (name === "set") {
-    const s = ME.settings || {};
-    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100;
-    $("a_auto").value = s.auto_ad_seconds ?? 0; $("a_pv").value = s.point_value_usd ?? 0.01;
-    $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
-    $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
-    $("a_bud").value = s.daily_bot_budget ?? 0;
-    $("a_closed").value = (s.withdraw_closed_until > Date.now() / 1000) ? toLocalInput(s.withdraw_closed_until) : "";
-  }
 }
-$("segStats").onclick = () => admSeg("stats");
-$("segReq").onclick = () => admSeg("req");
-$("segUsers").onclick = () => admSeg("users");
-$("segTask").onclick = () => admSeg("task");
-$("segPromo").onclick = () => admSeg("promo");
-$("segBcast").onclick = () => admSeg("bcast");
-$("segSet").onclick = () => admSeg("set");
-document.querySelectorAll("#admFilter .chip").forEach(c => c.onclick = () => {
-  admStatus = c.dataset.s;
-  document.querySelectorAll("#admFilter .chip").forEach(x => x.classList.toggle("on", x === c));
-  loadAdmin();
+function nameOf(u) {
+  if (!u) return "User";
+  return [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "User " + (u.telegram_id || ""));
+}
+function avatar(u) {
+  const n = nameOf(u);
+  return `<div class="av">${u && u.photo_url ? `<img src="${esc(u.photo_url)}" onerror="this.remove()">` : esc(n.charAt(0).toUpperCase())}</div>`;
+}
+function fmtDate(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  return isNaN(d) ? "" : d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+function fmtWait(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`;
+}
+const val = id => { const e = document.getElementById(id); return e ? e.value.trim() : ""; };
+
+/* ============================ STATE ============================ */
+const S = {
+  tab: "home", adminTab: "stats", d: {}, busy: {},
+  me: null, auto: false, autoTimer: null, adLock: false
+};
+const settings = () => (S.me && S.me.settings) || {};
+const user = () => (S.me && S.me.user) || {};
+const pointUsd = () => { const v = settings().point_value_usd; return Number.isFinite(v) ? v : 0.01; };
+
+/* ============================ BOOT ============================ */
+async function boot() {
+  const app = $("#app");
+  if (!tg || !tg.initData) {
+    app.innerHTML = `<div class="center"><div class="em">📱</div><h2>Open inside Telegram</h2><p class="mut">Please open this app from the bot in Telegram.</p></div>`;
+    return;
+  }
+  app.innerHTML = `<div class="spin"></div>`;
+  const r = await api("/me");
+  if (r.status === "banned" || r.httpStatus === 403) {
+    app.innerHTML = `<div class="center"><div class="em">🚫</div><h2>Access blocked</h2><p class="mut">${esc(r.error || "Your account is banned.")}</p></div>`;
+    return;
+  }
+  if (!r.ok) {
+    app.innerHTML = `<div class="center"><div class="em">⚠️</div><h2>Something went wrong</h2><p class="mut">${esc(r.error || "Try again.")}</p><button class="btn" onclick="boot()">Retry</button></div>`;
+    return;
+  }
+  S.me = r;
+  if (!r.allJoined) return renderGate();
+  renderShell();
+  go(S.tab);
+}
+
+function renderGate() {
+  const list = (S.me.channels || []).map(c => {
+    const isName = /^@/.test(c.channel);
+    return `<div class="item"><div class="sp"><b>${esc(c.channel)}</b></div>
+      ${c.joined ? `<span class="tag ok">Joined</span>` : (isName ? `<button class="btn small" data-a="openLink" data-v="https://t.me/${esc(c.channel.slice(1))}">Join</button>` : `<span class="tag warn">Join</span>`)}</div>`;
+  }).join("");
+  $("#app").innerHTML = `<div style="padding:20px"><div class="center" style="padding:20px"><div class="em">📢</div><h2>Join our channels</h2><p class="mut">Join all channels below to start earning.</p></div>
+    <div class="card">${list}</div><button class="btn full" data-a="recheck">I joined, check again</button></div>`;
+}
+
+function renderShell() {
+  const u = user();
+  const navItems = [["home", "🏠", "Home"], ["earn", "🎯", "Earn"], ["friends", "👥", "Friends"], ["wallet", "💳", "Wallet"], ["top", "🏆", "Top"]];
+  $("#app").innerHTML = `
+    <header>${avatar(u)}<div class="hname"><b>${esc(nameOf(u))}</b><small>Rank #${num(u.rank, 0)}</small></div>
+      <div class="pill" id="pts">💰 ${num(u.points)}</div>
+      ${u.is_admin ? `<button class="iconbtn" data-a="tab" data-v="admin">⚙️</button>` : ""}
+    </header>
+    <main id="view"></main>
+    <nav><div>${navItems.map(n => `<button data-a="tab" data-v="${n[0]}" id="nav-${n[0]}"><i>${n[1]}</i>${n[2]}</button>`).join("")}</div></nav>`;
+}
+function setPoints(p) {
+  if (p !== undefined && p !== null) S.me.user.points = Number(p);
+  const e = $("#pts"); if (e) e.textContent = "💰 " + num(user().points);
+}
+
+/* ============================ ROUTER ============================ */
+const loaders = {};
+const views = {};
+function go(tab) {
+  S.tab = tab;
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.id === "nav-" + tab));
+  render();
+  if (loaders[tab]) loaders[tab]();
+  window.scrollTo(0, 0);
+}
+function render() {
+  const v = $("#view"); if (!v) return;
+  const scroll = window.scrollY;
+  v.innerHTML = (views[S.tab] ? views[S.tab]() : "");
+  window.scrollTo(0, scroll);
+}
+async function reloadMe() {
+  const r = await api("/me");
+  if (r.ok) { S.me = r; setPoints(); }
+  return r;
+}
+
+/* ============================ ACTIONS (event delegation) ============================ */
+const A = {};
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-a]");
+  if (!el || el.disabled) return;
+  const fn = A[el.dataset.a];
+  if (fn) fn(el.dataset.v, el, e);
+});
+A.tab = v => go(v);
+A.openLink = v => openLink(v);
+A.recheck = async () => { await boot(); };
+A.closeModal = () => { const m = $(".modal"); if (m) m.remove(); };
+function modal(html) {
+  A.closeModal();
+  const d = document.createElement("div");
+  d.className = "modal";
+  d.innerHTML = `<div class="card">${html}</div>`;
+  d.addEventListener("click", e => { if (e.target === d) d.remove(); });
+  document.body.appendChild(d);
+}
+async function lock(key, fn) {
+  if (S.busy[key]) return;
+  S.busy[key] = true;
+  try { return await fn(); } finally { S.busy[key] = false; }
+}
+
+/* ============================ HOME ============================ */
+loaders.home = async () => {
+  const [b, p, sp] = await Promise.all([api("/banners"), api("/proof-feed"), api("/spin")]);
+  S.d.banners = b.ok ? b.banners : [];
+  S.d.feed = p.ok ? p.feed : [];
+  S.d.spin = sp.ok ? sp : null;
+  if (S.tab === "home") render();
+};
+views.home = () => {
+  const st = settings(), u = user();
+  const max = st.max_ads_per_day || 0, today = S.me.today_ads || 0;
+  const pct = max ? Math.min(100, Math.round(today / max * 100)) : 0;
+  const full = max > 0 && today >= max;
+  const rew = st.ad_reward != null ? st.ad_reward : 1;
+  const banners = (S.d.banners || []).map(b => `<div class="card row" data-a="banner" data-v="${b.id}" data-u="${esc(b.url)}" style="cursor:pointer">
+      <div class="sp"><b>${esc(b.title)}</b><div class="sm mut">${esc(b.text || "")}</div></div><span class="tag warn">Ad</span></div>`).join("");
+  const sp = S.d.spin;
+  const feed = (S.d.feed || []).slice(0, 6).map(f => `<div class="item"><div class="sp"><b>${esc(f.name)}</b> <span class="mut sm">withdrew</span></div><span class="tag ok">$${num(f.usd, 2)}</span></div>`).join("");
+  return `
+    <div class="card hero"><small>Your balance</small><div class="big">${num(u.points)}</div>
+      <small>≈ $${num(u.points * pointUsd(), 2)} ${esc((S.me.payout || {}).symbol || "USDT")}</small></div>
+    ${banners}
+    <div class="card"><div class="row"><h3 class="sp">Watch ads and earn</h3><span class="tag">${today} / ${max || "∞"}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div style="height:10px"></div>
+      <div class="grid2">
+        <button class="btn" data-a="watch" data-v="adsgram" ${full ? "disabled" : ""}>▶ Ad 1<br><small>+${num(rew)} pts</small></button>
+        <button class="btn" data-a="watch" data-v="monetag" ${full ? "disabled" : ""}>▶ Ad 2<br><small>+${num(rew)} pts</small></button>
+      </div>
+      ${st.auto_ad_seconds > 0 ? `<button class="btn ghost full" style="margin-top:8px" data-a="auto">${S.auto ? "⏸ Stop auto watch" : "⏯ Auto watch every " + st.auto_ad_seconds + "s"}</button>` : ""}
+      ${full ? `<p class="sm mut" style="margin:8px 0 0">Daily ad limit reached. Come back tomorrow.</p>` : ""}
+    </div>
+    ${sp && sp.enabled ? `<div class="card"><div class="row"><div class="sp"><h3 style="margin:0">🎰 Lucky Spin</h3>
+      <div class="sm mut">${sp.available} spin(s) available. Watch ads to unlock more.</div></div>
+      <button class="btn small" data-a="spin" ${sp.available < 1 ? "disabled" : ""}>Spin</button></div></div>` : ""}
+    ${feed ? `<div class="card"><h3>✅ Recent payouts</h3>${feed}</div>` : ""}`;
+};
+A.banner = (v, el) => { api("/banners/" + v + "/click", {}); openLink(el.dataset.u); };
+
+/* ---- ads ---- */
+let monetagLoaded = "";
+function loadMonetag(zone) {
+  return new Promise((resolve, reject) => {
+    const fn = "show_" + zone;
+    if (typeof window[fn] === "function") return resolve(window[fn]);
+    if (monetagLoaded !== zone) {
+      monetagLoaded = zone;
+      const s = document.createElement("script");
+      s.src = "https://libtl.com/sdk.js";
+      s.dataset.zone = zone; s.dataset.sdk = fn;
+      s.onerror = () => reject(new Error("Ad network blocked."));
+      document.head.appendChild(s);
+    }
+    let n = 0;
+    const t = setInterval(() => {
+      if (typeof window[fn] === "function") { clearInterval(t); resolve(window[fn]); }
+      else if (++n > 40) { clearInterval(t); reject(new Error("Ad is not ready. Try again.")); }
+    }, 150);
+  });
+}
+async function showAd(provider) {
+  if (provider === "monetag") {
+    const zone = (S.me.monetag || {}).zoneId;
+    if (!zone) throw new Error("Ad 2 is not configured.");
+    const fn = await loadMonetag(zone);
+    await fn();
+    return;
+  }
+  const blockId = (S.me.adsgram || {}).blockId;
+  if (!window.Adsgram) throw new Error("Ad network blocked.");
+  const ctrl = window.Adsgram.init({ blockId: String(blockId) });
+  const res = await ctrl.show();
+  if (res && res.done === false) throw new Error("Watch the whole ad to earn.");
+}
+async function claimAd(provider) {
+  const key = uid();
+  for (let i = 0; i < 14; i++) {
+    const r = await api("/ad-reward", { provider, rewardKey: key });
+    if (r.ok) return r;
+    if (r.pending) { await sleep(1500); continue; }
+    return r;
+  }
+  return { ok: false, error: "Ad was not confirmed. Try again." };
+}
+A.watch = provider => lock("ad", async () => {
+  if (S.adLock) return;
+  S.adLock = true;
+  try {
+    await showAd(provider);
+  } catch (e) {
+    S.adLock = false;
+    const m = (e && (e.message || e.description)) || "Ad not available right now.";
+    toast(m, "err");
+    return false;
+  }
+  toast("Checking your reward...");
+  const r = await claimAd(provider);
+  S.adLock = false;
+  if (r.ok) {
+    S.me.today_ads = (S.me.today_ads || 0) + 1;
+    S.me.user.ads_count = r.user.ads_count; S.me.user.total_ads = r.user.total_ads;
+    setPoints(r.user.points);
+    haptic("success"); toast("+" + num(r.reward) + " points!", "ok");
+    if (S.tab === "home") render();
+    return true;
+  }
+  haptic("error"); toast(r.error || "Reward failed.", "err");
+  return false;
+});
+A.auto = () => {
+  S.auto = !S.auto;
+  clearTimeout(S.autoTimer);
+  if (S.auto) autoStep();
+  render();
+};
+async function autoStep() {
+  if (!S.auto) return;
+  const max = settings().max_ads_per_day || 0;
+  if (max && (S.me.today_ads || 0) >= max) { S.auto = false; render(); return; }
+  if (S.tab === "home" && !document.hidden) {
+    const ok = await A.watch("adsgram");
+    if (!ok) { S.auto = false; render(); return; }
+  }
+  S.autoTimer = setTimeout(autoStep, Math.max(10, settings().auto_ad_seconds || 30) * 1000);
+}
+
+/* ---- spin ---- */
+A.spin = () => lock("spin", async () => {
+  const prizes = (S.d.spin && S.d.spin.prizes) || [1, 2, 5];
+  modal(`<h3 style="text-align:center">🎰 Lucky Spin</h3><div class="slot" id="slot">🎁</div><div class="center" style="padding:0" id="spinMsg"><p class="mut">Spinning...</p></div>`);
+  let i = 0;
+  const anim = setInterval(() => { const s = $("#slot"); if (s) s.textContent = "+" + prizes[i++ % prizes.length]; }, 90);
+  const [r] = await Promise.all([api("/spin", {}), sleep(1600)]);
+  clearInterval(anim);
+  const s = $("#slot"), m = $("#spinMsg");
+  if (!s) return;
+  if (r.ok) {
+    s.textContent = "🎉 +" + num(r.prize, 4);
+    m.innerHTML = `<p>You won <b>${num(r.prize, 4)}</b> points!</p><button class="btn full" data-a="closeModal">Great</button>`;
+    haptic("success");
+    await reloadMe();
+    const sp = await api("/spin"); if (sp.ok) S.d.spin = sp;
+    if (S.tab === "home") render();
+  } else {
+    s.textContent = "😕";
+    m.innerHTML = `<p class="mut">${esc(r.error || "Spin failed.")}</p><button class="btn full" data-a="closeModal">OK</button>`;
+  }
 });
 
-function openAdmin() {
-  ["home","earn","invite","profile"].forEach(t => $("v-" + t).classList.add("hidden"));
-  $("v-admin").classList.remove("hidden"); window.scrollTo(0, 0);
-  $("segStats").click();
-}
-
-async function loadAdmin() {
-  $("admList").innerHTML = '<div class="empty">Loading...</div>';
-  try {
-    const d = await api("/api/admin/withdrawals?status=" + admStatus);
-    $("admList").innerHTML = d.withdrawals.length ? d.withdrawals.map(w => {
-      const who = [w.first_name, w.last_name].filter(Boolean).join(" ") || (w.username ? "@" + w.username : "User");
-      const open = w.status === "pending" || w.status === "processing";
-      const actions = open ? `
-        <div class="row2" style="margin-top:12px">
-          <button class="btn red sm" data-rj="${esc(w.id)}">${svg("x")}<span>Reject</span></button>
-          <button class="btn green sm" data-ap="${esc(w.id)}">${svg("check")}<span>Approve &amp; pay</span></button>
-        </div>` : "";
-      return `<div class="card">
-        <div class="line"><span class="ib sm blue">${svg("user")}</span>
-          <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · #${esc(w.id)} · ${fmtDate(w.created_at)}</span></div>
-          ${badgeOf(w.status)}</div>
-        <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmtCrypto(w.token_amount)} <span class="muted">${esc(sym())} · BEP20</span></div>
-        <div class="muted">Requested ${fmt(w.amount)} pts · Fee ${fmt(w.fee)} · Net ${fmt(w.final_amount)}</div>
-        <div class="linkbox" style="margin:8px 0"><span class="muted">Address</span><br><b>${esc(w.address)}</b>
-          ${w.tx_hash ? `<br><span class="txlink" data-tx="${esc(w.tx_hash)}">View transaction</span>` : ""}</div>
-        ${w.admin_note ? `<div class="muted">Note: ${esc(w.admin_note)}</div>` : ""}
-        ${actions}
-      </div>`;
-    }).join("") : '<div class="empty">Nothing here.</div>';
-
-    $("admList").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
-
-    $("admList").querySelectorAll("button[data-ap]").forEach(b => b.onclick = async () => {
-      const id = b.dataset.ap, w = d.withdrawals.find(x => String(x.id) === id);
-      const ok = await confirmBox("Approve request #" + id + " and send " + fmtCrypto(w ? w.token_amount : 0) + " " + sym() + " now? This cannot be undone.");
-      if (!ok) return;
-      document.querySelectorAll("#admList button").forEach(x => x.disabled = true);
-      toast("Sending payment... please wait.");
-      try {
-        const r = await api("/api/admin/withdrawals/" + encodeURIComponent(id) + "/approve", "POST", {});
-        toast("Paid \u2705", "ok");
-        if (r && r.tx_hash) console.log("tx", r.tx_hash);
-      } catch (e) { toast(e.message, "err"); }
-      loadAdmin();
-    });
-
-    $("admList").querySelectorAll("button[data-rj]").forEach(b => b.onclick = async () => {
-      const id = b.dataset.rj;
-      const ok = await confirmBox("Reject request #" + id + "? The points will be returned to the user.");
-      if (!ok) return;
-      document.querySelectorAll("#admList button").forEach(x => x.disabled = true);
-      try {
-        await api("/api/admin/withdrawals/" + encodeURIComponent(id) + "/reject", "POST", { note: "Rejected by admin" });
-        toast("Rejected. Points returned.", "ok");
-      } catch (e) { toast(e.message, "err"); }
-      loadAdmin();
-    });
-  } catch (e) { $("admList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-
-const toLocalInput = sec => {
-  if (!sec) return "";
-  const d = new Date(sec * 1000), p = n => String(n).padStart(2, "0");
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+/* ============================ EARN ============================ */
+loaders.earn = async () => {
+  const [t, o, m] = await Promise.all([api("/tasks"), api("/offers"), api("/promote/mine")]);
+  S.d.tasks = t.ok ? t.tasks : [];
+  S.d.offers = o.ok ? o.offers : [];
+  S.d.mine = m.ok ? m.campaigns : [];
+  if (S.tab === "earn") render();
 };
-const fromLocalInput = v => {
-  if (!v) return 0;
-  const t = new Date(v + "T00:00:00").getTime();      // opens at 00:00 of that day
-  return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
+views.earn = () => {
+  const st = settings();
+  const tasks = (S.d.tasks || []).map(t => `<div class="item"><div class="sp"><b>${esc(t.title)}</b>${t.sponsored ? ` <span class="tag warn">Sponsored</span>` : ""}
+      <div class="sm mut">${esc(t.description || "")}</div></div>
+      <div style="text-align:right"><div class="tag ok">+${num(t.reward, 4)}</div><div style="height:6px"></div>
+      ${t.completed ? `<span class="tag ok">Done ✓</span>` : t.started
+        ? `<button class="btn small" data-a="taskClaim" data-v="${t.id}">Claim</button>`
+        : `<button class="btn small" data-a="taskStart" data-v="${t.id}" data-u="${esc(t.url)}">Start</button>`}</div></div>`).join("");
+  const offers = (S.d.offers || []).map(o => `<div class="item"><div class="sp"><b>${esc(o.title)}</b>${o.badge ? ` <span class="tag warn">${esc(o.badge)}</span>` : ""}
+      <div class="sm mut">${esc(o.description || "")}</div></div>
+      <div style="text-align:right"><div class="tag ok">+${num(o.reward, 2)}</div><div style="height:6px"></div>
+      <button class="btn small" data-a="openLink" data-v="${esc(o.url)}">Open</button></div></div>`).join("");
+  const mine = (S.d.mine || []).map(c => `<div class="item"><div class="sp"><b>${esc(c.channel)}</b></div><span class="tag">${c.done} / ${c.max_users}</span></div>`).join("");
+  const price = st.promo_price_per_join != null ? st.promo_price_per_join : 10;
+  const minJ = Math.max(1, Math.floor(st.promo_min_joins != null ? st.promo_min_joins : 20));
+  return `
+    <div class="card"><h3>📋 Tasks</h3>${S.d.tasks ? (tasks || `<p class="mut sm">No tasks right now.</p>`) : `<div class="spin"></div>`}</div>
+    <div class="card"><h3>🎁 Promo code</h3><div class="row"><input id="promo" placeholder="Enter code" autocapitalize="characters" style="margin:0"><button class="btn" data-a="promo">Redeem</button></div></div>
+    ${(S.d.offers || []).length ? `<div class="card"><h3>💎 Offers</h3>${offers}</div>` : ""}
+    <div class="card"><h3>📣 Promote your channel</h3>
+      <p class="sm mut" style="margin-top:0">Get real members. Price: ${num(price, 4)} points per join. Add the bot as admin of your channel first.</p>
+      <input id="pch" placeholder="@yourchannel"><input id="pjoins" type="number" inputmode="numeric" placeholder="Joins (min ${minJ}, max 5000)" oninput="promoCost()">
+      <div class="sm mut" id="pcost">Cost: 0 points</div>
+      <button class="btn full" style="margin-top:8px" data-a="promote">Start campaign</button>
+      ${mine ? `<div style="margin-top:10px">${mine}</div>` : ""}</div>`;
 };
-$("a_open").onclick = () => { $("a_closed").value = ""; toast("Tap Save settings to open withdrawals."); };
-
-$("saveSettings").onclick = async () => {
-  try {
-    await api("/api/admin/settings", "POST", {
-      ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
-      max_ads_per_day: $("a_max").value, auto_ad_seconds: $("a_auto").value,
-      min_withdraw: $("a_min").value, point_value_usd: $("a_pv").value, verify_ads: $("a_vads").value,
-      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value,
-      daily_bot_budget: $("a_bud").value,
-      withdraw_closed_until: fromLocalInput($("a_closed").value)
-    });
-    toast("Settings saved.", "ok"); await refreshMe();
-  } catch (e) { toast(e.message, "err"); }
+window.promoCost = () => {
+  const price = settings().promo_price_per_join != null ? settings().promo_price_per_join : 10;
+  const e = $("#pcost"); if (e) e.textContent = "Cost: " + num(Number(val("pjoins") || 0) * price, 4) + " points";
 };
+A.taskStart = (id, el) => lock("task" + id, async () => {
+  const r = await api("/tasks/" + id + "/start", {});
+  if (!r.ok) return toast(r.error || "Could not start.", "err");
+  openLink(el.dataset.u);
+  const t = await api("/tasks"); if (t.ok) S.d.tasks = t.tasks;
+  render();
+});
+A.taskClaim = id => lock("task" + id, async () => {
+  const r = await api("/tasks/" + id + "/claim", {});
+  if (!r.ok) return toast(r.error || "Could not claim.", "err");
+  haptic("success"); toast("+" + num(r.reward, 4) + " points!", "ok");
+  const [t] = await Promise.all([api("/tasks"), reloadMe()]);
+  if (t.ok) S.d.tasks = t.tasks;
+  render();
+});
+A.promo = () => lock("promo", async () => {
+  const code = val("promo").toUpperCase();
+  if (!code) return toast("Enter a code.", "err");
+  const r = await api("/promo/redeem", { code });
+  if (!r.ok) return toast(r.error || "Invalid code.", "err");
+  haptic("success"); toast("+" + num(r.reward, 4) + " points!", "ok");
+  await reloadMe(); render();
+});
+A.promote = () => lock("promote", async () => {
+  const channel = val("pch"), joins = Number(val("pjoins"));
+  if (!channel || !joins) return toast("Fill in channel and joins.", "err");
+  if (!(await confirmBox(`Start a campaign for ${channel} with ${joins} joins?`))) return;
+  const r = await api("/promote", { channel, joins });
+  if (!r.ok) return toast(r.error || "Failed.", "err");
+  haptic("success"); toast("Campaign started! Cost " + num(r.cost, 4), "ok");
+  await reloadMe(); loaders.earn();
+});
 
-/* ---------------- promo code ---------------- */
-$("promoBtn").onclick = async () => {
-  const code = $("promoIn").value.trim();
-  if (!code) return toast("Enter a promo code.", "err");
-  $("promoBtn").disabled = true;
-  try {
-    const d = await api("/api/promo/redeem", "POST", { code });
-    $("promoIn").value = "";
-    toast("+" + fmt(d.reward) + " points", "ok");
-    await refreshMe();
-  } catch (e) { toast(e.message, "err"); }
-  $("promoBtn").disabled = false;
+/* ============================ FRIENDS ============================ */
+loaders.friends = async () => {
+  const r = await api("/referrals");
+  S.d.friends = r.ok ? r.friends : [];
+  S.d.claimed = r.ok ? r.claimed : [];
+  if (S.tab === "friends") render();
 };
-
-/* ---------------- milestones ---------------- */
-function renderMilestones(verified, claimed) {
-  const st = ME.settings || {};
-  $("mileList").innerHTML = [5, 10, 25].map(m => {
-    const bonus = st["milestone_" + m] ?? 0;
-    const done = claimed.includes(m) || verified >= m;
-    const pct = Math.min(100, (Math.min(verified, m) / m) * 100);
-    return `<div class="card" style="padding:13px"><div class="ms">
-      <span class="ib sm ${done ? "green" : "orange"}">${svg(done ? "check" : "gift")}</span>
-      <div class="x" style="flex:1;min-width:0"><b>${m} verified friends</b><span class="muted" style="display:block">Bonus +${fmt(bonus)} points</span>
-        <div class="progress" style="margin:8px 0 0"><i style="width:${pct}%"></i></div></div>
-      ${done ? statusBadge("approved").replace("Approved", "Reached") : `<span class="badge pending">${Math.min(verified, m)}/${m}</span>`}
-    </div></div>`;
+const refLink = () => {
+  const b = (S.me.bot || {}).username;
+  return b ? `https://t.me/${b}?start=ref_${user().referral_code}` : "";
+};
+views.friends = () => {
+  const st = settings(), u = user(), link = refLink();
+  const total = Number(u.total_invites || 0);
+  const ms = [5, 10, 25].map(m => {
+    const done = (S.d.claimed || []).map(Number).includes(m) || total >= m;
+    return `<div class="item"><div class="sp"><b>${m} friends</b><div class="bar"><i style="width:${Math.min(100, total / m * 100)}%"></i></div></div>
+      <span class="tag ${done ? "ok" : ""}">+${num(st["milestone_" + m])}${done ? " ✓" : ""}</span></div>`;
   }).join("");
-}
-
-/* ---------------- admin: dashboard / users / promo / broadcast ---------------- */
-const tile = (ic, color, v, l) => `<div class="stat"><span class="ib ${color}">${svg(ic)}</span><div class="v">${v}</div><div class="l">${l}</div></div>`;
-
-async function loadStats() {
-  $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">Loading...</div>';
-  try {
-    const d = (await api("/api/admin/stats")).stats;
-    $("statGrid").innerHTML =
-      tile("users", "blue", fmt(d.total_users), "Total users") +
-      tile("star", "green", fmt(d.new_today), "New today") +
-      tile("play", "pink", fmt(d.ads_today), "Ads today") +
-      tile("play", "purple", fmt(d.ads_total), "Ads total") +
-      tile("wallet", "green", fmt(d.paid_total), "Total paid (pts)") +
-      tile("wallet", "teal", fmt(d.paid_today), "Paid today (pts)") +
-      tile("clock", "orange", fmt(d.pending_count), "Pending") +
-      tile("coin", "teal", fmtCrypto(d.budget_used || 0) + " " + sym(), "Budget used today") +
-      tile("shield", "redg", fmt(d.banned), "Banned") +
-      tile("users", "blue", fmt(d.verified_refs), "Verified invites");
-  } catch (e) { $("statGrid").innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(e.message) + "</div>"; }
-}
-
-let usersCache = [];
-async function loadUsers() {
-  $("userList").innerHTML = '<div class="empty">Loading...</div>';
-  try {
-    const d = await api("/api/admin/users?q=" + encodeURIComponent($("uQ").value.trim()));
-    usersCache = d.users;
-    $("userList").innerHTML = d.users.length ? d.users.map(u => {
-      const name = nameOf(u), letter = esc((name.replace("@", "")[0] || "U").toUpperCase());
-      const img = u.photo_url ? `<img src="${esc(u.photo_url)}" alt="" onerror="this.remove()">` : "";
-      return `<div class="card"><div class="line">
-        <div class="av"><span>${letter}</span>${img}</div>
-        <div class="x"><b class="ellip">${esc(name)}</b><span>ID ${esc(u.telegram_id)}</span></div>
-        ${u.is_banned ? '<span class="badge rejected">Banned</span>' : ""}</div>
-        <div class="mini"><span>Points: ${fmt(u.points)}</span><span>Ads: ${u.total_ads}</span><span>Invites: ${u.total_invites}</span></div>
-        <div class="row2" style="margin-top:12px">
-          <button class="btn dark sm" data-pts="${esc(u.telegram_id)}">Points</button>
-          <button class="btn ${u.is_banned ? "green" : "red"} sm" data-ban="${esc(u.telegram_id)}">${u.is_banned ? "Unban" : "Ban"}</button></div></div>`;
-    }).join("") : '<div class="empty">No users found.</div>';
-
-    $("userList").querySelectorAll("button[data-ban]").forEach(b => b.onclick = async () => {
-      const u = usersCache.find(x => String(x.telegram_id) === b.dataset.ban);
-      b.disabled = true;
-      try {
-        await api("/api/admin/users/" + encodeURIComponent(b.dataset.ban) + "/ban", "POST", { banned: !u.is_banned });
-        toast(u.is_banned ? "User unbanned." : "User banned.", "ok"); loadUsers();
-      } catch (e) { toast(e.message, "err"); b.disabled = false; }
-    });
-    $("userList").querySelectorAll("button[data-pts]").forEach(b => b.onclick = () => pointsSheet(usersCache.find(x => String(x.telegram_id) === b.dataset.pts)));
-  } catch (e) { $("userList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-$("uSearch").onclick = loadUsers;
-$("uQ").addEventListener("keydown", e => { if (e.key === "Enter") loadUsers(); });
-
-function pointsSheet(u) {
-  const modal = $("modal");
-  modal.innerHTML = `<div class="sheet">
-    <div class="line" style="margin-bottom:12px"><span class="ib orange">${svg("coin")}</span>
-    <div class="x"><b style="font-size:17px">${esc(nameOf(u))}</b><span>Balance: ${fmt(u.points)}</span></div></div>
-    <input id="mAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount">
-    <div class="row2" style="margin-top:14px">
-      <button class="btn red" id="mSub">Subtract</button>
-      <button class="btn green" id="mAdd">Add</button></div>
-    <button class="btn dark" id="mClose" style="margin-top:10px">Cancel</button></div>`;
-  modal.classList.remove("hidden");
-  $("mClose").onclick = () => modal.classList.add("hidden");
-  modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
-  const apply = async sign => {
-    const amt = Math.abs(Number($("mAmt").value));
-    if (!amt) return toast("Enter an amount.", "err");
-    try {
-      await api("/api/admin/users/" + encodeURIComponent(u.telegram_id) + "/points", "POST", { amount: sign * amt });
-      modal.classList.add("hidden"); toast("Points updated.", "ok"); loadUsers();
-    } catch (e) { toast(e.message, "err"); }
-  };
-  $("mAdd").onclick = () => apply(1);
-  $("mSub").onclick = () => apply(-1);
-}
-
-async function loadPromos() {
-  $("promoList").innerHTML = '<div class="empty">Loading...</div>';
-  try {
-    const d = await api("/api/admin/promos");
-    $("promoList").innerHTML = d.promos.length ? d.promos.map(p => `<div class="card"><div class="line">
-      <span class="ib sm purple">${svg("gift")}</span>
-      <div class="x"><b>${esc(p.code)}</b><span>+${fmt(p.reward)} each · ${p.used_count}/${p.max_uses} used</span></div>
-      <button class="btn red sm" data-pdel="${esc(p.code)}" style="width:auto;padding:9px 14px">Delete</button></div></div>`).join("")
-      : '<div class="empty">No promo codes yet.</div>';
-    $("promoList").querySelectorAll("button[data-pdel]").forEach(b => b.onclick = async () => {
-      b.disabled = true;
-      try { await api("/api/admin/promos/" + encodeURIComponent(b.dataset.pdel) + "/delete", "POST"); toast("Code deleted.", "ok"); loadPromos(); }
-      catch (e) { toast(e.message, "err"); b.disabled = false; }
-    });
-  } catch (e) { $("promoList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-$("pCreate").onclick = async () => {
-  $("pCreate").disabled = true;
-  try {
-    const d = await api("/api/admin/promos", "POST", { code: $("pr_code").value.trim(), reward: Number($("pr_rew").value), maxUses: Number($("pr_max").value) });
-    ["pr_code", "pr_rew", "pr_max"].forEach(i => $(i).value = "");
-    toast("Code created: " + d.code, "ok"); loadPromos();
-  } catch (e) { toast(e.message, "err"); }
-  $("pCreate").disabled = false;
+  const list = (S.d.friends || []).map(f => `<div class="item">${avatar(f)}<div class="sp"><b>${esc(nameOf(f))}</b><div class="sm mut">${f.total_ads || 0} ads</div></div>
+      <span class="tag ${f.verified ? "ok" : "warn"}">${f.verified ? "Verified" : "Pending"}</span></div>`).join("");
+  return `
+    <div class="card hero"><small>Invite friends</small><div class="big">+${num(st.invite_reward != null ? st.invite_reward : 1)} pts</div>
+      <small>for every verified friend (they must join the channels and watch ${num(st.verify_ads != null ? st.verify_ads : 1, 0)} ad(s)).</small></div>
+    <div class="card"><div class="mono" id="rl">${esc(link || "Bot username is not set.")}</div>
+      <div class="grid2" style="margin-top:10px"><button class="btn ghost" data-a="copy">📋 Copy</button><button class="btn" data-a="share">📨 Share</button></div></div>
+    <div class="card"><h3>🏅 Milestone bonuses</h3><p class="sm mut" style="margin-top:0">Verified friends: ${total}</p>${ms}</div>
+    <div class="card"><h3>👥 My friends (${(S.d.friends || []).length})</h3>${S.d.friends ? (list || `<p class="mut sm">No friends yet.</p>`) : `<div class="spin"></div>`}</div>`;
+};
+A.copy = async () => {
+  const l = refLink(); if (!l) return;
+  try { await navigator.clipboard.writeText(l); toast("Link copied", "ok"); }
+  catch (e) { const t = document.createElement("textarea"); t.value = l; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); toast("Link copied", "ok"); }
+};
+A.share = () => {
+  const l = refLink(); if (!l) return;
+  openLink("https://t.me/share/url?url=" + encodeURIComponent(l) + "&text=" + encodeURIComponent("Watch ads and earn real USDT! 💰"));
 };
 
-$("bSend").onclick = () => {
-  const text = $("bText").value.trim();
-  if (!text) return toast("Write a message first.", "err");
-  const modal = $("modal");
-  modal.innerHTML = `<div class="sheet">
-    <div class="line" style="margin-bottom:12px"><span class="ib blue">${svg("send")}</span>
-    <div class="x"><b style="font-size:17px">Send to everyone?</b><span>This message goes to all users through the bot.</span></div></div>
-    <div class="row2"><button class="btn dark" id="mNo">Cancel</button><button class="btn" id="mYes">Send</button></div></div>`;
-  modal.classList.remove("hidden");
-  $("mNo").onclick = () => modal.classList.add("hidden");
-  $("mYes").onclick = async () => {
-    modal.classList.add("hidden");
-    $("bSend").disabled = true;
-    let sent = 0, failed = 0;
-    try {
-      let d = await api("/api/admin/broadcast", "POST", { text });
-      sent += d.sent; failed += d.failed;
-      $("bStatus").textContent = "Sending... sent " + sent + ", failed " + failed + ", remaining " + d.remaining;
-      while (d.remaining > 0) {
-        d = await api("/api/admin/broadcast/" + encodeURIComponent(d.id) + "/continue", "POST");
-        sent += d.sent; failed += d.failed;
-        $("bStatus").textContent = "Sending... sent " + sent + ", failed " + failed + ", remaining " + d.remaining;
-      }
-      $("bStatus").textContent = "Done. Sent " + sent + ", failed " + failed + " (blocked the bot).";
-      toast("Broadcast finished.", "ok"); $("bText").value = "";
-    } catch (e) { toast(e.message, "err"); }
-    $("bSend").disabled = false;
-  };
+/* ============================ WALLET ============================ */
+loaders.wallet = async () => {
+  await reloadMe();
+  const r = await api("/withdrawals");
+  S.d.wd = r.ok ? r.withdrawals : [];
+  if (S.tab === "wallet") render();
+};
+function statusTag(s) {
+  return `<span class="tag ${s === "approved" ? "ok" : s === "rejected" ? "bad" : "warn"}">${s === "approved" ? "Paid" : s === "rejected" ? "Rejected" : "In progress"}</span>`;
+}
+views.wallet = () => {
+  const st = settings(), u = user(), pay = S.me.payout || {}, req = S.me.withdraw_req || {};
+  const fee = st.withdraw_fee_percent != null ? st.withdraw_fee_percent : 25;
+  const min = st.min_withdraw != null ? st.min_withdraw : 100;
+  const nextAt = Number(S.me.withdraw_next_at || 0), closed = (st.withdraw_closed_until || 0) * 1000;
+  let note = "";
+  if (!pay.ready) note = "Withdrawals are temporarily unavailable.";
+  else if (closed > Date.now()) note = "Withdrawals are closed until " + new Date(closed).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + ".";
+  else if (nextAt > Date.now()) note = "Next withdraw in " + fmtWait(nextAt - Date.now()) + ".";
+  else if (req.maxAds > 0 && req.adsToday < req.maxAds) note = `Watch all of today's ads first: ${req.adsToday} / ${req.maxAds}.`;
+  else if (req.tasksLeft > 0) note = `Complete all tasks first: ${req.tasksLeft} left.`;
+  const lim = pay.limits;
+  const budgetFull = lim && lim.budget && lim.budget.full;
+  const hist = (S.d.wd || []).map(w => `<div class="item"><div class="sp"><b>$${num(w.token_amount || w.final_amount * pointUsd(), 4)}</b>
+      <div class="sm mut">${num(w.amount)} pts · ${fmtDate(w.created_at)}</div>
+      ${w.admin_note && w.status === "rejected" ? `<div class="sm" style="color:var(--bad)">${esc(w.admin_note)}</div>` : ""}
+      ${w.tx_hash ? `<a class="sm" href="#" data-a="openLink" data-v="${esc((pay.explorer || "https://bscscan.com/tx/") + w.tx_hash)}">View transaction</a>` : ""}</div>${statusTag(w.status)}</div>`).join("");
+  return `
+    <div class="card hero"><small>Available</small><div class="big">${num(u.points)} pts</div><small>≈ $${num(u.points * pointUsd(), 2)} ${esc(pay.symbol || "USDT")}</small></div>
+    <div class="card"><h3>💸 Withdraw ${esc(pay.symbol || "USDT")} (BEP20)</h3>
+      ${note || budgetFull ? `<div class="tag warn" style="display:block;border-radius:10px;padding:8px 10px;margin-bottom:8px">${esc(note || "Today's payout budget is finished. Try again tomorrow.")}</div>` : ""}
+      <label>Amount (points) · minimum ${num(min, 0)} · fee ${num(fee, 0)}%</label>
+      <input id="wamt" type="number" inputmode="decimal" placeholder="${num(min, 0)}" oninput="wdCalc()">
+      <div class="sm mut" id="wcalc">You receive: $0.00</div>
+      <label>Wallet address (BEP20)</label><input id="waddr" placeholder="0x..." autocomplete="off" autocapitalize="off">
+      <button class="btn full" style="margin-top:10px" data-a="withdraw">Request withdraw</button></div>
+    <div class="card"><h3>🧾 History</h3>${S.d.wd ? (hist || `<p class="mut sm">No withdrawals yet.</p>`) : `<div class="spin"></div>`}</div>`;
+};
+window.wdCalc = () => {
+  const fee = settings().withdraw_fee_percent != null ? settings().withdraw_fee_percent : 25;
+  const a = Number(val("wamt") || 0), fin = a - Math.round(a * fee) / 100;
+  const e = $("#wcalc"); if (e) e.textContent = "You receive: $" + num(Math.max(0, fin) * pointUsd(), 4);
+};
+A.withdraw = () => lock("wd", async () => {
+  const amount = Number(val("wamt")), address = val("waddr");
+  if (!amount || amount <= 0) return toast("Enter an amount.", "err");
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return toast("Enter a valid BEP20 address.", "err");
+  if (!(await confirmBox(`Withdraw ${num(amount)} points to ${address.slice(0, 8)}...${address.slice(-6)}?`))) return;
+  toast("Sending request...");
+  const r = await api("/withdraw", { amount, address });
+  if (!r.ok) { haptic("error"); return toast(r.error || "Withdraw failed.", "err"); }
+  haptic("success");
+  const d = r.receipt_data || {};
+  modal(`<div class="center" style="padding:6px 0"><div class="em">✅</div><h3>Withdraw request received</h3></div>
+    <div class="item"><div class="sp mut">Account</div><b>${esc(d.name || nameOf(user()))}</b></div>
+    <div class="item"><div class="sp mut">Amount</div><b>$${num(d.requested_usd, 4)} ${esc(d.symbol || "USDT")}</b></div>
+    <div class="item"><div class="sp mut">Fee</div><b>$${num(d.fee_usd, 4)}</b></div>
+    <div class="item"><div class="sp mut">You receive</div><b>$${num(d.final_usd, 4)}</b></div>
+    <div class="item"><div class="sp mut">Gateway</div><b>${esc(d.gateway || "USDT BEP20")}</b></div>
+    <button class="btn full" style="margin-top:12px" data-a="closeModal">Done</button>`);
+  setPoints(r.points);
+  await reloadMe();
+  loaders.wallet();
+});
+
+/* ============================ TOP ============================ */
+loaders.top = async () => {
+  const [l, r] = await Promise.all([api("/leaderboard"), api("/rewards")]);
+  S.d.lb = l.ok ? l.leaderboard : [];
+  S.d.rewards = r.ok ? r.rewards : [];
+  if (S.tab === "top") render();
+};
+views.top = () => {
+  const medal = n => n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n;
+  const lb = (S.d.lb || []).map(x => `<div class="item"><div class="rk">${medal(x.rank)}</div>${avatar(x)}<div class="sp"><b>${esc(nameOf(x))}</b>
+      <div class="sm mut">${x.ads} ads · ${x.invites} invites</div></div><b>${num(x.points)}</b></div>`).join("");
+  const rw = (S.d.rewards || []).map(x => `<div class="item"><div class="rk">${medal(x.position)}</div><div class="sp"><b>${esc(x.title)}</b><div class="sm mut">${esc(x.description || "")}</div></div></div>`).join("");
+  return `
+    ${rw ? `<div class="card"><h3>🎁 Rewards</h3>${rw}</div>` : ""}
+    <div class="card"><h3>🏆 Leaderboard</h3>${S.d.lb ? (lb || `<p class="mut sm">No players yet.</p>`) : `<div class="spin"></div>`}</div>`;
 };
 
-/* ---------------- my friends ---------------- */
-async function loadFriends() {
-  try {
-    const d = await api("/api/referrals");
-    const need = (ME.settings || {}).verify_ads ?? 1;
-    const list = d.friends;
-    $("iInv").textContent = list.length;
-    $("iVer").textContent = list.filter(f => f.verified).length;
-    renderMilestones(list.filter(f => f.verified).length, d.claimed || []);
-    $("friendList").innerHTML = list.length ? list.map(f => {
-      const name = nameOf(f);
-      const letter = esc((name.replace("@", "")[0] || "U").toUpperCase());
-      const img = f.photo_url ? `<img src="${esc(f.photo_url)}" alt="" onerror="this.remove()">` : "";
-      const ads = Number(f.total_ads || 0);
-      return `<div class="card" style="padding:13px"><div class="line">
-        <div class="av"><span>${letter}</span>${img}</div>
-        <div class="x"><b class="ellip">${esc(name)}</b><span>ID ${esc(f.telegram_id)}</span>
-          <div class="mini"><span class="${f.joined ? "ok" : ""}">Channels: ${f.joined ? "joined" : "not joined"}</span><span class="${ads >= need ? "ok" : ""}">Ads: ${Math.min(ads, need)}/${need}</span></div></div>
-        <span class="badge ${f.verified ? "approved" : "pending"}">${f.verified ? "Verified" : "Unverified"}</span>
-      </div></div>`;
-    }).join("") : '<div class="empty">No friends yet. Share your link to invite friends.</div>';
-  } catch (e) { $("friendList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
+/* ============================ ADMIN ============================ */
+const ADMIN_TABS = [["stats", "Stats"], ["wd", "Withdrawals"], ["users", "Users"], ["settings", "Settings"], ["tasks", "Tasks"], ["promos", "Promos"], ["banners", "Banners"], ["offers", "Offers"], ["rewards", "Rewards"], ["bc", "Broadcast"]];
+loaders.admin = () => adminLoad();
+async function adminLoad() {
+  const t = S.adminTab, D = S.d;
+  if (t === "stats") { const r = await api("/admin/stats"); D.stats = r.ok ? r.stats : {}; }
+  else if (t === "wd") { const r = await api("/admin/withdrawals?status=" + (D.wdFilter || "pending")); D.awd = r.ok ? r.withdrawals : []; }
+  else if (t === "users") { const r = await api("/admin/users?q=" + encodeURIComponent(D.uq || "")); D.users = r.ok ? r.users : []; }
+  else if (t === "tasks") { const r = await api("/admin/tasks"); D.atasks = r.ok ? r.tasks : []; }
+  else if (t === "promos") { const r = await api("/admin/promos"); D.promos = r.ok ? r.promos : []; }
+  else if (t === "banners") { const r = await api("/admin/banners"); D.abanners = r.ok ? r.banners : []; }
+  else if (t === "offers") { const r = await api("/admin/offers"); D.aoffers = r.ok ? r.offers : []; }
+  else if (t === "rewards") { const r = await api("/rewards"); D.arewards = r.ok ? r.rewards : []; }
+  else if (t === "settings") { await reloadMe(); }
+  if (S.tab === "admin" && S.adminTab === t) render();
 }
+A.atab = v => { S.adminTab = v; render(); adminLoad(); };
 
-/* ---------------- tasks ---------------- */
-const taskState = {};
-
-async function loadTasks() {
-  try {
-    const d = await api("/api/tasks");
-    $("taskList").innerHTML = d.tasks.length ? d.tasks.map(t => {
-      const started = t.completed ? false : (t.started || taskState[t.id]);
-      let action;
-      if (t.completed) action = statusBadge("approved").replace("Approved", "Done");
-      else if (started) action = `<button class="btn green sm" data-claim="${esc(t.id)}" style="width:auto;padding:10px 18px">Claim</button>`;
-      else action = `<button class="btn sm" data-start="${esc(t.id)}" style="width:auto;padding:10px 18px">Start</button>`;
-      return `<div class="card ${t.completed ? "task-done" : ""}"><div class="line">
-        <span class="ib ${t.completed ? "green" : "orange"}">${svg(t.completed ? "check" : "star")}</span>
-        <div class="x"><b>${esc(t.title)}${t.sponsored ? ' <span style="color:#f59e0b">· Sponsored</span>' : ""}</b><span>${esc(t.description || "")}</span><span style="display:block;color:#fbbf24;font-weight:700">+${fmt(t.reward)} points</span></div>
-        ${action}</div></div>`;
-    }).join("") : '<div class="empty">No tasks right now. Check back soon.</div>';
-
-    $("taskList").querySelectorAll("button[data-start]").forEach(b => b.onclick = async () => {
-      const id = b.dataset.start, t = d.tasks.find(x => String(x.id) === id);
-      b.disabled = true;
-      try {
-        await api("/api/tasks/" + encodeURIComponent(id) + "/start", "POST");
-        taskState[id] = "started";
-        openLink(t.url);
-        loadTasks();
-      } catch (e) { toast(e.message, "err"); b.disabled = false; }
-    });
-    $("taskList").querySelectorAll("button[data-claim]").forEach(b => b.onclick = async () => {
-      b.disabled = true;
-      try {
-        const r = await api("/api/tasks/" + encodeURIComponent(b.dataset.claim) + "/claim", "POST");
-        toast("+" + fmt(r.reward) + " points", "ok");
-        await refreshMe(); loadTasks();
-      } catch (e) { toast(e.message, "err"); b.disabled = false; }
-    });
-  } catch (e) { $("taskList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-
-async function loadAdminTasks() {
-  $("admTaskList").innerHTML = '<div class="empty">Loading...</div>';
-  try {
-    const d = await api("/api/admin/tasks");
-    $("admTaskList").innerHTML = d.tasks.length ? d.tasks.map(t => `<div class="card"><div class="line">
-      <span class="ib sm orange">${svg("star")}</span>
-      <div class="x"><b class="ellip">${esc(t.title)}</b><span>+${fmt(t.reward)} · ${t.completions} done${t.channel ? " · " + esc(t.channel) : ""}</span></div>
-      <button class="btn red sm" data-del="${esc(t.id)}" style="width:auto;padding:9px 14px">Delete</button></div></div>`).join("")
-      : '<div class="empty">No tasks yet.</div>';
-    $("admTaskList").querySelectorAll("button[data-del]").forEach(b => b.onclick = async () => {
-      b.disabled = true;
-      try { await api("/api/admin/tasks/" + encodeURIComponent(b.dataset.del) + "/delete", "POST"); toast("Task deleted.", "ok"); loadAdminTasks(); }
-      catch (e) { toast(e.message, "err"); b.disabled = false; }
-    });
-  } catch (e) { $("admTaskList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
-}
-
-$("addTask").onclick = async () => {
-  $("addTask").disabled = true;
-  try {
-    await api("/api/admin/tasks", "POST", {
-      title: $("t_title").value.trim(), description: $("t_desc").value.trim(),
-      url: $("t_url").value.trim(), channel: $("t_chan").value.trim(), reward: Number($("t_rew").value), max_users: Number($("t_max").value) || 0
-    });
-    ["t_title","t_desc","t_url","t_chan","t_rew","t_max"].forEach(i => $(i).value = "");
-    toast("Task added.", "ok"); loadAdminTasks();
-  } catch (e) { toast(e.message, "err"); }
-  $("addTask").disabled = false;
-};
-
-/* =====================================================
-   GROWTH FEATURES (proof feed, spin, banner, offerwall, promotion, admin)
-===================================================== */
-const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFixed(4));
-let SP = null;
-
-async function loadHomeExtras() { loadBanner(); loadProof(); loadSpin(); }
-async function loadEarnExtras() { loadOffers(); renderPromoQuote(); loadMyCampaigns(); }
-
-async function loadBanner() {
-  try {
-    const d = await api("/api/banners");
-    $("bannerBox").innerHTML = d.banners.map(b => `<div class="card" data-bn="${esc(b.id)}" style="margin-top:12px;border-color:#f59e0b;cursor:pointer">
-      <div class="line"><span class="ib orange">⭐</span><div class="x"><b>${esc(b.title)}</b><span>${esc(b.text || "")}</span></div><span class="muted">Sponsored</span></div></div>`).join("");
-    $("bannerBox").querySelectorAll("[data-bn]").forEach(el => el.onclick = () => {
-      const b = d.banners.find(x => String(x.id) === el.dataset.bn);
-      api("/api/banners/" + encodeURIComponent(b.id) + "/click", "POST").catch(() => {});
-      openLink(b.url);
-    });
-  } catch (e) { $("bannerBox").innerHTML = ""; }
-}
-
-async function loadProof() {
-  try {
-    const d = await api("/api/proof-feed");
-    $("proofList").innerHTML = d.feed.length ? d.feed.map(p => `<div class="card" style="padding:12px"><div class="line">
-      <span class="ib sm green">✅</span><div class="x"><b>${esc(p.name)}</b><span>${esc(p.method || "")} · ${p.at ? new Date(p.at).toLocaleDateString() : ""}</span></div><b>${money(p.usd)}</b></div></div>`).join("")
-      : '<div class="empty">No payouts yet.</div>';
-  } catch (e) { $("proofList").innerHTML = ""; }
-}
-
-function renderSpin() {
-  if (!SP) return;
-  $("spinCard").classList.toggle("hidden", !SP.enabled);
-  $("spinSub").textContent = SP.free ? "Your free spin is ready!" : (SP.available > 0 ? SP.available + " extra spin(s) ready" : (SP.extra_left > 0 ? "Watch an ad for an extra spin (" + SP.extra_left + " left today)" : "Come back tomorrow"));
-  $("spinBtn").textContent = SP.available > 0 ? "Spin now" : (SP.extra_left > 0 ? "Watch ad for extra spin" : "No spins left");
-  $("spinBtn").disabled = SP.available <= 0 && SP.extra_left <= 0;
-}
-async function loadSpin() { try { SP = await api("/api/spin"); renderSpin(); } catch (e) {} }
-$("spinBtn").onclick = async () => {
-  if (watching || !SP) return;
-  $("spinBtn").disabled = true;
-  try {
-    if (SP.available <= 0) { await watchAd(); await loadSpin(); if (SP.available <= 0) return; }
-    $("spinRes").textContent = "🎡 Spinning...";
-    await sleep(1200);
-    const r = await api("/api/spin", "POST");
-    $("spinRes").textContent = "🎉 You won +" + fmt(r.prize) + " points!";
-    toast("+" + fmt(r.prize) + " points", "ok");
-    await refreshMe();
-  } catch (e) { $("spinRes").textContent = ""; toast(e.message, "err"); }
-  finally { await loadSpin(); }
-};
-
-async function loadOffers() {
-  try {
-    const d = await api("/api/offers");
-    $("offerList").innerHTML = d.offers.length ? d.offers.map(o => `<div class="card"><div class="line">
-      <span class="ib pink">🔥</span>
-      <div class="x"><b>${esc(o.title)}${o.badge ? ' <span style="color:#f59e0b">· ' + esc(o.badge) + "</span>" : ""}</b><span>${esc(o.description || "")}</span><span style="display:block;color:#fbbf24;font-weight:700">+${fmt(o.reward)} points</span></div>
-      <button class="btn sm" data-off="${esc(o.id)}" style="width:auto;padding:10px 18px">Open</button></div></div>`).join("") : '<div class="empty">No offers right now.</div>';
-    $("offerList").querySelectorAll("[data-off]").forEach(b => b.onclick = () => openLink(d.offers.find(o => String(o.id) === b.dataset.off).url));
-  } catch (e) { $("offerList").innerHTML = ""; }
-}
-
-function renderPromoQuote() {
-  const st = (ME && ME.settings) || {}, p = st.promo_price_per_join ?? 10, sh = st.promo_user_share ?? 25, mj = st.promo_min_joins ?? 20;
-  const j = Math.floor(Number($("pm_joins").value) || 0);
-  $("pmInfo").textContent = "Pay " + fmt(p) + " points per join (min " + mj + " joins). Members earn " + fmt(p * sh / 100) + " points each.";
-  $("pmQuote").textContent = j > 0 ? "Total cost: " + fmt(j * p) + " points" : "";
-}
-$("pm_joins").oninput = renderPromoQuote;
-$("pmBtn").onclick = async () => {
-  const joins = Math.floor(Number($("pm_joins").value) || 0), chan = $("pm_chan").value.trim();
-  if (!(await confirmBox("Start the campaign for " + chan + " (" + joins + " joins)?"))) return;
-  $("pmBtn").disabled = true;
-  try {
-    const r = await api("/api/promote", "POST", { channel: chan, joins });
-    toast("Campaign started. -" + fmt(r.cost) + " points", "ok");
-    $("pm_chan").value = ""; $("pm_joins").value = "";
-    await refreshMe(); renderPromoQuote(); loadMyCampaigns();
-  } catch (e) { toast(e.message, "err"); }
-  $("pmBtn").disabled = false;
-};
-async function loadMyCampaigns() {
-  try {
-    const d = await api("/api/promote/mine");
-    $("pmMine").innerHTML = d.campaigns.map(c => `<div class="muted">${esc(c.channel)} · ${c.done} / ${c.max_users} joined</div>`).join("");
-  } catch (e) {}
-}
-
-/* ---- admin: More ---- */
-const _admSeg = admSeg;
-admSeg = function (name) {
-  _admSeg(name === "more" ? "" : name);
-  $("segMore").classList.toggle("on", name === "more");
-  $("admMore").classList.toggle("hidden", name !== "more");
-  if (name === "more") loadMore();
-};
-$("segMore").onclick = () => admSeg("more");
-
-async function loadMore() {
-  const s = ME.settings || {};
-  $("f_spin").value = s.spin_enabled ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
-  $("f_price").value = s.promo_price_per_join ?? 10; $("f_share").value = s.promo_user_share ?? 25; $("f_minj").value = s.promo_min_joins ?? 20; $("f_rem").value = s.remind_enabled ?? 1;
-  try {
-    const b = await api("/api/admin/banners");
-    $("b_list").innerHTML = b.banners.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>${x.live ? "Live" : "Ended"} · ${x.clicks} clicks</span></div>
-      <button class="btn red sm" data-bdel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
-    $("b_list").querySelectorAll("[data-bdel]").forEach(el => el.onclick = async () => { try { await api("/api/admin/banners/" + encodeURIComponent(el.dataset.bdel) + "/delete", "POST"); loadMore(); } catch (e) { toast(e.message, "err"); } });
-    const o = await api("/api/admin/offers");
-    $("o_list").innerHTML = o.offers.map(x => `<div class="line" style="margin-top:8px"><div class="x"><b class="ellip">${esc(x.title)}</b><span>+${fmt(x.reward)} · ${x.done} done</span></div>
-      <button class="btn red sm" data-odel="${esc(x.id)}" style="width:auto;padding:9px 14px">Delete</button></div>`).join("");
-    $("o_list").querySelectorAll("[data-odel]").forEach(el => el.onclick = async () => { try { await api("/api/admin/offers/" + encodeURIComponent(el.dataset.odel) + "/delete", "POST"); loadMore(); } catch (e) { toast(e.message, "err"); } });
-  } catch (e) { toast(e.message, "err"); }
-}
-$("f_save").onclick = async () => {
-  try {
-    await api("/api/admin/feature-settings", "POST", { spin_enabled: $("f_spin").value, spin_max_extra: $("f_spinx").value, spin_scale: $("f_spins").value,
-      promo_price_per_join: $("f_price").value, promo_user_share: $("f_share").value, promo_min_joins: $("f_minj").value, remind_enabled: $("f_rem").value });
-    toast("Saved.", "ok"); await refreshMe();
-  } catch (e) { toast(e.message, "err"); }
-};
-$("f_remind").onclick = async () => {
-  $("f_remind").disabled = true;
-  try { const r = await api("/api/admin/reminders/run", "POST"); toast(r.off ? "Reminders are off." : "Sent " + r.sent + ", remaining " + r.remaining, "ok"); }
-  catch (e) { toast(e.message, "err"); }
-  $("f_remind").disabled = false;
-};
-$("b_add").onclick = async () => {
-  try {
-    await api("/api/admin/banners", "POST", { title: $("b_title").value, text: $("b_text").value, url: $("b_url").value, days: Number($("b_days").value) });
-    ["b_title", "b_text", "b_url"].forEach(i => $(i).value = ""); toast("Banner added.", "ok"); loadMore();
-  } catch (e) { toast(e.message, "err"); }
-};
-$("o_add").onclick = async () => {
-  try {
-    await api("/api/admin/offers", "POST", { title: $("o_title").value, description: $("o_desc").value, url: $("o_url").value, reward: Number($("o_rew").value), badge: $("o_badge").value });
-    ["o_title", "o_desc", "o_url", "o_rew"].forEach(i => $(i).value = ""); toast("Offer added.", "ok"); loadMore();
-  } catch (e) { toast(e.message, "err"); }
-};
-$("pc_post").onclick = async () => {
-  try { await api("/api/admin/promos/" + encodeURIComponent($("pc_code").value.trim().toUpperCase()) + "/post", "POST"); toast("Posted to the channel.", "ok"); }
-  catch (e) { toast(e.message, "err"); }
-};
-
-/* ---------------- tabs ---------------- */
-function showTab(name) {
-  currentTab = name;
-  ["home","earn","invite","profile","admin"].forEach(t => $("v-" + t).classList.toggle("hidden", t !== name));
-  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name || (name === "admin" && b.dataset.tab === "profile")));
-  window.scrollTo(0, 0);
-  if (name === "home") { loadTop(); loadHomeExtras(); }
-  if (name === "profile") loadHistory();
-  if (name === "earn") { loadTasks(); loadEarnExtras(); }
-  if (name === "invite") loadFriends();
-}
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-$("checkBtn").onclick = async () => {
-  $("checkBtn").disabled = true;
-  try { await refreshMe(); toast(ME.allJoined ? "Verified!" : "You have not joined all channels yet.", ME.allJoined ? "ok" : ""); }
-  catch (e) { toast(e.message, "err"); }
-  $("checkBtn").disabled = false;
-};
-
-/* ---------------- init ---------------- */
-async function init() {
-  const t0 = performance.now();
-  try {
-    if (!INIT_DATA) {
-      $("spT1").textContent = "Open in Telegram";
-      $("spName").textContent = "Please open this app from the Telegram bot.";
-      return;
-    }
-    await refreshMe();
-    $("spName").textContent = nameOf(ME.user);
-    applyGate();
-    loadTop(); loadHomeExtras();
-    const wait = Math.max(0, 2300 - (performance.now() - t0));
-    setTimeout(() => { $("splash").classList.add("out"); setTimeout(() => $("splash").remove(), 700); }, wait);
-  } catch (e) {
-    $("spT1").textContent = e.banned ? "Access blocked" : "Error";
-    $("spName").textContent = e.message;
-    $("spName").style.whiteSpace = "normal";
-    $("spName").style.fontSize = "18px";
+views.admin = () => {
+  const t = S.adminTab, D = S.d;
+  const head = `<div class="row"><h3 class="sp" style="margin:12px 0 0">⚙️ Admin</h3><button class="btn ghost small" data-a="tab" data-v="home">← Back</button></div>
+    <div class="tabs">${ADMIN_TABS.map(x => `<button class="${t === x[0] ? "on" : ""}" data-a="atab" data-v="${x[0]}">${x[1]}</button>`).join("")}</div>`;
+  const spin = `<div class="spin"></div>`;
+  let body = "";
+  if (t === "stats") {
+    const s = D.stats;
+    body = !s ? spin : `<div class="card"><div class="grid2">
+      <div class="stat"><small class="mut">Users</small><b>${num(s.total_users, 0)}</b></div>
+      <div class="stat"><small class="mut">New today</small><b>${num(s.new_today, 0)}</b></div>
+      <div class="stat"><small class="mut">Ads today</small><b>${num(s.ads_today, 0)}</b></div>
+      <div class="stat"><small class="mut">Ads total</small><b>${num(s.ads_total, 0)}</b></div>
+      <div class="stat"><small class="mut">Pending</small><b>${num(s.pending_count, 0)}</b></div>
+      <div class="stat"><small class="mut">Pending pts</small><b>${num(s.pending_amount)}</b></div>
+      <div class="stat"><small class="mut">Paid total (pts)</small><b>${num(s.paid_total)}</b></div>
+      <div class="stat"><small class="mut">Paid today (pts)</small><b>${num(s.paid_today)}</b></div>
+      <div class="stat"><small class="mut">Budget used today</small><b>$${num(s.budget_used, 2)}</b></div>
+      <div class="stat"><small class="mut">Banned</small><b>${num(s.banned, 0)}</b></div>
+      <div class="stat"><small class="mut">Verified refs</small><b>${num(s.verified_refs, 0)}</b></div></div></div>
+      <div class="card"><button class="btn ghost full" data-a="remind">🔔 Send reminders now</button></div>`;
+  } else if (t === "wd") {
+    const f = D.wdFilter || "pending";
+    const list = (D.awd || []).map(w => `<div class="card" style="margin:8px 0"><div class="row"><div class="sp"><b>#${w.id} · ${esc(nameOf(w))}</b>
+      <div class="sm mut">ID ${esc(w.telegram_id)}${w.username ? " · @" + esc(w.username) : ""}</div></div>${statusTag(w.status)}</div>
+      <div class="sm" style="margin-top:6px">${num(w.amount)} pts · fee ${num(w.fee)} · pays <b>$${num(w.token_amount, 4)}</b></div>
+      <div class="mono" style="margin:4px 0">${esc(w.address)}</div>
+      <div class="sm mut">${fmtDate(w.created_at)}${w.admin_note ? " · " + esc(w.admin_note) : ""}</div>
+      ${w.tx_hash ? `<a class="sm" href="#" data-a="openLink" data-v="${esc(((S.me.payout || {}).explorer || "https://bscscan.com/tx/") + w.tx_hash)}">View transaction</a>` : ""}
+      ${w.status === "pending" ? `<div class="grid2" style="margin-top:8px"><button class="btn ok small" data-a="wdApprove" data-v="${w.id}">✅ Approve</button><button class="btn bad small" data-a="wdReject" data-v="${w.id}">❌ Reject</button></div>` : ""}
+      </div>`).join("");
+    body = `<div class="tabs">${["pending", "approved", "rejected"].map(x => `<button class="${f === x ? "on" : ""}" data-a="wdFilter" data-v="${x}">${x === "pending" ? "In progress" : x[0].toUpperCase() + x.slice(1)}</button>`).join("")}</div>
+      ${D.awd ? (list || `<p class="mut center" style="padding:30px">Nothing here.</p>`) : spin}`;
+  } else if (t === "users") {
+    const list = (D.users || []).map(u => `<div class="card" style="margin:8px 0"><div class="row">${avatar(u)}<div class="sp"><b>${esc(nameOf(u))}</b>
+      <div class="sm mut">ID ${esc(u.telegram_id)}${u.username ? " · @" + esc(u.username) : ""}</div></div>${u.is_banned ? `<span class="tag bad">Banned</span>` : ""}</div>
+      <div class="sm" style="margin:6px 0">💰 ${num(u.points)} · ${u.total_ads} ads · ${u.total_invites} invites</div>
+      <div class="grid2"><button class="btn small ${u.is_banned ? "ok" : "bad"}" data-a="ban" data-v="${u.telegram_id}" data-b="${u.is_banned ? 0 : 1}">${u.is_banned ? "Unban" : "Ban"}</button>
+      <button class="btn ghost small" data-a="pointsBox" data-v="${u.telegram_id}">± Points</button></div></div>`).join("");
+    body = `<div class="row"><input id="uq" placeholder="Search by ID, @username or name" value="${esc(D.uq || "")}" style="margin:0"><button class="btn" data-a="usearch">🔍</button></div>
+      ${D.users ? (list || `<p class="mut center">No users found.</p>`) : spin}`;
+  } else if (t === "settings") {
+    const st = settings();
+    const fld = (k, label) => `<label>${label} <span class="mono">(${k})</span></label><input data-set="${k}" type="number" step="any" value="${st[k] != null ? st[k] : ""}">`;
+    body = `<div class="card"><h3>General</h3>
+      ${fld("ad_reward", "Points per ad")}${fld("max_ads_per_day", "Max ads per day")}${fld("auto_ad_seconds", "Auto ad seconds (0 = off, min 10)")}
+      ${fld("invite_reward", "Points per verified friend")}${fld("verify_ads", "Ads a friend must watch")}
+      ${fld("milestone_5", "Bonus: 5 friends")}${fld("milestone_10", "Bonus: 10 friends")}${fld("milestone_25", "Bonus: 25 friends")}</div>
+      <div class="card"><h3>Withdrawals</h3>
+      ${fld("min_withdraw", "Minimum withdraw (points)")}${fld("daily_withdraw_limit", "Daily limit per user (0 = off)")}${fld("withdraw_fee_percent", "Fee percent")}
+      ${fld("point_value_usd", "USD value of 1 point")}${fld("withdraw_hourly_limit", "Bot requests per hour (0 = off)")}${fld("daily_bot_budget", "Bot budget per day, USDT (0 = off)")}
+      ${fld("withdraw_cooldown_hours", "Hours between a user's requests")}
+      <label>Close withdrawals until</label><input id="wclose" type="date" value="${st.withdraw_closed_until > Date.now() / 1000 ? new Date(st.withdraw_closed_until * 1000).toISOString().slice(0, 10) : ""}">
+      <button class="btn ghost small" style="margin-top:6px" data-a="openWd">Open withdrawals now</button></div>
+      <div class="card"><h3>Features</h3>
+      ${fld("spin_enabled", "Lucky spin on (1/0)")}${fld("spin_max_extra", "Extra spins per day")}${fld("spin_scale", "Spin prize scale")}
+      ${fld("promo_price_per_join", "Promotion price per join (points)")}${fld("promo_user_share", "Promotion: user share (%)")}${fld("promo_min_joins", "Promotion: minimum joins")}
+      ${fld("remind_enabled", "Reminders on (1/0)")}</div>
+      <button class="btn full" data-a="saveSettings">💾 Save settings</button>`;
+  } else if (t === "tasks") {
+    const list = (D.atasks || []).map(x => `<div class="item"><div class="sp"><b>${esc(x.title)}</b><div class="sm mut">${esc(x.channel || x.url)} · ${x.completions} done</div></div>
+      <span class="tag ok">+${num(x.reward, 4)}</span><button class="btn bad small" data-a="del" data-v="/admin/tasks/${x.id}/delete">🗑</button></div>`).join("");
+    body = `<div class="card"><h3>New task</h3><input id="tt" placeholder="Title"><input id="td" placeholder="Description"><input id="tu" placeholder="Link (https://...)">
+      <input id="tc" placeholder="Channel to verify (@channel, optional)"><input id="tr" type="number" step="any" placeholder="Reward points"><input id="tm" type="number" placeholder="Max users (0 = unlimited)">
+      <button class="btn full" data-a="addTask">Add task</button></div><div class="card">${D.atasks ? (list || `<p class="mut sm">No tasks.</p>`) : spin}</div>`;
+  } else if (t === "promos") {
+    const list = (D.promos || []).map(p => `<div class="item"><div class="sp"><b class="mono">${esc(p.code)}</b><div class="sm mut">+${num(p.reward, 4)} · ${p.used_count} / ${p.max_uses}</div></div>
+      <button class="btn ghost small" data-a="postPromo" data-v="${esc(p.code)}">📢</button><button class="btn bad small" data-a="del" data-v="/admin/promos/${encodeURIComponent(p.code)}/delete">🗑</button></div>`).join("");
+    body = `<div class="card"><h3>New promo code</h3><input id="pc" placeholder="Code (empty = random)" autocapitalize="characters"><input id="pr" type="number" step="any" placeholder="Reward points">
+      <input id="pm" type="number" placeholder="Number of people"><button class="btn full" data-a="addPromo">Create</button></div><div class="card">${D.promos ? (list || `<p class="mut sm">No codes.</p>`) : spin}</div>`;
+  } else if (t === "banners") {
+    const list = (D.abanners || []).map(b => `<div class="item"><div class="sp"><b>${esc(b.title)}</b><div class="sm mut">${b.clicks} clicks · ${b.live ? "live" : "ended"}</div></div>
+      <button class="btn bad small" data-a="del" data-v="/admin/banners/${b.id}/delete">🗑</button></div>`).join("");
+    body = `<div class="card"><h3>New banner</h3><input id="bt" placeholder="Title"><input id="bx" placeholder="Text"><input id="bu" placeholder="Link (https://...)">
+      <input id="bd" type="number" placeholder="Days (0 = no end)"><button class="btn full" data-a="addBanner">Add</button></div><div class="card">${D.abanners ? (list || `<p class="mut sm">No banners.</p>`) : spin}</div>`;
+  } else if (t === "offers") {
+    const list = (D.aoffers || []).map(o => `<div class="item"><div class="sp"><b>${esc(o.title)}</b><div class="sm mut">+${num(o.reward, 2)} · ${o.done} done</div></div>
+      <button class="btn bad small" data-a="del" data-v="/admin/offers/${o.id}/delete">🗑</button></div>`).join("");
+    body = `<div class="card"><h3>New offer</h3><input id="ot" placeholder="Title"><input id="od" placeholder="Description"><input id="ou" placeholder="Link (use {userid})">
+      <input id="or" type="number" step="any" placeholder="Reward points"><input id="ob" placeholder="Badge (optional)"><button class="btn full" data-a="addOffer">Add</button></div>
+      <div class="card">${D.aoffers ? (list || `<p class="mut sm">No offers.</p>`) : spin}</div>`;
+  } else if (t === "rewards") {
+    const list = (D.arewards || []).map(x => `<div class="item"><div class="rk">${x.position}</div><div class="sp"><b>${esc(x.title)}</b><div class="sm mut">${esc(x.description || "")}</div></div></div>`).join("");
+    body = `<div class="card"><h3>Set leaderboard reward</h3><input id="rp" type="number" placeholder="Position (1-30)"><input id="rt" placeholder="Title"><input id="rd" placeholder="Description">
+      <label><input type="checkbox" id="re" checked style="width:auto;margin-right:6px">Enabled</label><button class="btn full" data-a="saveReward" style="margin-top:8px">Save</button></div>
+      <div class="card">${D.arewards ? (list || `<p class="mut sm">No rewards.</p>`) : spin}</div>`;
+  } else if (t === "bc") {
+    body = `<div class="card"><h3>📣 Broadcast</h3><textarea id="bct" rows="5" maxlength="1000" placeholder="Message to all users"></textarea>
+      <button class="btn full" data-a="broadcast" style="margin-top:8px">Send to everyone</button><div class="sm mut" id="bcs" style="margin-top:8px"></div></div>`;
   }
+  return head + body;
+};
+
+A.wdFilter = v => { S.d.wdFilter = v; S.d.awd = null; render(); adminLoad(); };
+A.wdApprove = id => lock("wd" + id, async () => {
+  if (!(await confirmBox("Approve and pay request #" + id + "?"))) return;
+  toast("Sending payment...");
+  const r = await api("/admin/withdrawals/" + id + "/approve", {});
+  if (!r.ok) { haptic("error"); toast(r.error || "Approve failed.", "err"); }
+  else { haptic("success"); toast("Approved", "ok"); }
+  adminLoad();
+});
+A.wdReject = id => lock("wd" + id, async () => {
+  const note = window.prompt("Reason (optional):", "Rejected by admin");
+  if (note === null) return;
+  const r = await api("/admin/withdrawals/" + id + "/reject", { note });
+  toast(r.ok ? "Rejected, points returned." : (r.error || "Reject failed."), r.ok ? "ok" : "err");
+  adminLoad();
+});
+A.usearch = () => { S.d.uq = val("uq"); S.d.users = null; render(); adminLoad(); };
+A.ban = (id, el) => lock("ban" + id, async () => {
+  const banned = el.dataset.b === "1";
+  if (!(await confirmBox((banned ? "Ban " : "Unban ") + id + "?"))) return;
+  const r = await api("/admin/users/" + id + "/ban", { banned });
+  toast(r.ok ? (banned ? "Banned" : "Unbanned") : (r.error || "Failed."), r.ok ? "ok" : "err");
+  adminLoad();
+});
+A.pointsBox = id => modal(`<h3>± Points for ${esc(id)}</h3><input id="pamt" type="number" step="any" placeholder="e.g. 50 or -50">
+  <div class="grid2" style="margin-top:8px"><button class="btn ghost" data-a="closeModal">Cancel</button><button class="btn" data-a="pointsSave" data-v="${esc(id)}">Apply</button></div>`);
+A.pointsSave = id => lock("pts", async () => {
+  const amount = Number(val("pamt"));
+  const r = await api("/admin/users/" + id + "/points", { amount });
+  if (!r.ok) return toast(r.error || "Failed.", "err");
+  A.closeModal(); toast("New balance: " + num(r.points), "ok"); adminLoad();
+});
+A.saveSettings = () => lock("set", async () => {
+  const body = {};
+  document.querySelectorAll("[data-set]").forEach(i => { if (i.value !== "") body[i.dataset.set] = Number(i.value); });
+  const c = val("wclose");
+  if (c) body.withdraw_closed_until = Math.floor(new Date(c + "T23:59:59").getTime() / 1000);
+  const r = await api("/admin/settings", body);
+  if (!r.ok) return toast(r.error || "Failed.", "err");
+  const f = {};
+  ["spin_enabled", "spin_max_extra", "spin_scale", "promo_price_per_join", "promo_user_share", "promo_min_joins", "remind_enabled"].forEach(k => { if (body[k] !== undefined) f[k] = body[k]; });
+  const r2 = await api("/admin/feature-settings", f);
+  if (!r2.ok) return toast(r2.error || "Failed.", "err");
+  await reloadMe(); toast("Settings saved", "ok"); render();
+});
+A.openWd = () => lock("set", async () => {
+  const r = await api("/admin/settings", { withdraw_closed_until: 0 });
+  toast(r.ok ? "Withdrawals are open." : (r.error || "Failed."), r.ok ? "ok" : "err");
+  await reloadMe(); render();
+});
+A.del = path => lock("del" + path, async () => {
+  if (!(await confirmBox("Delete this item?"))) return;
+  const r = await api(path, {});
+  toast(r.ok ? "Deleted" : (r.error || "Failed."), r.ok ? "ok" : "err");
+  adminLoad();
+});
+async function adminAdd(path, body, clear) {
+  const r = await api(path, body);
+  if (!r.ok) return toast(r.error || "Failed.", "err");
+  clear.forEach(i => { const e = document.getElementById(i); if (e) e.value = ""; });
+  toast("Added", "ok"); adminLoad();
+  return r;
 }
-init();
+A.addTask = () => lock("add", () => adminAdd("/admin/tasks", { title: val("tt"), description: val("td"), url: val("tu"), channel: val("tc"), reward: Number(val("tr")), max_users: Number(val("tm") || 0) }, ["tt", "td", "tu", "tc", "tr", "tm"]));
+A.addPromo = () => lock("add", () => adminAdd("/admin/promos", { code: val("pc"), reward: Number(val("pr")), maxUses: Number(val("pm")) }, ["pc", "pr", "pm"]));
+A.addBanner = () => lock("add", () => adminAdd("/admin/banners", { title: val("bt"), text: val("bx"), url: val("bu"), days: Number(val("bd") || 0) }, ["bt", "bx", "bu", "bd"]));
+A.addOffer = () => lock("add", () => adminAdd("/admin/offers", { title: val("ot"), description: val("od"), url: val("ou"), reward: Number(val("or")), badge: val("ob") }, ["ot", "od", "ou", "or", "ob"]));
+A.saveReward = () => lock("add", async () => {
+  const r = await api("/admin/reward", { position: Number(val("rp")), title: val("rt"), description: val("rd"), enabled: !!($("#re") && $("#re").checked) });
+  if (!r.ok) return toast(r.error || "Failed.", "err");
+  toast("Saved", "ok"); adminLoad();
+});
+A.postPromo = code => lock("post" + code, async () => {
+  const r = await api("/admin/promos/" + encodeURIComponent(code) + "/post", {});
+  toast(r.ok ? "Posted to channel" : (r.error || "Failed."), r.ok ? "ok" : "err");
+});
+A.remind = () => lock("remind", async () => {
+  toast("Sending reminders...");
+  const r = await api("/admin/reminders/run", {});
+  toast(r.ok ? (r.off ? "Reminders are off." : `Sent ${r.sent}, remaining ${r.remaining}`) : (r.error || "Failed."), r.ok ? "ok" : "err");
+});
+A.broadcast = () => lock("bc", async () => {
+  const text = val("bct");
+  if (!text) return toast("Write a message.", "err");
+  if (!(await confirmBox("Send this message to all users?"))) return;
+  const s = $("#bcs");
+  let r = await api("/admin/broadcast", { text });
+  if (!r.ok) return toast(r.error || "Failed.", "err");
+  let sent = r.sent, failed = r.failed;
+  while (r.ok && r.remaining > 0) {
+    if (s) s.textContent = `Sent ${sent}, failed ${failed}, remaining ${r.remaining}...`;
+    r = await api("/admin/broadcast/" + r.id + "/continue", {});
+    if (r.ok) { sent += r.sent; failed += r.failed; }
+  }
+  if (s) s.textContent = `Done. Sent ${sent}, failed ${failed}.`;
+  haptic("success"); toast("Broadcast finished", "ok");
+});
+
+/* ============================ START ============================ */
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && S.me && S.tab === "wallet") reloadMe().then(() => render());
+});
+boot();
 </script>
 </body>
 </html>
