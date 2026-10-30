@@ -19,7 +19,7 @@ const APP_URL = String(process.env.APP_URL || "https://mini-reward-bot.vercel.ap
 const WEBHOOK_SECRET = String(process.env.WEBHOOK_SECRET || "");
 const PROOF_CHANNEL = String(process.env.PROOF_CHANNEL || "").trim();
 const PROOF_MASK = String(process.env.PROOF_MASK || "true").toLowerCase() !== "false";
-const PROOF_HANDLE = String(process.env.PROOF_HANDLE || "@abdu_monye2").trim();
+const PROOF_HANDLE = String(process.env.PROOF_HANDLE || "").trim();
 
 const ADSGRAM_SECRET = String(process.env.ADSGRAM_SECRET || "");
 const STRICT_ADS = ADSGRAM_SECRET.length > 0;
