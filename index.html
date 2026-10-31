@@ -801,18 +801,24 @@ function render() {
   applyGate();
 }
 
+// channel names shown to users. Order = the order of REQUIRED_CHANNELS on the server.
+// If you want to be exact, add your real usernames here, e.g. "@adewa_news": "Adewa News"
+const CHANNEL_NAMES = {};
+const CHANNEL_NAMES_BY_ORDER = ["Adewa News", "Payment Channel"];
+
 function applyGate() {
   const ok = !!(ME && ME.allJoined);
   $("gate").classList.toggle("hidden", ok);
   $("app").classList.toggle("hidden", !ok);
   $("nav").classList.toggle("hidden", !ok);
   if (ok) return;
-  $("channelList").innerHTML = (ME.channels || []).map(c => {
+  $("channelList").innerHTML = (ME.channels || []).map((c, i) => {
     const h = String(c.channel).replace(/^@/, "");
-    const hint = c.error ? "Bot must be admin in this channel" : (c.joined ? "Joined" : "Not joined yet");
+    const title = CHANNEL_NAMES[c.channel] || CHANNEL_NAMES[h] || CHANNEL_NAMES_BY_ORDER[i] || c.channel;
+    const hint = c.error ? "Bot must be admin in this channel" : (c.joined ? "Joined" : "Join to continue") + " \u00B7 " + c.channel;
     return `<div class="card" style="padding:13px"><div class="line">
-      <span class="ib sm ${c.joined ? "green" : "purple"}">${svg(c.joined ? "check" : "send")}</span>
-      <div class="x"><b class="ellip">${esc(c.channel)}</b><span>${esc(hint)}</span></div>
+      <span class="ib sm ${c.joined ? "green" : "blue"}">${svg(c.joined ? "check" : "send")}</span>
+      <div class="x"><b class="ellip">${esc(title)}</b><span class="ellip" style="display:block">${esc(hint)}</span></div>
       ${c.joined ? statusBadge("approved") : `<button class="btn sm" data-j="${esc(h)}" style="width:auto;padding:10px 18px">Join</button>`}
     </div></div>`;
   }).join("");
