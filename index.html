@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Reward Mini App</title>
+<script>try{if(localStorage.getItem("app_theme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <!-- Monetag SDK (zone 11984693) -->
@@ -252,6 +253,73 @@ nav button.active{color:var(--blue);background:var(--sky)}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* ---------- toolbar (language + theme) ---------- */
+.toolbar{display:flex;justify-content:flex-end;gap:8px;margin:-4px 0 12px}
+.tbtn{display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:20px;border:1px solid var(--line2);background:var(--card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);font-family:inherit}
+.tbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tbtn:active{transform:scale(.96)}
+.gate-in .toolbar{margin-bottom:18px}
+
+/* ---------- saved wallet + QR ---------- */
+.chk{display:flex;align-items:center;gap:10px;margin:12px 0 0;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.chk input{width:18px;height:18px;padding:0;flex:none;accent-color:var(--blue);border-radius:4px}
+.saved-chip{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#e6f7f0;border:1px solid #cdeedf;color:#0b7a4f;font-size:13px;font-weight:600}
+.saved-chip svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.saved-chip .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.saved-chip button{border:0;background:none;color:#b42318;font-weight:700;font-size:13px;cursor:pointer;padding:4px 6px}
+
+/* ---------- dark theme ---------- */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0a1226;--card:#111b36;--line:#1f2c4d;--line2:#2c3c66;
+  --text:#e8eefc;--muted:#8f9dc0;--sky:#17284f;--blue:#5b97ff;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.28);
+}
+[data-theme="dark"] body::before{background:linear-gradient(180deg,#12234a 0,rgba(10,18,38,0) 280px)}
+[data-theme="dark"] .ib.blue{background:rgba(79,139,255,.16);color:#7fb0ff;border-color:rgba(79,139,255,.28)}
+[data-theme="dark"] .ib.green{background:rgba(18,174,120,.16);color:#34d399;border-color:rgba(18,174,120,.3)}
+[data-theme="dark"] .ib.orange{background:rgba(245,158,11,.16);color:#fbbf24;border-color:rgba(245,158,11,.3)}
+[data-theme="dark"] .ib.purple{background:rgba(129,120,255,.18);color:#a5a0ff;border-color:rgba(129,120,255,.3)}
+[data-theme="dark"] .ib.pink{background:rgba(244,114,182,.16);color:#f472b6;border-color:rgba(244,114,182,.3)}
+[data-theme="dark"] .ib.teal{background:rgba(34,211,238,.14);color:#22d3ee;border-color:rgba(34,211,238,.28)}
+[data-theme="dark"] .ib.redg{background:rgba(248,113,113,.16);color:#f87171;border-color:rgba(248,113,113,.3)}
+[data-theme="dark"] .pill{background:var(--card)}
+[data-theme="dark"] .avatar,[data-theme="dark"] .av{border-color:var(--card);box-shadow:0 0 0 2px #2c3c66}
+[data-theme="dark"] .toast{background:#1b2b55;border-color:#1b2b55}
+[data-theme="dark"] .toast.ok{background:#0d2b22;color:#6ee7b7;border-color:#14624a}
+[data-theme="dark"] .toast.err{background:#2c1214;color:#fda4a4;border-color:#6b2326}
+[data-theme="dark"] .notice{background:#2b2310;border-color:#5c4a14;color:#f5d78a}
+[data-theme="dark"] .progress{background:#1c2a4d}
+[data-theme="dark"] .linkbox{background:#12234a;border-color:#3b5aa0;color:#8fb4ff}
+[data-theme="dark"] .receipt{background:#0d1630}
+[data-theme="dark"] label{color:#aab6d6}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:#0d1630}
+[data-theme="dark"] input::placeholder,[data-theme="dark"] textarea::placeholder{color:#5d6b8f}
+[data-theme="dark"] .chip{background:var(--card)}
+[data-theme="dark"] .chip.on{background:#2468dc;border-color:#2468dc}
+[data-theme="dark"] .badge.pending{background:#2b2310;color:#f5d78a;border-color:#5c4a14}
+[data-theme="dark"] .badge.processing{background:#14284f;color:#8fb4ff;border-color:#27447f}
+[data-theme="dark"] .badge.approved{background:#0d2b22;color:#6ee7b7;border-color:#14624a}
+[data-theme="dark"] .badge.rejected{background:#2c1214;color:#fda4a4;border-color:#6b2326}
+[data-theme="dark"] .mini span{background:#1a2747}
+[data-theme="dark"] .mini span.ok{background:#0d2b22;color:#6ee7b7}
+[data-theme="dark"] .seg{background:#0d1630}
+[data-theme="dark"] .seg button.on{background:var(--card);color:#7fb0ff}
+[data-theme="dark"] .gate{background:radial-gradient(520px 360px at 50% 0%,#14284f,transparent 70%),var(--bg)}
+[data-theme="dark"] nav{background:rgba(11,19,40,.96)}
+[data-theme="dark"] #modal{background:rgba(2,6,18,.65)}
+[data-theme="dark"] #modal .sheet{background:var(--card)}
+[data-theme="dark"] .rc-amt b{color:#8fb4ff}
+[data-theme="dark"] .rc-rows .pend{background:#2b2310;color:#f5d78a}
+[data-theme="dark"] .btn.dark{background:var(--card);border-color:#2c4a8a;color:#7fb0ff}
+[data-theme="dark"] .btn.dark:active{background:var(--sky)}
+[data-theme="dark"] .pt-slot{background:#0f1a36}
+[data-theme="dark"] .pt-chip{background:#0d2b22;color:#6ee7b7}
+[data-theme="dark"] .adsgram-task .pt-done{background:#1c2a4d;color:#8f9dc0}
+[data-theme="dark"] .pm-support{background:#2b2310;border-color:#5c4a14}
+[data-theme="dark"] .saved-chip{background:#0d2b22;border-color:#14624a;color:#6ee7b7}
+[data-theme="dark"] .saved-chip button{color:#fca5a5}
 </style>
 </head>
 <body>
@@ -272,6 +340,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
 
 <div id="gate" class="gate hidden">
   <div class="gate-in">
+    <div class="toolbar"><button type="button" class="tbtn" data-act="lang"></button><button type="button" class="tbtn" data-act="theme"></button></div>
     <span class="ib purple" id="gIc"></span>
     <h1>Verification required</h1>
     <p>Join all required channels to continue.</p>
@@ -284,6 +353,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
 
   <!-- HOME -->
   <section id="v-home" class="view">
+    <div class="toolbar"><button type="button" class="tbtn" data-act="lang"></button><button type="button" class="tbtn" data-act="theme"></button></div>
     <div class="head">
       <img id="hAvatar" class="avatar" alt="">
       <div><div class="t">Welcome back</div><div class="n" id="hName">User</div></div>
@@ -376,7 +446,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
   <section id="v-invite" class="view hidden">
     <h2 style="margin-top:6px"><span class="ib sm green" id="iIc"></span>Invite friends</h2>
     <div class="card">
-      <div class="muted">Share your personal link. You earn <b id="iReward" style="color:var(--text)">0</b> points for each friend who joins the required channels and watches <b id="iNeed" style="color:var(--text)">1</b> ad(s).</div>
+      <div class="muted" id="invTxt"></div>
       <div class="linkbox" id="refLink">-</div>
       <div class="row2">
         <button class="btn" id="shareBtn"></button>
@@ -398,6 +468,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
 
   <!-- PROFILE -->
   <section id="v-profile" class="view hidden">
+    <div class="toolbar"><button type="button" class="tbtn" data-act="lang"></button><button type="button" class="tbtn" data-act="theme"></button></div>
     <div class="head">
       <img id="pAvatar" class="avatar" alt="">
       <div><div class="n" id="pName">User</div><div class="t" id="pId">ID</div></div>
@@ -419,7 +490,12 @@ nav button.active{color:var(--blue);background:var(--sky)}
       <div class="notice hidden" id="wNotice"></div>
       <div class="muted" id="wLimits" style="margin-bottom:4px"></div>
       <label>BEP20 wallet address</label>
-      <input id="wAddr" type="text" placeholder="0x..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="42">
+      <div class="row2" style="align-items:stretch">
+        <input id="wAddr" type="text" placeholder="0x..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="42">
+        <button type="button" class="btn dark" id="wScan" aria-label="Scan QR" style="flex:none;width:52px;padding:0"></button>
+      </div>
+      <div class="saved-chip hidden" id="wSavedBox"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="t" id="wSavedTxt"></span><button type="button" id="wClearSaved">Remove</button></div>
+      <label class="chk"><input type="checkbox" id="wSaveChk" checked><span>Save this address for next time</span></label>
       <div class="muted" style="margin-top:6px">BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.</div>
       <label>Amount (points)</label>
       <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
@@ -626,7 +702,10 @@ const P = {
   refresh:'<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
   gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z"/>',
   globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/>',
-  star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>'
+  star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:'<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>',
+  qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v4"/>'
 };
 const svg = n => `<svg viewBox="0 0 24 24">${P[n] || ""}</svg>`;
 function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
@@ -774,14 +853,13 @@ function render() {
   $("hAds").textContent = u.total_ads; $("pAds").textContent = u.total_ads;
   $("hInv").textContent = u.total_invites; $("pInv").textContent = u.total_invites;
   $("hToday").textContent = ME.today_ads;
-  $("iNeed").textContent = (ME.settings || {}).verify_ads ?? 1;
   $("iPts").textContent = fmt(u.points);
   $("wBal").textContent = fmt(u.points);
 
   const adR = st.ad_reward ?? 1, invR = st.invite_reward ?? 1, max = st.max_ads_per_day ?? 100, minW = st.min_withdraw ?? 100;
   $("hAdSub").textContent = "+" + fmt(adR) + " points per ad";
   $("eAdSub").textContent = "+" + fmt(adR) + " points per ad";
-  $("iReward").textContent = fmt(invR);
+  setInviteText();
   $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
   $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
   updateFee();
@@ -806,6 +884,41 @@ function render() {
 const CHANNEL_NAMES = {};
 const CHANNEL_NAMES_BY_ORDER = ["Adewa News", "Payment Channel"];
 
+// optional: full links in the same order as the channels (only needed if a channel has no public @username)
+const CHANNEL_LINKS = [];
+const joinClicked = {};                 // channels the user already opened -> the button becomes "Check"
+let gateBusy = false, gateTimer = null;
+const gateOpen = () => !!(ME && !ME.allJoined);
+const pendingAny = () => Object.keys(joinClicked).length > 0;
+
+async function checkGate(mode) {         // mode: "manual" | "back" | "poll"
+  if (gateBusy || !ME) return;
+  gateBusy = true;
+  if (mode !== "poll") document.querySelectorAll("#channelList button[data-chk], #checkBtn").forEach(b => { b.disabled = true; if (b.dataset.chk !== undefined) b.textContent = "Checking..."; });
+  try {
+    await refreshMe();
+    if (ME.allJoined) { stopGateWatch(); toast("Verified!", "ok"); }
+    else if (mode === "manual") toast("You have not joined all channels yet.");
+  } catch (e) { if (mode === "manual") toast(e.message, "err"); }
+  finally {
+    gateBusy = false;
+    $("checkBtn").disabled = false;
+    if (gateOpen()) applyGate();
+  }
+}
+function startGateWatch() {
+  if (gateTimer) return;
+  gateTimer = setInterval(() => {
+    if (!gateOpen() || !pendingAny()) { stopGateWatch(); return; }
+    if (!document.hidden) checkGate("poll");
+  }, 4000);
+}
+function stopGateWatch() { clearInterval(gateTimer); gateTimer = null; }
+function onBackToApp() { if (gateOpen() && pendingAny() && !document.hidden) setTimeout(() => checkGate("back"), 500); }
+document.addEventListener("visibilitychange", onBackToApp);
+window.addEventListener("focus", onBackToApp);
+if (tg && tg.onEvent) { try { tg.onEvent("activated", onBackToApp); } catch (e) {} }
+
 function applyGate() {
   const ok = !!(ME && ME.allJoined);
   $("gate").classList.toggle("hidden", ok);
@@ -815,14 +928,30 @@ function applyGate() {
   $("channelList").innerHTML = (ME.channels || []).map((c, i) => {
     const h = String(c.channel).replace(/^@/, "");
     const title = CHANNEL_NAMES[c.channel] || CHANNEL_NAMES[h] || CHANNEL_NAMES_BY_ORDER[i] || c.channel;
-    const hint = c.error ? "Bot must be admin in this channel" : (c.joined ? "Joined" : "Join to continue") + " \u00B7 " + c.channel;
+    if (c.joined) delete joinClicked[h];
+    const hint = c.error ? "Bot must be admin in this channel"
+      : c.joined ? "Joined"
+      : joinClicked[h] ? "Tap Check after you join"
+      : "Join to continue";
+    let act;
+    if (c.joined) act = statusBadge("approved");
+    else if (joinClicked[h]) act = `<button class="btn green sm" data-chk="${esc(h)}" style="width:auto;padding:10px 18px">Check</button>`;
+    else act = `<button class="btn sm" data-j="${esc(h)}" data-i="${i}" style="width:auto;padding:10px 18px">Join</button>`;
     return `<div class="card" style="padding:13px"><div class="line">
       <span class="ib sm ${c.joined ? "green" : "blue"}">${svg(c.joined ? "check" : "send")}</span>
       <div class="x"><b class="ellip">${esc(title)}</b><span class="ellip" style="display:block">${esc(hint)}</span></div>
-      ${c.joined ? statusBadge("approved") : `<button class="btn sm" data-j="${esc(h)}" style="width:auto;padding:10px 18px">Join</button>`}
+      ${act}
     </div></div>`;
   }).join("");
-  $("channelList").querySelectorAll("button[data-j]").forEach(b => b.onclick = () => openLink("https://t.me/" + b.dataset.j));
+  $("channelList").querySelectorAll("button[data-j]").forEach(b => b.onclick = () => {
+    const h = b.dataset.j;
+    joinClicked[h] = true;                                   // the button turns into "Check" right away
+    openLink(CHANNEL_LINKS[Number(b.dataset.i)] || ("https://t.me/" + h));
+    applyGate();
+    startGateWatch();                                        // and it checks by itself when the user comes back
+  });
+  $("channelList").querySelectorAll("button[data-chk]").forEach(b => b.onclick = () => checkGate("manual"));
+  if (pendingAny()) startGateWatch();
 }
 
 function openLink(url) {
@@ -1053,6 +1182,7 @@ $("wBtn").onclick = async () => {
     const d = await api("/api/withdraw", "POST", { amount, address: addr });
     $("wAmt").value = ""; updateFee();
     showReceipt(d);
+    saveWallet(addr);
     await refreshMe(); loadHistory();
   } catch (e) { toast(e.message, "err"); }
   btn.disabled = false;
@@ -1725,12 +1855,234 @@ function showTab(name) {
   if (name === "invite") loadFriends();
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
-$("checkBtn").onclick = async () => {
-  $("checkBtn").disabled = true;
-  try { await refreshMe(); toast(ME.allJoined ? "Verified!" : "You have not joined all channels yet.", ME.allJoined ? "ok" : ""); }
-  catch (e) { toast(e.message, "err"); }
-  $("checkBtn").disabled = false;
+$("checkBtn").onclick = () => checkGate("manual");
+
+setIc("wScan", "qr");
+/* =====================================================
+   LANGUAGE (English / Amharic), THEME (light / dark), SAVED WALLET + QR
+===================================================== */
+const lsGet = k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const lsDel = k => { try { localStorage.removeItem(k); } catch (e) {} };
+
+/* ---------------- theme ---------------- */
+let THEME = lsGet("app_theme") === "dark" ? "dark" : "light";
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", THEME);
+  const c = THEME === "dark" ? "#0a1226" : "#f3f6fc";
+  if (tg) { try { tg.setHeaderColor && tg.setHeaderColor(c); tg.setBackgroundColor && tg.setBackgroundColor(c); } catch (e) {} }
+  document.querySelectorAll('.tbtn[data-act="theme"]').forEach(b => { b.innerHTML = svg(THEME === "dark" ? "sun" : "moon") + "<span>" + (THEME === "dark" ? "Light" : "Dark") + "</span>"; });
+}
+
+/* ---------------- language ---------------- */
+const AM = {
+  "Welcome":"እንኳን ደህና መጡ","Reward Hub":"የሽልማት ማዕከል","Welcome back":"እንኳን ደህና ተመለሱ","User":"ተጠቃሚ",
+  "Verification required":"ማረጋገጫ ያስፈልጋል","Join all required channels to continue.":"ለመቀጠል ሁሉንም አስፈላጊ ቻናሎች ይቀላቀሉ።",
+  "Check membership":"አባልነትን አረጋግጥ","Payment Channel":"የክፍያ ቻናል",
+  "My Wallet":"የእኔ ዋሌት","Available balance":"ያለዎት ቀሪ ሂሳብ","pts":"ነጥብ","Withdraw":"ገንዘብ አውጣ","Invite":"ጋብዝ",
+  "Ads watched":"የታዩ ማስታወቂያዎች","Invites":"ግብዣዎች","Today":"ዛሬ","Watch an ad":"ማስታወቂያ ይመልከቱ","Earn points instantly":"ወዲያውኑ ነጥብ ያግኙ",
+  "Watch ad & earn":"ማስታወቂያ ተመልከት እና አግኝ","Lucky Spin":"የዕድል ማዞሪያ","1 free spin every day":"በየቀኑ 1 ነጻ ዙር","Spin":"አሽከርክር",
+  "Recent payouts":"የቅርብ ጊዜ ክፍያዎች","Top earners":"ከፍተኛ ገቢ ያላቸው",
+  "Earn points":"ነጥብ ያግኙ","Watch ads":"ማስታወቂያ ይመልከቱ","Promo code":"የፕሮሞ ኮድ","Enter a code to get points":"ነጥብ ለማግኘት ኮድ ያስገቡ","Redeem":"ተጠቀም",
+  "Partner tasks":"የአጋር ተግባራት","Tasks":"ተግባራት","Invite friends":"ጓደኞችን ይጋብዙ","Share":"አጋራ","Copy":"ቅዳ",
+  "Friends invited":"የተጋበዙ ጓደኞች","Verified":"የተረጋገጠ","Your points":"ነጥቦችዎ","Bonus milestones":"የጉርሻ ደረጃዎች","Your friends":"ጓደኞችዎ",
+  "Ads":"ማስታወቂያ","Rank":"ደረጃ","Withdraw (BEP20)":"ገንዘብ ማውጣት (BEP20)","BEP20 wallet address":"የBEP20 ዋሌት አድራሻ",
+  "BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.":"የBNB Smart Chain (BEP20) አድራሻ ብቻ። በጥንቃቄ ያረጋግጡ፤ ክፍያ መመለስ አይቻልም።",
+  "Amount (points)":"መጠን (ነጥብ)","Withdraw now":"አሁን አውጣ","Withdrawal history":"የማውጣት ታሪክ","Need help?":"እርዳታ ይፈልጋሉ?",
+  "For any question or promotion, contact admin.":"ለማንኛውም ጥያቄ ወይም ማስታወቂያ አድሚኑን ያነጋግሩ።","Contact admin":"አድሚኑን ያነጋግሩ",
+  "Home":"መነሻ","Earn":"ያግኙ","Profile":"መገለጫ",
+  "Spin now":"አሁን አሽከርክር","Watch ad for extra spin":"ለተጨማሪ ዙር ማስታወቂያ ይመልከቱ","No spins left":"ዙር አልቋል","Come back tomorrow":"ነገ ይመለሱ","Spinning...":"በማሽከርከር ላይ...",
+  "Join":"ተቀላቀል","Check":"አረጋግጥ","Checking...":"በማረጋገጥ ላይ...","Joined":"ተቀላቅለዋል","Tap Check after you join":"ከተቀላቀሉ በኋላ «አረጋግጥ»ን ይጫኑ",
+  "Join to continue":"ለመቀጠል ይቀላቀሉ","Bot must be admin in this channel":"ቦቱ በዚህ ቻናል አድሚን መሆን አለበት",
+  "Approved":"ጸድቋል","Reached":"ተሳክቷል","Done":"ተጠናቋል","Pending":"በመጠባበቅ ላይ","Processing":"በሂደት ላይ","Paid":"ተከፍሏል","Failed":"አልተሳካም","Unverified":"ያልተረጋገጠ",
+  "Start":"ጀምር","Claim":"ውሰድ","Already joined":"ቀድሞ ተቀላቅለዋል","No reward":"ሽልማት የለም","· Sponsored":"· ስፖንሰር የተደረገ",
+  "No tasks right now. Check back soon.":"አሁን ምንም ተግባር የለም። በቅርቡ ይመለሱ።","No users yet.":"እስካሁን ተጠቃሚ የለም።","No payouts yet.":"እስካሁን ምንም ክፍያ የለም።",
+  "No withdrawals yet.":"እስካሁን ምንም ማውጣት የለም።","No friends yet. Share your link to invite friends.":"እስካሁን ጓደኛ የለም። ጓደኞችዎን ለመጋበዝ ሊንክዎን ያጋሩ።",
+  "Next partner task":"ቀጣይ የአጋር ተግባር","Finish the current task first":"መጀመሪያ አሁን ያለውን ተግባር ይጨርሱ","Partner task":"የአጋር ተግባር","Go":"ሂድ",
+  "Your Withdraw request received":"የማውጣት ጥያቄዎ ተቀብሏል","Waiting for admin approval":"የአድሚን ማረጋገጫ በመጠበቅ ላይ","After fee amount":"ከክፍያ በኋላ",
+  "User account":"የተጠቃሚ መለያ","Amount":"መጠን","Service fee":"የአገልግሎት ክፍያ","Gateway":"መንገድ","Request":"ጥያቄ","Status":"ሁኔታ","OK":"እሺ","View tx":"ግብይቱን እይ",
+  "Withdrawn:":"የወጣ:","Received:":"የተቀበሉት:","Light":"ብርሃን","Dark":"ጨለማ",
+  "Join all required channels first.":"መጀመሪያ ሁሉንም አስፈላጊ ቻናሎች ይቀላቀሉ።","Confirming your ad...":"ማስታወቂያዎን በማረጋገጥ ላይ...",
+  "Ads not ready. Try again in a moment.":"ማስታወቂያ ዝግጁ አይደለም። ጥቂት ቆይተው ይሞክሩ።","Ad was not completed.":"ማስታወቂያው አልተጠናቀቀም።","Ad error":"የማስታወቂያ ስህተት",
+  "Link copied":"ሊንኩ ተቀድቷል","Copy failed.":"መቅዳት አልተሳካም።","Bot username is not configured.":"የቦት ስም አልተዋቀረም።","Bot username is not configured":"የቦት ስም አልተዋቀረም",
+  "Enter a valid BEP20 address (0x + 40 characters).":"ትክክለኛ የBEP20 አድራሻ ያስገቡ (0x + 40 ፊደላት)።","Enter a valid amount.":"ትክክለኛ መጠን ያስገቡ።","Enter a promo code.":"የፕሮሞ ኮድ ያስገቡ።",
+  "Verified!":"ተረጋግጧል!","You have not joined all channels yet.":"ሁሉንም ቻናሎች እስካሁን አልተቀላቀሉም።","Checking your task...":"ተግባርዎን በማረጋገጥ ላይ...",
+  "Not verified yet. Points are added only after the partner confirms the task.":"እስካሁን አልተረጋገጠም። ነጥብ የሚጨመረው አጋሩ ተግባሩን ካረጋገጠ በኋላ ብቻ ነው።",
+  "You were already a member of this channel, so this task gives no reward.":"ቀድሞ የዚህ ቻናል አባል ነበሩ፣ ስለዚህ ይህ ተግባር ሽልማት አይሰጥም።",
+  "Save this address for next time":"ይህን አድራሻ ለቀጣይ ያስቀምጡ","Remove":"አስወግድ","Wallet saved":"ዋሌት ተቀምጧል","Saved wallet removed.":"የተቀመጠው ዋሌት ተወግዷል።",
+  "QR scan is not supported on this device.":"QR መቃኘት በዚህ መሣሪያ አይደገፍም።","No BEP20 address found in this QR code.":"በዚህ QR ኮድ ውስጥ የBEP20 አድራሻ አልተገኘም።",
+  "Scan a BEP20 wallet QR code":"የBEP20 ዋሌት QR ኮድ ይቃኙ","Open in Telegram":"በቴሌግራም ይክፈቱ","Please open this app from the Telegram bot.":"እባክዎ ይህን መተግበሪያ ከቴሌግራም ቦት ይክፈቱ።",
+  "Access blocked":"መዳረሻ ታግዷል","Error":"ስህተት"
 };
+const sp = s => s.replace(/\bpts\b/g, "ነጥብ");
+const AM_RULES = [
+  [/^\+([\d.,]+) points per ad$/, m => "+" + m[1] + " ነጥብ በአንድ ማስታወቂያ"],
+  [/^\+([\d.,]+) points · Completed$/, m => "+" + m[1] + " ነጥብ · ተጠናቋል"],
+  [/^\+([\d.,]+) points$/, m => "+" + m[1] + " ነጥብ"],
+  [/^Bonus \+([\d.,]+) points$/, m => "ጉርሻ +" + m[1] + " ነጥብ"],
+  [/^([\d.,]+) pts · BEP20$/, m => m[1] + " ነጥብ · BEP20"],
+  [/^([\d.,]+) pts$/, m => m[1] + " ነጥብ"],
+  [/^(\d+) \/ (\d+) ads today$/, m => "ዛሬ " + m[1] + " / " + m[2] + " ማስታወቂያ"],
+  [/^ID: (.+)$/, m => "መታወቂያ: " + m[1]],
+  [/^ID (.+)$/, m => "መታወቂያ " + m[1]],
+  [/^(\d+) verified friends$/, m => m[1] + " የተረጋገጡ ጓደኞች"],
+  [/^Channels: (joined|not joined)$/, m => m[1] === "joined" ? "ቻናሎች: ተቀላቅሏል" : "ቻናሎች: አልተቀላቀለም"],
+  [/^Ads: (\d+)\/(\d+)$/, m => "ማስታወቂያ: " + m[1] + "/" + m[2]],
+  [/^(.+) · Withdraw paid$/, m => m[1] + " · ክፍያ ተፈጽሟል"],
+  [/^Fee: (.+) pts$/, m => "ክፍያ: " + m[1] + " ነጥብ"],
+  [/^Wallet: (.+)$/, m => "ዋሌት: " + m[1]],
+  [/^TX: (.+)$/, m => "ግብይት: " + m[1]],
+  [/^Saved wallet: (.+)$/, m => "የተቀመጠ ዋሌት: " + m[1]],
+  [/^(\d+) free spins? ready!(?: \(\+(\d+) extra with ads\))?$/, m => m[1] + " ነጻ ዙር ዝግጁ ነው!" + (m[2] ? " (+" + m[2] + " ተጨማሪ በማስታወቂያ)" : "")],
+  [/^(\d+) extra spin\(s\) ready$/, m => m[1] + " ተጨማሪ ዙር ዝግጁ ነው"],
+  [/^Watch an ad for an extra spin \((\d+) left today\)$/, m => "ለተጨማሪ ዙር ማስታወቂያ ይመልከቱ (ዛሬ " + m[1] + " ቀርቷል)"],
+  [/^You won \+([\d.,]+) points!$/, m => "+" + m[1] + " ነጥብ አሸንፈዋል!"],
+  [/^Task verified! \+(.+) points added\.$/, m => "ተግባሩ ተረጋግጧል! +" + m[1] + " ነጥብ ታክሏል።"],
+  [/^Completed today: (.+) · Earned today: \+(.+) points · Total completed: (.+)$/, m => "ዛሬ የተጠናቀቁ: " + m[1] + " · ዛሬ የተገኘ: +" + m[2] + " ነጥብ · ጠቅላላ የተጠናቀቁ: " + m[3]],
+  [/^Required to withdraw: (.+) \/ (.+) today$/, m => "ለማውጣት የሚያስፈልግ: ዛሬ " + m[1] + " / " + m[2]],
+  [/^Min (.+?) · Daily (.+)$/, m => "ዝቅተኛ " + m[1] + " · ዕለታዊ " + m[2]],
+  [/^Min (.+)$/, m => "ዝቅተኛ " + m[1]],
+  [/^1 point = (.+) USD · paid in (.+) \(BEP20\)$/, m => "1 ነጥብ = " + m[1] + " USD · በ" + m[2] + " (BEP20) ይከፈላል"],
+  [/^1 (\S+) = (.+) points · 1 point = \$(.+)$/, m => "1 " + m[1] + " = " + m[2] + " ነጥብ · 1 ነጥብ = $" + m[3]],
+  [/^Service fee (.+?)%: (.+?) · You receive: (.+)$/, m => "የአገልግሎት ክፍያ " + m[1] + "%: " + m[2] + " · ይቀበላሉ: " + sp(m[3])],
+  [/^Service fee (.+?)%$/, m => "የአገልግሎት ክፍያ " + m[1] + "%"],
+  [/^\u26D4 Withdraw requests are closed for today\. They open on (.+)\.$/, m => "\u26D4 ዛሬ የማውጣት ጥያቄዎች ዝግ ናቸው። በ" + m[1] + " ይከፈታሉ።"],
+  [/^\u23F3 Only one withdraw request per day\. You can send the next one on (.+)\.$/, m => "\u23F3 በቀን አንድ የማውጣት ጥያቄ ብቻ። ቀጣዩን በ" + m[1] + " መላክ ይችላሉ።"],
+  [/^Watch all of today's ads first: (.+) \/ (.+) done\.$/, m => "መጀመሪያ የዛሬውን ማስታወቂያዎች ሁሉ ይመልከቱ: " + m[1] + " / " + m[2] + " ተጠናቋል።"],
+  [/^Complete all tasks first: (.+) left\.$/, m => "መጀመሪያ ሁሉንም ተግባራት ያጠናቅቁ: " + m[1] + " ቀርተዋል።"],
+  [/^Complete the Partner tasks first: (.+) \/ (.+) done today\.$/, m => "መጀመሪያ የአጋር ተግባራትን ያጠናቅቁ: ዛሬ " + m[1] + " / " + m[2] + " ተጠናቋል።"],
+  [/^\u26A0\uFE0F Today's payout budget is finished\. Try again tomorrow\.$/, () => "\u26A0\uFE0F የዛሬው የክፍያ በጀት አልቋል። ነገ ይሞክሩ።"],
+  [/^Today's payout budget left: (.+)$/, m => "ዛሬ የቀረ የክፍያ በጀት: " + sp(m[1])]
+];
+function trCore(c) {
+  if (AM[c] !== undefined) return AM[c];
+  if (c.indexOf("\n") >= 0) return c.split("\n").map(trCore).join("\n");
+  for (let i = 0; i < AM_RULES.length; i++) { const m = c.match(AM_RULES[i][0]); if (m) return AM_RULES[i][1](m); }
+  return c;
+}
+function trText(s) {
+  if (!/[A-Za-z]/.test(s)) return s;
+  const lead = s.match(/^\s*/)[0], trail = s.match(/\s*$/)[0];
+  const core = s.slice(lead.length, s.length - trail.length);
+  if (!core) return s;
+  const r = trCore(core);
+  return r === core ? s : lead + r + trail;
+}
+
+let LANG = lsGet("app_lang") || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code === "am") ? "am" : "en");
+const origText = new WeakMap(), shownText = new WeakMap();
+const SKIP = /^(SCRIPT|STYLE|TEXTAREA)$/;
+function walkText(root, fn) {
+  if (root.nodeType === 3) { if (!SKIP.test(root.parentNode ? root.parentNode.nodeName : "")) fn(root); return; }
+  if (root.nodeType !== 1 || SKIP.test(root.nodeName)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => SKIP.test(n.parentNode.nodeName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  let n; while ((n = w.nextNode())) fn(n);
+}
+function trNode(n) {                       // text the app just wrote
+  if (LANG !== "am") return;
+  const cur = n.nodeValue;
+  if (shownText.get(n) === cur) return;    // that is our own translation
+  const out = trText(cur);
+  origText.set(n, cur);
+  if (out !== cur) { shownText.set(n, out); n.nodeValue = out; } else shownText.delete(n);
+}
+function retranslate() {                    // language switched: redo every text on the page
+  walkText(document.body, n => {
+    const cur = n.nodeValue;
+    const base = (shownText.has(n) && shownText.get(n) === cur) ? origText.get(n) : cur;
+    const out = LANG === "am" ? trText(base) : base;
+    origText.set(n, base);
+    if (out !== cur) n.nodeValue = out;
+    if (out !== base) shownText.set(n, out); else shownText.delete(n);
+  });
+}
+new MutationObserver(ms => {
+  if (LANG !== "am") return;
+  for (const m of ms) {
+    if (m.type === "characterData") trNode(m.target);
+    else m.addedNodes.forEach(n => walkText(n, trNode));
+  }
+}).observe(document.body, { childList: true, subtree: true, characterData: true });
+
+let invCache = "";
+function setInviteText() {
+  const el = $("invTxt"); if (!el) return;
+  const st = (ME && ME.settings) || {};
+  const r = fmt(st.invite_reward ?? 1), n = st.verify_ads ?? 1;
+  const b = v => '<b style="color:var(--text)">' + v + "</b>";
+  const html = LANG === "am"
+    ? "የግል ሊንክዎን ያጋሩ። የሚያስፈልጉትን ቻናሎች ለተቀላቀለና " + b(n) + " ማስታወቂያ(ዎች) ለተመለከተ ለእያንዳንዱ ጓደኛ " + b(r) + " ነጥብ ያገኛሉ።"
+    : "Share your personal link. You earn " + b(r) + " points for each friend who joins the required channels and watches " + b(n) + " ad(s).";
+  if (html !== invCache) { invCache = html; el.innerHTML = html; }
+}
+function applyLang() {
+  document.documentElement.lang = LANG === "am" ? "am" : "en";
+  invCache = ""; setInviteText();
+  retranslate();
+  document.querySelectorAll('.tbtn[data-act="lang"]').forEach(b => { b.innerHTML = svg("globe") + "<span>" + (LANG === "am" ? "EN" : "\u12A0\u121B") + "</span>"; });
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest(".tbtn");
+  if (!b) return;
+  if (b.dataset.act === "lang") { LANG = LANG === "am" ? "en" : "am"; lsSet("app_lang", LANG); applyLang(); }
+  else { THEME = THEME === "dark" ? "light" : "dark"; lsSet("app_theme", THEME); applyTheme(); }
+});
+
+/* ---------------- saved wallet + QR scan ---------------- */
+const WALLET_KEY = "bep20_wallet";
+const cloudOK = () => !!(tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9"));
+const localKey = () => WALLET_KEY + "_" + ((ME && ME.user && ME.user.telegram_id) || "");
+function storeGet() {
+  return new Promise(res => {
+    const local = lsGet(localKey());
+    if (!cloudOK()) return res(local);
+    let done = false;
+    const to = setTimeout(() => { if (!done) { done = true; res(local); } }, 2500);
+    try {
+      tg.CloudStorage.getItem(WALLET_KEY, (err, v) => { if (done) return; done = true; clearTimeout(to); res(!err && v ? v : local); });
+    } catch (e) { done = true; clearTimeout(to); res(local); }
+  });
+}
+function storeSet(v) { lsSet(localKey(), v); if (cloudOK()) { try { tg.CloudStorage.setItem(WALLET_KEY, v, () => {}); } catch (e) {} } }
+function storeDel() { lsDel(localKey()); if (cloudOK()) { try { tg.CloudStorage.removeItem(WALLET_KEY, () => {}); } catch (e) {} } }
+
+let SAVED_ADDR = "";
+function renderSaved() {
+  $("wSavedBox").classList.toggle("hidden", !SAVED_ADDR);
+  $("wSavedTxt").textContent = SAVED_ADDR ? "Saved wallet: " + shortAddr(SAVED_ADDR) : "";
+}
+async function loadSavedWallet() {
+  if (!ME) return;
+  const a = await storeGet();
+  if (ADDR_RE.test(a)) { SAVED_ADDR = a; if (!$("wAddr").value) $("wAddr").value = a; }
+  renderSaved();
+}
+function saveWallet(addr) {                 // returns true when a new address was stored
+  if (!$("wSaveChk").checked || !ADDR_RE.test(addr) || addr === SAVED_ADDR) return false;
+  SAVED_ADDR = addr; storeSet(addr); renderSaved();
+  return true;
+}
+$("wAddr").addEventListener("change", () => { if (saveWallet($("wAddr").value.trim())) toast("Wallet saved", "ok"); });
+$("wClearSaved").onclick = () => {
+  if ($("wAddr").value.trim() === SAVED_ADDR) $("wAddr").value = "";
+  SAVED_ADDR = ""; storeDel(); renderSaved();
+  toast("Saved wallet removed.", "ok");
+};
+$("wScan").onclick = () => {
+  if (!tg || typeof tg.showScanQrPopup !== "function") return toast("QR scan is not supported on this device.", "err");
+  try {
+    tg.showScanQrPopup({ text: trText("Scan a BEP20 wallet QR code") }, text => {
+      const m = String(text || "").match(/0x[a-fA-F0-9]{40}/);
+      if (!m) { toast("No BEP20 address found in this QR code.", "err"); return false; }
+      $("wAddr").value = m[0];
+      $("wAddr").dispatchEvent(new Event("change"));
+      return true;                           // closes the scanner
+    });
+  } catch (e) { toast("QR scan is not supported on this device.", "err"); }
+};
+
+applyTheme();
+applyLang();
 
 /* ---------------- init ---------------- */
 async function init() {
@@ -1742,6 +2094,7 @@ async function init() {
       return;
     }
     await refreshMe();
+    loadSavedWallet();
     $("spName").textContent = nameOf(ME.user);
     applyGate();
     loadTop(); loadHomeExtras();
