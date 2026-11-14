@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>Reward Mini App</title>
+<title>Reward Mining App</title>
 <script>try{if(localStorage.getItem("app_theme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
@@ -95,16 +95,16 @@ h2{font-size:16px;font-weight:700;letter-spacing:-.1px;margin:24px 0 12px;displa
   box-shadow:0 14px 30px rgba(11,58,138,.3)}
 .balance::after{content:"";position:absolute;right:-56px;bottom:-78px;width:210px;height:210px;border-radius:50%;border:36px solid rgba(255,255,255,.06);pointer-events:none}
 .balance>*{position:relative;z-index:1}
-.bal-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:20px}
+.bal-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
 .bal-lbl{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:rgba(255,255,255,.88)}
 .bal-chip{width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center}
 .bal-chip svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .bal-acct{font-size:12px;font-weight:600;color:rgba(255,255,255,.8);background:rgba(255,255,255,.13);padding:4px 10px;border-radius:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .bal-cap{font-size:12px;letter-spacing:.9px;text-transform:uppercase;color:rgba(255,255,255,.72);font-weight:600}
-.balance .big{display:flex;align-items:baseline;gap:8px;font-size:42px;font-weight:800;margin:4px 0 8px;letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1.1}
+.balance .big{display:flex;align-items:baseline;gap:8px;font-size:38px;font-weight:800;margin:4px 0 6px;letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1.1}
 .balance .big em{font-style:normal;font-size:16px;font-weight:600;letter-spacing:0;color:rgba(255,255,255,.75)}
-.bnbline{margin:0 0 18px;font-size:14px;font-weight:700;color:#fff}
-.bnbline .sub{font-size:12px;font-weight:500;color:rgba(255,255,255,.7);margin-top:3px}
+.bnbline{margin:0 0 16px;font-size:13px;font-weight:700;color:#fff}
+.bnbline .sub{font-size:12px;font-weight:500;color:rgba(255,255,255,.85);margin-top:3px}
 .notice{background:#fff8e6;border:1px solid #f3d894;color:#8a5a00;border-radius:12px;padding:12px;font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.6;white-space:pre-line}
 
 .row2{display:flex;gap:10px}
@@ -248,7 +248,6 @@ nav button.active{color:var(--blue);background:var(--sky)}
 .adsgram-task .pt-reward{flex:1 1 auto;min-width:0;font-weight:700;font-size:14px;color:var(--green)}
 .adsgram-task .pt-btn{display:block;width:100%;min-width:0;max-width:100%;padding:9px 4px;overflow:hidden;white-space:nowrap;text-align:center;font-size:13px;line-height:1.2;border-radius:10px;background:var(--grad);color:#fff;font-weight:600;cursor:pointer;box-shadow:0 3px 8px rgba(29,95,209,.25)}
 .adsgram-task .pt-done{background:#e6ebf4;color:#64718c;box-shadow:none}
-.pm-support{margin-top:12px;padding:12px;border-radius:12px;border:1px solid #f3d894;background:#fff8e6}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
@@ -317,7 +316,6 @@ nav button.active{color:var(--blue);background:var(--sky)}
 [data-theme="dark"] .pt-slot{background:#0f1a36}
 [data-theme="dark"] .pt-chip{background:#0d2b22;color:#6ee7b7}
 [data-theme="dark"] .adsgram-task .pt-done{background:#1c2a4d;color:#8f9dc0}
-[data-theme="dark"] .pm-support{background:#2b2310;border-color:#5c4a14}
 [data-theme="dark"] .saved-chip{background:#0d2b22;border-color:#14624a;color:#6ee7b7}
 [data-theme="dark"] .saved-chip button{color:#fca5a5}
 </style>
@@ -331,7 +329,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
     <div class="core"><svg viewBox="0 0 24 24"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg></div>
   </div>
   <div class="sp-t1" id="spT1">Welcome</div>
-  <div class="sp-t2" id="spName">Reward Hub</div>
+  <div class="sp-t2" id="spName">Reward Mining Hub</div>
   <div class="bar"><i></i></div>
 </div>
 
@@ -365,8 +363,8 @@ nav button.active{color:var(--blue);background:var(--sky)}
         <div class="bal-lbl"><span class="bal-chip"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2.5"/></svg></span>My Wallet</div>
         <div class="bal-acct" id="hAcct"></div>
       </div>
-      <div class="bal-cap">Available balance</div>
-      <div class="big"><span id="hPoints">0</span><em>pts</em></div>
+      <div class="bal-cap">Mined Balance (USD)</div>
+      <div class="big"><span id="hPoints">0.000000</span><em>USD</em></div>
       <div class="bnbline"><div id="hBnbBal">&nbsp;</div><div class="sub" id="hBnbRate"></div></div>
       <div class="row2">
         <button class="btn white" id="hWithdraw"></button>
@@ -377,13 +375,13 @@ nav button.active{color:var(--blue);background:var(--sky)}
     <div class="stats">
       <div class="stat"><span class="ib blue" id="s1"></span><div class="v" id="hAds">0</div><div class="l">Ads watched</div></div>
       <div class="stat"><span class="ib green" id="s2"></span><div class="v" id="hInv">0</div><div class="l">Invites</div></div>
-      <div class="stat"><span class="ib orange" id="s3"></span><div class="v" id="hToday">0</div><div class="l">Today</div></div>
+      <div class="stat"><span class="ib orange" id="s3"></span><div class="v" id="hBoost">0%</div><div class="l">Mining Boost</div></div>
     </div>
 
     <div class="card" style="margin-top:14px">
       <div class="line">
         <span class="ib pink" id="hAdIc"></span>
-        <div class="x"><b>Watch an ad</b><span id="hAdSub">Earn points instantly</span></div>
+        <div class="x"><b>Watch ads</b><span id="hAdSub">Watch 50 ads to increase mining rate by 10%</span></div>
       </div>
       <button class="btn" id="hWatch" style="margin-top:14px"></button>
     </div>
@@ -410,20 +408,20 @@ nav button.active{color:var(--blue);background:var(--sky)}
 
   <!-- EARN -->
   <section id="v-earn" class="view hidden">
-    <h2 style="margin-top:6px"><span class="ib sm green" id="eIc"></span>Earn points</h2>
+    <h2 style="margin-top:6px"><span class="ib sm green" id="eIc"></span>Mining &amp; Boosts</h2>
 
     <div class="card">
       <div class="line">
         <span class="ib blue" id="eAdIc"></span>
-        <div class="x"><b>Watch ads</b><span id="eAdSub">-</span></div>
+        <div class="x"><b>Watch ads</b><span id="eAdSub">50 ads required for +10% mining rate</span></div>
       </div>
       <div class="progress"><i id="eBar" style="width:0"></i></div>
-      <div class="muted" id="eProg">0 / 0 today</div>
+      <div class="muted" id="eProg">0 / 50 lifetime ads · +10% boost at 50 ads</div>
       <button class="btn" id="eWatch" style="margin-top:14px"></button>
     </div>
 
     <div class="card">
-      <div class="line"><span class="ib purple" id="prIc"></span><div class="x"><b>Promo code</b><span>Enter a code to get points</span></div></div>
+      <div class="line"><span class="ib purple" id="prIc"></span><div class="x"><b>Promo code</b><span>Enter a code to get extra mining balance</span></div></div>
       <div class="row2" style="margin-top:12px;align-items:stretch">
         <input id="promoIn" type="text" placeholder="CODE" autocapitalize="characters" autocomplete="off" maxlength="32">
         <button class="btn green" id="promoBtn" style="flex:none;width:auto;padding:0 20px"></button>
@@ -438,13 +436,13 @@ nav button.active{color:var(--blue);background:var(--sky)}
       </div>
     </div>
 
-    <h2><span class="ib sm orange" id="tIc"></span>Tasks</h2>
+    <h2><span class="ib sm orange" id="tIc"></span>Tasks (Boost Mining)</h2>
     <div id="taskList"></div>
   </section>
 
   <!-- INVITE -->
   <section id="v-invite" class="view hidden">
-    <h2 style="margin-top:6px"><span class="ib sm green" id="iIc"></span>Invite friends</h2>
+    <h2 style="margin-top:6px"><span class="ib sm green" id="iIc"></span>Invite Friends (+1% per referral)</h2>
     <div class="card">
       <div class="muted" id="invTxt"></div>
       <div class="linkbox" id="refLink">-</div>
@@ -456,7 +454,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
     <div class="stats">
       <div class="stat"><span class="ib blue" id="i1"></span><div class="v" id="iInv">0</div><div class="l">Friends invited</div></div>
       <div class="stat"><span class="ib green" id="i3"></span><div class="v" id="iVer">0</div><div class="l">Verified</div></div>
-      <div class="stat"><span class="ib orange" id="i2"></span><div class="v" id="iPts">0</div><div class="l">Your points</div></div>
+      <div class="stat"><span class="ib orange" id="i2"></span><div class="v" id="iBoost">+0%</div><div class="l">Invite Boost</div></div>
     </div>
 
     <h2><span class="ib sm orange" id="msIc"></span>Bonus milestones</h2>
@@ -483,7 +481,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
     <h2><span class="ib sm teal" id="wIc"></span>Withdraw (BEP20)</h2>
     <div class="card" id="wCard">
       <div class="line" style="margin-bottom:6px">
-        <div class="x"><span>Available balance</span><b style="font-size:24px" id="wBal">0</b></div>
+        <div class="x"><span>Mined Balance</span><b style="font-size:24px" id="wBal">$0.00 USD</b></div>
         <div class="muted" id="wMin">Min -</div>
       </div>
       <div class="muted" id="wRate" style="margin-bottom:4px"></div>
@@ -497,8 +495,8 @@ nav button.active{color:var(--blue);background:var(--sky)}
       <div class="saved-chip hidden" id="wSavedBox"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="t" id="wSavedTxt"></span><button type="button" id="wClearSaved">Remove</button></div>
       <label class="chk"><input type="checkbox" id="wSaveChk" checked><span>Save this address for next time</span></label>
       <div class="muted" style="margin-top:6px">BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.</div>
-      <label>Amount (points)</label>
-      <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+      <label>Amount (USD)</label>
+      <input id="wAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="0.00">
       <div class="muted" id="wFee" style="margin-top:8px"></div>
       <button class="btn green" id="wBtn" style="margin-top:14px"></button>
     </div>
@@ -549,7 +547,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
     <div id="admPromo" class="hidden">
       <div class="card">
         <label style="margin-top:0">Code (leave empty to auto-generate)</label><input id="pr_code" type="text" maxlength="32" autocapitalize="characters" placeholder="WELCOME10">
-        <label>Points per person</label><input id="pr_rew" type="number" step="any" min="0" placeholder="10">
+        <label>USD amount per person</label><input id="pr_rew" type="number" step="any" min="0" placeholder="0.5">
         <label>Number of people who can use it</label><input id="pr_max" type="number" min="1" placeholder="100">
         <button class="btn green" id="pCreate" style="margin-top:16px"></button>
       </div>
@@ -580,7 +578,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
         <label>Description (optional)</label><input id="t_desc" type="text" maxlength="200" placeholder="Short instruction">
         <label>Link</label><input id="t_url" type="url" placeholder="https://t.me/yourchannel">
         <label>Channel to verify (optional)</label><input id="t_chan" type="text" placeholder="@yourchannel (bot must be admin)">
-        <label>Reward (points)</label><input id="t_rew" type="number" step="any" min="0" placeholder="5">
+        <label>Mining rate increase (%)</label><input id="t_rew" type="number" step="0.01" min="0" placeholder="1">
         <label>User slots (0 = unlimited, task hides when full)</label><input id="t_max" type="number" step="1" min="0" placeholder="0">
         <button class="btn green" id="addTask" style="margin-top:16px"></button>
       </div>
@@ -594,7 +592,7 @@ nav button.active{color:var(--blue);background:var(--sky)}
         <label>Free spins per day (first spins, no ad needed)</label><input id="f_spinf" type="number" min="0" step="1">
         <label>Extra spins per day (each one unlocked by watching an ad)</label><input id="f_spinx" type="number" min="0" step="1">
         <label>Spin prize multiplier (x)</label><input id="f_spins" type="number" min="0" step="any">
-        <label>Partner task (Adsgram) reward in points</label><input id="f_ptr" type="number" min="0" step="any">
+        <label>Partner task (Adsgram) mining rate increase (%)</label><input id="f_ptr" type="number" min="0" step="any">
         <label>Partner tasks required before withdraw (per day, 0 = not required)</label><input id="f_ptq" type="number" min="0" step="1">
         <label>Partner tasks per user per day (0 = no limit)</label><input id="f_ptd" type="number" min="0" step="1">
         <label>Daily reminder bot on (1/0)</label><input id="f_rem" type="number" min="0" step="1">
@@ -610,24 +608,24 @@ nav button.active{color:var(--blue);background:var(--sky)}
 
     <div id="admSet" class="hidden">
       <div class="card">
-        <label style="margin-top:0">Ad reward (points)</label><input id="a_ad" type="number" step="any" min="0">
-        <label>Invite reward (points)</label><input id="a_inv" type="number" step="any" min="0">
+        <label style="margin-top:0">Base mining payout per day (USD)</label><input id="a_pv" type="number" step="0.0001" min="0" placeholder="0.10">
+        <label>Mining boost for 50 ads watched (%)</label><input id="a_ad50pct" type="number" step="0.01" min="0" placeholder="10">
+        <label>Mining boost per verified invite (%)</label><input id="a_invpct" type="number" step="0.01" min="0" placeholder="1">
         <label>Daily ads limit</label><input id="a_max" type="number" min="0">
         <label>Surprise ad every N seconds (0 = off, min 10)</label><input id="a_auto" type="number" min="0" step="1">
-        <label>Minimum withdrawal (points)</label><input id="a_min" type="number" step="any" min="0">
-        <label>Value of 1 point in USD (e.g. 0.01)</label><input id="a_pv" type="number" step="any" min="0">
+        <label>Minimum withdrawal (USD)</label><input id="a_min" type="number" step="0.0001" min="0">
         <label>Ads a friend must watch to be verified</label><input id="a_vads" type="number" min="0">
-        <label>Daily withdrawal limit per user (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
+        <label>Daily withdrawal limit per user in USD (0 = no limit)</label><input id="a_dwl" type="number" step="any" min="0">
         <label>Withdrawal service fee (%)</label><input id="a_fee" type="number" step="any" min="0" max="90">
-                <label>Daily withdraw bot budget in USDT, all users together (0 = no limit). The bot messages you when it is finished.</label><input id="a_bud" type="number" min="0" step="any">
+        <label>Daily withdraw bot budget in USDT, all users together (0 = no limit)</label><input id="a_bud" type="number" min="0" step="any">
         <label>Withdraw closed until this day (leave empty = open)</label>
         <div class="row2" style="align-items:stretch">
           <input id="a_closed" type="date">
           <button class="btn dark sm" id="a_open" type="button" style="flex:none;width:auto;padding:0 16px">Open now</button>
         </div>
-        <label>Bonus: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
-        <label>Bonus: 10 verified friends</label><input id="a_m10" type="number" step="any" min="0">
-        <label>Bonus: 25 verified friends</label><input id="a_m25" type="number" step="any" min="0">
+        <label>Bonus USD: 5 verified friends</label><input id="a_m5" type="number" step="any" min="0">
+        <label>Bonus USD: 10 verified friends</label><input id="a_m10" type="number" step="any" min="0">
+        <label>Bonus USD: 25 verified friends</label><input id="a_m25" type="number" step="any" min="0">
         <button class="btn green" id="saveSettings" style="margin-top:16px"></button>
       </div>
     </div>
@@ -644,19 +642,16 @@ nav button.active{color:var(--blue);background:var(--sky)}
 
 <script>
 /* =====================================================
-   CONFIG
+   CONFIG & STATE
 ===================================================== */
-// fallback only: the real Adsgram block id comes from the server (/api/me -> adsgram.blockId)
-// so the app and the server always use the same block.
 const ADSGRAM_BLOCK_FALLBACK = "52630";
-const ADSGRAM_INTERSTITIAL_ID = "";        // optional "int-..." block for surprise ads
-const MONETAG_ZONE = "11984693";           // Monetag zone id
+const ADSGRAM_INTERSTITIAL_ID = "";
+const MONETAG_ZONE = "11984693";
 
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#f3f6fc"); tg.setBackgroundColor && tg.setBackgroundColor("#f3f6fc"); } catch (e) {} }
 const INIT_DATA = tg ? tg.initData : "";
 
-// device id (used by the server to detect multiple accounts on one device)
 let DEVICE_ID = "";
 try {
   DEVICE_ID = localStorage.getItem("device_installation_id") || "";
@@ -669,7 +664,6 @@ try {
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = n => { const x = Number(n || 0); return Number.isInteger(x) ? x.toLocaleString() : x.toFixed(2); };
-// BNB amounts can be very small, so show up to 8 decimals (no trailing zeros)
 const fmtCrypto = n => {
   const x = Number(n || 0);
   if (!x) return "0";
@@ -703,7 +697,7 @@ const P = {
   gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8h14v-8M12 8c-2.5 0-4-1-4-2.5S9 3 10 3s2 2 2 5zm0 0c2.5 0 4-1 4-2.5S15 3 14 3s-2 2-2 5z"/>',
   globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/>',
   star:'<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z"/>',
-  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  sun:'<circle cx="12" cy="4" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon:'<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>',
   qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h3M20 17v4"/>'
 };
@@ -712,13 +706,13 @@ function setIc(id, name) { const el = $(id); if (el) el.innerHTML = svg(name); }
 function setBtn(id, name, text) { $(id).innerHTML = svg(name) + "<span>" + text + "</span>"; }
 
 [["gIc","shield"],["prIc","gift"],["msIc","gift"],["tIc","star"],["supIc","send"],["hRankIc","trophy"],["s1","play"],["s2","users"],["s3","bolt"],["hAdIc","play"],["topIc","trophy"],
- ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i3","shield"],["frIc","users"],["i2","coin"],
+ ["eIc","bolt"],["eAdIc","play"],["iIc","users"],["i1","users"],["i3","shield"],["frIc","users"],["i2","bolt"],
  ["p1","play"],["p2","users"],["p3","trophy"],["wIc","wallet"],["hisIc","list"],["adminBack","back"]].forEach(a => setIc(a[0], a[1]));
 setBtn("checkBtn","refresh","Check membership");
 setBtn("hWithdraw","wallet","Withdraw");
 setBtn("hInvite","users","Invite");
-setBtn("hWatch","play","Watch ad &amp; earn");
-setBtn("eWatch","play","Watch ad &amp; earn");
+setBtn("hWatch","play","Watch ad &amp; progress");
+setBtn("eWatch","play","Watch ad");
 setBtn("supportBtn","send","Contact admin");
 setBtn("addTask","check","Add task");
 setBtn("promoBtn","check","Redeem");
@@ -730,15 +724,29 @@ setBtn("copyBtn","copy","Copy");
 setBtn("wBtn","send","Withdraw now");
 setBtn("adminBtn","shield","Admin panel");
 setBtn("saveSettings","check","Save settings");
-const NAV = { home:["home","Home"], earn:["bolt","Earn"], invite:["users","Invite"], profile:["user","Profile"] };
+const NAV = { home:["home","Home"], earn:["bolt","Mining"], invite:["users","Invite"], profile:["user","Profile"] };
 document.querySelectorAll("nav button").forEach(b => { const n = NAV[b.dataset.tab]; b.innerHTML = svg(n[0]) + "<span>" + n[1] + "</span>"; });
 
-/* ---------------- state / helpers ---------------- */
 let ME = null, BOT_USERNAME = "", adController = null, adControllerBlock = "", interCtrl = null, interCtrlId = "";
 let watching = false, autoBusy = false, spinBusy = false, autoIdle = 0;
 let admStatus = "pending", currentTab = "home";
 const SUPPORT_BOT = "Adewa_eran_support_bot";
 const ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
+
+/* ---------------- live balance ticker ---------------- */
+let liveBalance = 0, miningPerSec = 0, lastTickTime = performance.now();
+function startBalanceTicker() {
+  setInterval(() => {
+    const now = performance.now();
+    const dt = (now - lastTickTime) / 1000;
+    lastTickTime = now;
+    if (miningPerSec > 0 && !document.hidden) {
+      liveBalance += miningPerSec * dt;
+      if ($("hPoints")) $("hPoints").textContent = liveBalance.toFixed(6);
+    }
+  }, 100);
+}
+startBalanceTicker();
 
 let toastTimer;
 function toast(msg, type) {
@@ -765,7 +773,6 @@ async function api(path, method, body) {
   return data;
 }
 
-// asks the admin to confirm an action (Telegram native popup, or the browser confirm as fallback)
 function confirmBox(message) {
   return new Promise(resolve => {
     if (tg && typeof tg.showConfirm === "function") {
@@ -775,38 +782,20 @@ function confirmBox(message) {
   });
 }
 
-function countUp(el, to) {
-  const from = Number(el.dataset.v || 0);
-  el.dataset.v = to;
-  const start = performance.now(), dur = 700;
-  function step(t) {
-    const k = Math.min(1, (t - start) / dur), e = 1 - Math.pow(1 - k, 3);
-    el.textContent = fmt(from + (to - from) * e);
-    if (k < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
 const nameOf = u => [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.username ? "@" + u.username : "User");
 const fmtDay = d => d ? new Date(d).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "";
 const fmtDate = d => d ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 const sym = () => (ME && ME.payout && ME.payout.symbol) || "USDT";
 const explorer = () => (ME && ME.payout && ME.payout.explorer) || "https://bscscan.com/tx/";
 
-/* ---------------- BNB value + payout limits ---------------- */
-const bnbPrice = () => Number((ME && ME.payout && ME.payout.bnb_price) || 0);
-// BNB value of one point = (USD value of a point) / (BNB price)
-function bnbPerPoint() {
-  const price = bnbPrice(), rate = Number(((ME && ME.settings) || {}).point_value_usd ?? 0.01);
-  return price > 0 ? rate / price : 0;
-}
 function renderBnb() {
-  const rate = Number(((ME && ME.settings) || {}).point_value_usd ?? 0.01);
-  if (!(rate > 0)) { $("hBnbBal").innerHTML = "&nbsp;"; $("hBnbRate").textContent = ""; return; }
-  $("hBnbBal").textContent = "\u2248 $" + (ME.user.points * rate).toFixed(2) + " " + sym();
-  $("hBnbRate").textContent = "1 " + sym() + " = " + fmt(Math.round(1 / rate)) + " points \u00B7 1 point = $" + rate;
+  const hourly = Number((ME.user && ME.user.mining_hourly_usd) || 0.004166);
+  const daily = hourly * 24;
+  const pct = Number((ME.user && ME.user.mining_percent) || 0);
+  $("hBnbBal").textContent = "Base rate: $" + daily.toFixed(4) + "/day · $" + hourly.toFixed(6) + "/hour";
+  $("hBnbRate").textContent = "Total Mining Boost: +" + pct.toFixed(2) + "%";
 }
-// text shown when withdrawing is closed by the admin or the user must wait
+
 function withdrawNoticeText() {
   const st = (ME && ME.settings) || {};
   const closed = Number(st.withdraw_closed_until || 0) * 1000;
@@ -849,22 +838,31 @@ function render() {
   $("pId").textContent = "ID: " + u.telegram_id;
   $("hAcct").textContent = "ID " + u.telegram_id;
   $("hRank").textContent = "#" + u.rank; $("pRank").textContent = "#" + u.rank;
-  countUp($("hPoints"), u.points);
+
+  liveBalance = Number(u.points || 0);
+  miningPerSec = Number(u.mining_per_second || 0);
+  lastTickTime = performance.now();
+  $("hPoints").textContent = liveBalance.toFixed(6);
+
   $("hAds").textContent = u.total_ads; $("pAds").textContent = u.total_ads;
   $("hInv").textContent = u.total_invites; $("pInv").textContent = u.total_invites;
-  $("hToday").textContent = ME.today_ads;
-  $("iPts").textContent = fmt(u.points);
-  $("wBal").textContent = fmt(u.points);
+  $("hBoost").textContent = "+" + Number(u.mining_percent || 0).toFixed(1) + "%";
+  $("iBoost").textContent = "+" + (Number(u.total_invites || 0) * Number(st.invite_mining_percent ?? 1)).toFixed(1) + "%";
+  $("wBal").textContent = "$" + liveBalance.toFixed(4) + " USD";
 
-  const adR = st.ad_reward ?? 1, invR = st.invite_reward ?? 1, max = st.max_ads_per_day ?? 100, minW = st.min_withdraw ?? 100;
-  $("hAdSub").textContent = "+" + fmt(adR) + " points per ad";
-  $("eAdSub").textContent = "+" + fmt(adR) + " points per ad";
+  const totalAds = Number(u.total_ads || 0);
+  const curTierAds = totalAds % 50;
+  const adBoosts = Math.floor(totalAds / 50) * Number(st.ad_50_mining_percent ?? 10);
+  $("hAdSub").textContent = totalAds >= 50 ? `Current ad boost: +${adBoosts}% · Next 50: ${curTierAds}/50` : `Progress: ${totalAds}/50 ads for +10% boost`;
+  $("eAdSub").textContent = `Watching all 50 ads increases mining rate by 10%`;
+  $("eProg").textContent = `${totalAds} lifetime ads watched · +${adBoosts}% current boost from ads`;
+  $("eBar").style.width = Math.min(100, (curTierAds === 0 && totalAds > 0 ? 100 : (curTierAds / 50) * 100)) + "%";
+
   setInviteText();
-  $("eProg").textContent = ME.today_ads + " / " + max + " ads today";
-  $("eBar").style.width = Math.min(100, (ME.today_ads / Math.max(1, max)) * 100) + "%";
   updateFee();
-  $("wMin").textContent = "Min " + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily " + fmt(st.daily_withdraw_limit) : "");
-  $("wRate").textContent = "1 point = " + (st.point_value_usd ?? 0.01) + " USD · paid in " + sym() + " (BEP20)";
+  const minW = st.min_withdraw ?? 0.1;
+  $("wMin").textContent = "Min $" + fmt(minW) + (st.daily_withdraw_limit > 0 ? " · Daily $" + fmt(st.daily_withdraw_limit) : "");
+  $("wRate").textContent = "Mining yield is calculated in USD · Paid in " + sym() + " (BEP20)";
 
   renderBnb();
   renderLimits();
@@ -879,19 +877,15 @@ function render() {
   applyGate();
 }
 
-// channel names shown to users. Order = the order of REQUIRED_CHANNELS on the server.
-// If you want to be exact, add your real usernames here, e.g. "@adewa_news": "Adewa News"
 const CHANNEL_NAMES = {};
 const CHANNEL_NAMES_BY_ORDER = ["Adewa News", "Payment Channel"];
-
-// optional: full links in the same order as the channels (only needed if a channel has no public @username)
 const CHANNEL_LINKS = [];
-const joinClicked = {};                 // channels the user already opened -> the button becomes "Check"
+const joinClicked = {};
 let gateBusy = false, gateTimer = null;
 const gateOpen = () => !!(ME && !ME.allJoined);
 const pendingAny = () => Object.keys(joinClicked).length > 0;
 
-async function checkGate(mode) {         // mode: "manual" | "back" | "poll"
+async function checkGate(mode) {
   if (gateBusy || !ME) return;
   gateBusy = true;
   if (mode !== "poll") document.querySelectorAll("#channelList button[data-chk], #checkBtn").forEach(b => { b.disabled = true; if (b.dataset.chk !== undefined) b.textContent = "Checking..."; });
@@ -945,10 +939,10 @@ function applyGate() {
   }).join("");
   $("channelList").querySelectorAll("button[data-j]").forEach(b => b.onclick = () => {
     const h = b.dataset.j;
-    joinClicked[h] = true;                                   // the button turns into "Check" right away
+    joinClicked[h] = true;
     openLink(CHANNEL_LINKS[Number(b.dataset.i)] || ("https://t.me/" + h));
     applyGate();
-    startGateWatch();                                        // and it checks by itself when the user comes back
+    startGateWatch();
   });
   $("channelList").querySelectorAll("button[data-chk]").forEach(b => b.onclick = () => checkGate("manual"));
   if (pendingAny()) startGateWatch();
@@ -976,12 +970,12 @@ async function loadTop() {
       <div class="card" style="padding:12px;${String(u.telegram_id) === my ? "border-color:#1d5fd1" : ""}">
         <div class="line"><div class="rankn">${u.rank}</div>
         <div class="x"><b class="ellip">${esc(nameOf(u))}</b><span>${u.ads} ads · ${u.invites} invites</span></div>
-        <b>${fmt(u.points)}</b></div></div>`).join("") : '<div class="empty">No users yet.</div>';
+        <b>$${Number(u.points || 0).toFixed(4)} USD</b></div></div>`).join("") : '<div class="empty">No users yet.</div>';
   } catch (e) { $("topList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
 }
 
 /* =====================================================
-   ADS: Adsgram + Monetag in turns
+   ADS
 ===================================================== */
 const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
 const WATCH_BTNS = ["hWatch", "eWatch"];
@@ -991,7 +985,6 @@ const other = p => (p === "adsgram" ? "monetag" : "adsgram");
 function getTurn(key) { try { return localStorage.getItem(key) === "monetag" ? "monetag" : "adsgram"; } catch (e) { return "adsgram"; } }
 function setTurn(key, p) { try { localStorage.setItem(key, p); } catch (e) {} }
 
-// the block id comes from the server so app and server always match
 const adsgramBlock = () => String((ME && ME.adsgram && ME.adsgram.blockId) || ADSGRAM_BLOCK_FALLBACK);
 
 function getCtrl() {
@@ -1002,7 +995,6 @@ function getCtrl() {
   return adController;
 }
 function getInter() {
-  // surprise ads: use the interstitial block when one is set, otherwise the normal Adsgram block (so Adsgram shows too)
   const id = String((ME && ME.adsgram && ME.adsgram.interBlockId) || ADSGRAM_INTERSTITIAL_ID || "");
   if (!id) return getCtrl();
   if (interCtrl && interCtrlId === id) return interCtrl;
@@ -1012,7 +1004,6 @@ function getInter() {
 }
 const monetagFn = () => { const f = window["show_" + MONETAG_ZONE]; return typeof f === "function" ? f : null; };
 
-// returns "done" | "skipped" | "noad"
 async function showProvider(p) {
   if (p === "adsgram") {
     const c = getCtrl();
@@ -1038,7 +1029,11 @@ async function claimAdReward(provider) {
     try { d = await api("/api/ad-reward", "POST", { rewardKey: newKey(), provider }); break; }
     catch (e) { if (!e.pending || i === 39) throw e; if (i === 2) toast("Confirming your ad..."); await sleep(600); }
   }
-  toast("+" + fmt(d.reward) + " points", "ok");
+  if (d.unlocked_boost) {
+    toast("\uD83C\uDF89 50 Ads completed! Mining rate boosted by +10%!", "ok");
+  } else {
+    toast(`Ad watched! (${d.total_ads % 50}/50 towards next +10% boost)`, "ok");
+  }
   await refreshMe();
 }
 
@@ -1049,13 +1044,13 @@ async function watchAd() {
   try {
     const first = getTurn("adTurn");
     let used = null, result = "noad";
-    for (const p of [first, other(first)]) {          // whichever is ready is shown
+    for (const p of [first, other(first)]) {
       const r = await showProvider(p);
       if (r === "noad") continue;
       used = p; result = r; break;
     }
     if (result === "noad") return toast("Ads not ready. Try again in a moment.", "err");
-    setTurn("adTurn", other(used));                    // next time the other network goes first
+    setTurn("adTurn", other(used));
     if (result === "skipped") return toast("Ad was not completed.");
     await claimAdReward(used);
   } catch (e) {
@@ -1067,9 +1062,7 @@ async function watchAd() {
 }
 $("hWatch").onclick = watchAd; $("eWatch").onclick = watchAd;
 
-/* ---------------- surprise ads (admin sets the seconds) ----------------
-   The user stays N seconds in the app -> ONE ad. The next N seconds are counted
-   only AFTER that ad was closed, then the next ad comes. */
+/* ---------------- surprise ads ---------------- */
 let autoTimer = null, autoSec = 0;
 function scheduleAuto() {
   const s = Number(((ME && ME.settings) || {}).auto_ad_seconds || 0);
@@ -1079,7 +1072,6 @@ function scheduleAuto() {
   if (s >= 10) autoTimer = setInterval(autoTick, 1000);
 }
 function autoTick() {
-  // time only counts while the user is really in the app and nothing else is going on
   if (document.hidden || autoBusy || watching || spinBusy) return;
   if (!ME || !ME.allJoined) return;
   if (!$("modal").classList.contains("hidden")) return;
@@ -1100,20 +1092,18 @@ async function showAutoAd() {
         if (c) { try { const x = await c.show(); r = x && x.done ? "done" : "skipped"; } catch (e) { r = e && e.error === false ? "skipped" : "noad"; } }
       } else {
         const f = monetagFn();
-        if (f) { try { await f(); r = "done"; } catch (e) { r = "noad"; } }   // no ymid -> never gives points
+        if (f) { try { await f(); r = "done"; } catch (e) { r = "noad"; } }
       }
       if (r !== "noad") { setTurn("autoTurn", other(p)); break; }
     }
-  } finally { autoBusy = false; autoIdle = 0; }   // the next countdown starts when this ad is closed
+  } finally { autoBusy = false; autoIdle = 0; }
 }
-// pick up changes made by the admin
-setInterval(() => { if (ME && !document.hidden && !watching && !autoBusy && !spinBusy) refreshMe().catch(() => {}); }, 60000);
 
 /* ---------------- invite ---------------- */
 $("shareBtn").onclick = () => {
   const link = $("refLink").textContent;
   if (!link.startsWith("http")) return toast("Bot username is not configured.", "err");
-  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent("Join and earn rewards!");
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent("Join my mining pool and mine crypto together!");
   if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
 };
 $("copyBtn").onclick = async () => {
@@ -1123,25 +1113,22 @@ $("copyBtn").onclick = async () => {
 $("hInvite").onclick = () => showTab("invite");
 $("hWithdraw").onclick = () => { showTab("profile"); setTimeout(() => $("wCard").scrollIntoView({ behavior: "smooth" }), 150); };
 
-/* ---------------- withdraw (BEP20, admin approves, then auto payment) ---------------- */
+/* ---------------- withdraw (BEP20 USDT) ---------------- */
 function updateFee() {
   const st = (ME && ME.settings) || {};
   const pct = st.withdraw_fee_percent ?? 25;
-  const rate = st.point_value_usd ?? 0.01;
   const amt = Number($("wAmt").value) || 0;
   const fee = Math.round(amt * pct) / 100;
-  const fin = amt - fee;
+  const fin = Math.max(0, amt - fee);
   $("wFee").textContent = "Service fee " + pct + "%" +
-    (amt > 0 ? ": " + fee.toFixed(2) + " · You receive: " + fin.toFixed(2) + " pts ≈ " + (fin * rate).toFixed(4) + " " + sym() +
-      (bnbPrice() > 0 ? " ≈ " + fmtCrypto(fin * rate / bnbPrice()) + " " + sym() : "") : "");
+    (amt > 0 ? ": $" + fee.toFixed(2) + " · You receive: $" + fin.toFixed(2) + " " + sym() : "");
 }
 $("wAmt").addEventListener("input", updateFee);
 
 function showReceipt(d) {
   const modal = $("modal");
   const r = d && d.receipt_data;
-  const usd = n => { n = Number(n || 0); return "$" + (n >= 1 ? n.toFixed(2) : n.toFixed(4)); };
-  const feeTxt = n => { n = Number(n || 0); return "-$" + (n >= 0.01 ? n.toFixed(2) : n.toFixed(4)); };
+  const usd = n => "$" + Number(n || 0).toFixed(4);
   if (!r) {
     modal.innerHTML = `<div class="sheet"><pre class="receipt">${esc((d && d.receipt) || "Your Withdraw request received")}</pre>
       <button class="btn green" id="mReceiptOk" style="margin-top:14px">OK</button></div>`;
@@ -1152,13 +1139,13 @@ function showReceipt(d) {
         <div class="rc-t">Your Withdraw request received</div>
         <div class="rc-s">Waiting for admin approval</div>
       </div>
-      <div class="rc-amt"><small>After fee amount</small><b>${usd(r.final_usd)}</b><i>${esc(r.symbol)}</i></div>
+      <div class="rc-amt"><small>Net Payout Amount</small><b>${usd(r.final_usd)}</b><i>${esc(r.symbol)}</i></div>
       <div class="rc-rows">
         <div><span>User account</span><b>${esc(r.name)}</b></div>
-        <div><span>Amount</span><b>${usd(r.requested_usd)} ${esc(r.symbol)}</b></div>
-        <div><span>Service fee</span><b>${feeTxt(r.fee_usd)}</b></div>
+        <div><span>Amount requested</span><b>${usd(r.requested_usd)}</b></div>
+        <div><span>Service fee</span><b>-${usd(r.fee_usd)}</b></div>
         <div><span>Gateway</span><b>${esc(r.gateway)}</b></div>
-        <div><span>Request</span><b>#${esc(r.id)}</b></div>
+        <div><span>Request ID</span><b>#${esc(r.id)}</b></div>
         <div><span>Status</span><b class="pend">Pending</b></div>
       </div>
       <div class="rc-foot"><button class="btn green" id="mReceiptOk">OK</button></div></div>`;
@@ -1202,7 +1189,7 @@ async function loadHistory() {
       const tx = w.tx_hash ? ` · <span class="txlink" data-tx="${esc(w.tx_hash)}">View tx</span>` : "";
       return `<div class="card" style="padding:13px"><div class="line">
         <span class="ib sm ${ic[1]}">${svg(ic[0])}</span>
-        <div class="x"><b>${fmt(w.amount)} pts · BEP20</b><span>${esc(shortAddr(w.address))} · ${fmtCrypto(w.token_amount)} ${esc(sym())} · ${fmtDate(w.created_at)}${tx}</span></div>
+        <div class="x"><b>$${fmt(w.amount)} USD · BEP20</b><span>${esc(shortAddr(w.address))} · ${fmtCrypto(w.token_amount)} ${esc(sym())} · ${fmtDate(w.created_at)}${tx}</span></div>
         ${badgeOf(w.status)}</div></div>`;
     }).join("") : '<div class="empty">No withdrawals yet.</div>';
     $("wHist").querySelectorAll("[data-tx]").forEach(el => el.onclick = () => openLink(explorer() + el.dataset.tx));
@@ -1225,10 +1212,18 @@ function admSeg(name) {
   if (name === "promo") loadPromos();
   if (name === "set") {
     const s = ME.settings || {};
-    $("a_ad").value = s.ad_reward ?? 1; $("a_inv").value = s.invite_reward ?? 1; $("a_max").value = s.max_ads_per_day ?? 100;
-    $("a_auto").value = s.auto_ad_seconds ?? 0; $("a_pv").value = s.point_value_usd ?? 0.01;
-    $("a_min").value = s.min_withdraw ?? 100; $("a_vads").value = s.verify_ads ?? 1;
-    $("a_dwl").value = s.daily_withdraw_limit ?? 0; $("a_m5").value = s.milestone_5 ?? 5; $("a_m10").value = s.milestone_10 ?? 15; $("a_m25").value = s.milestone_25 ?? 50; $("a_fee").value = s.withdraw_fee_percent ?? 25;
+    $("a_pv").value = s.mining_daily_usd ?? 0.1;
+    $("a_ad50pct").value = s.ad_50_mining_percent ?? 10;
+    $("a_invpct").value = s.invite_mining_percent ?? 1;
+    $("a_max").value = s.max_ads_per_day ?? 100;
+    $("a_auto").value = s.auto_ad_seconds ?? 0;
+    $("a_min").value = s.min_withdraw ?? 0.1;
+    $("a_vads").value = s.verify_ads ?? 1;
+    $("a_dwl").value = s.daily_withdraw_limit ?? 0;
+    $("a_m5").value = s.milestone_5 ?? 0.05;
+    $("a_m10").value = s.milestone_10 ?? 0.15;
+    $("a_m25").value = s.milestone_25 ?? 0.50;
+    $("a_fee").value = s.withdraw_fee_percent ?? 25;
     $("a_bud").value = s.daily_bot_budget ?? 0;
     $("a_closed").value = (s.withdraw_closed_until > Date.now() / 1000) ? toLocalInput(s.withdraw_closed_until) : "";
   }
@@ -1269,7 +1264,7 @@ async function loadAdmin() {
           <div class="x"><b class="ellip">${esc(who)}</b><span>ID ${esc(w.telegram_id)} · #${esc(w.id)} · ${fmtDate(w.created_at)}</span></div>
           ${badgeOf(w.status)}</div>
         <div style="margin:12px 0 4px;font-size:22px;font-weight:800">${fmtCrypto(w.token_amount)} <span class="muted">${esc(sym())} · BEP20</span></div>
-        <div class="muted">Requested ${fmt(w.amount)} pts · Fee ${fmt(w.fee)} · Net ${fmt(w.final_amount)}</div>
+        <div class="muted">Requested $${fmt(w.amount)} · Fee $${fmt(w.fee)} · Net $${fmt(w.final_amount)}</div>
         <div class="linkbox" style="margin:8px 0"><span class="muted">Address</span><br><b>${esc(w.address)}</b>
           ${w.tx_hash ? `<br><span class="txlink" data-tx="${esc(w.tx_hash)}">View transaction</span>` : ""}</div>
         ${w.admin_note ? `<div class="muted">Note: ${esc(w.admin_note)}</div>` : ""}
@@ -1288,19 +1283,18 @@ async function loadAdmin() {
       try {
         const r = await api("/api/admin/withdrawals/" + encodeURIComponent(id) + "/approve", "POST", {});
         toast("Paid \u2705", "ok");
-        if (r && r.tx_hash) console.log("tx", r.tx_hash);
       } catch (e) { toast(e.message, "err"); }
       loadAdmin();
     });
 
     $("admList").querySelectorAll("button[data-rj]").forEach(b => b.onclick = async () => {
       const id = b.dataset.rj;
-      const ok = await confirmBox("Reject request #" + id + "? The points will be returned to the user.");
+      const ok = await confirmBox("Reject request #" + id + "? The funds will be returned to the user.");
       if (!ok) return;
       document.querySelectorAll("#admList button").forEach(x => x.disabled = true);
       try {
         await api("/api/admin/withdrawals/" + encodeURIComponent(id) + "/reject", "POST", { note: "Rejected by admin" });
-        toast("Rejected. Points returned.", "ok");
+        toast("Rejected. Funds returned.", "ok");
       } catch (e) { toast(e.message, "err"); }
       loadAdmin();
     });
@@ -1314,7 +1308,7 @@ const toLocalInput = sec => {
 };
 const fromLocalInput = v => {
   if (!v) return 0;
-  const t = new Date(v + "T00:00:00").getTime();      // opens at 00:00 of that day
+  const t = new Date(v + "T00:00:00").getTime();
   return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
 };
 $("a_open").onclick = () => { $("a_closed").value = ""; toast("Tap Save settings to open withdrawals."); };
@@ -1322,10 +1316,18 @@ $("a_open").onclick = () => { $("a_closed").value = ""; toast("Tap Save settings
 $("saveSettings").onclick = async () => {
   try {
     await api("/api/admin/settings", "POST", {
-      ad_reward: $("a_ad").value, invite_reward: $("a_inv").value,
-      max_ads_per_day: $("a_max").value, auto_ad_seconds: $("a_auto").value,
-      min_withdraw: $("a_min").value, point_value_usd: $("a_pv").value, verify_ads: $("a_vads").value,
-      daily_withdraw_limit: $("a_dwl").value, milestone_5: $("a_m5").value, milestone_10: $("a_m10").value, milestone_25: $("a_m25").value, withdraw_fee_percent: $("a_fee").value,
+      mining_daily_usd: $("a_pv").value,
+      ad_50_mining_percent: $("a_ad50pct").value,
+      invite_mining_percent: $("a_invpct").value,
+      max_ads_per_day: $("a_max").value,
+      auto_ad_seconds: $("a_auto").value,
+      min_withdraw: $("a_min").value,
+      verify_ads: $("a_vads").value,
+      daily_withdraw_limit: $("a_dwl").value,
+      milestone_5: $("a_m5").value,
+      milestone_10: $("a_m10").value,
+      milestone_25: $("a_m25").value,
+      withdraw_fee_percent: $("a_fee").value,
       daily_bot_budget: $("a_bud").value,
       withdraw_closed_until: fromLocalInput($("a_closed").value)
     });
@@ -1341,7 +1343,7 @@ $("promoBtn").onclick = async () => {
   try {
     const d = await api("/api/promo/redeem", "POST", { code });
     $("promoIn").value = "";
-    toast("+" + fmt(d.reward) + " points", "ok");
+    toast("+$" + fmt(d.reward) + " added to balance", "ok");
     await refreshMe();
   } catch (e) { toast(e.message, "err"); }
   $("promoBtn").disabled = false;
@@ -1356,7 +1358,7 @@ function renderMilestones(verified, claimed) {
     const pct = Math.min(100, (Math.min(verified, m) / m) * 100);
     return `<div class="card" style="padding:13px"><div class="ms">
       <span class="ib sm ${done ? "green" : "orange"}">${svg(done ? "check" : "gift")}</span>
-      <div class="x" style="flex:1;min-width:0"><b>${m} verified friends</b><span class="muted" style="display:block">Bonus +${fmt(bonus)} points</span>
+      <div class="x" style="flex:1;min-width:0"><b>${m} verified friends</b><span class="muted" style="display:block">Bonus +$${fmt(bonus)} USD</span>
         <div class="progress" style="margin:8px 0 0"><i style="width:${pct}%"></i></div></div>
       ${done ? statusBadge("approved").replace("Approved", "Reached") : `<span class="badge pending">${Math.min(verified, m)}/${m}</span>`}
     </div></div>`;
@@ -1375,8 +1377,8 @@ async function loadStats() {
       tile("star", "green", fmt(d.new_today), "New today") +
       tile("play", "pink", fmt(d.ads_today), "Ads today") +
       tile("play", "purple", fmt(d.ads_total), "Ads total") +
-      tile("wallet", "green", fmt(d.paid_total), "Total paid (pts)") +
-      tile("wallet", "teal", fmt(d.paid_today), "Paid today (pts)") +
+      tile("wallet", "green", "$" + fmt(d.paid_total), "Total paid (USD)") +
+      tile("wallet", "teal", "$" + fmt(d.paid_today), "Paid today (USD)") +
       tile("clock", "orange", fmt(d.pending_count), "Pending") +
       tile("coin", "teal", fmtCrypto(d.budget_used || 0) + " " + sym(), "Budget used today") +
       tile("shield", "redg", fmt(d.banned), "Banned") +
@@ -1397,9 +1399,9 @@ async function loadUsers() {
         <div class="av"><span>${letter}</span>${img}</div>
         <div class="x"><b class="ellip">${esc(name)}</b><span>ID ${esc(u.telegram_id)}</span></div>
         ${u.is_banned ? '<span class="badge rejected">Banned</span>' : ""}</div>
-        <div class="mini"><span>Points: ${fmt(u.points)}</span><span>Ads: ${u.total_ads}</span><span>Invites: ${u.total_invites}</span></div>
+        <div class="mini"><span>Balance: $${Number(u.points || 0).toFixed(4)} USD</span><span>Ads: ${u.total_ads}</span><span>Invites: ${u.total_invites}</span></div>
         <div class="row2" style="margin-top:12px">
-          <button class="btn dark sm" data-pts="${esc(u.telegram_id)}">Points</button>
+          <button class="btn dark sm" data-pts="${esc(u.telegram_id)}">Adjust Balance</button>
           <button class="btn ${u.is_banned ? "green" : "red"} sm" data-ban="${esc(u.telegram_id)}">${u.is_banned ? "Unban" : "Ban"}</button></div></div>`;
     }).join("") : '<div class="empty">No users found.</div>';
 
@@ -1421,8 +1423,8 @@ function pointsSheet(u) {
   const modal = $("modal");
   modal.innerHTML = `<div class="sheet">
     <div class="line" style="margin-bottom:12px"><span class="ib orange">${svg("coin")}</span>
-    <div class="x"><b style="font-size:17px">${esc(nameOf(u))}</b><span>Balance: ${fmt(u.points)}</span></div></div>
-    <input id="mAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount">
+    <div class="x"><b style="font-size:17px">${esc(nameOf(u))}</b><span>Balance: $${Number(u.points || 0).toFixed(4)} USD</span></div></div>
+    <input id="mAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount (USD)">
     <div class="row2" style="margin-top:14px">
       <button class="btn red" id="mSub">Subtract</button>
       <button class="btn green" id="mAdd">Add</button></div>
@@ -1435,7 +1437,7 @@ function pointsSheet(u) {
     if (!amt) return toast("Enter an amount.", "err");
     try {
       await api("/api/admin/users/" + encodeURIComponent(u.telegram_id) + "/points", "POST", { amount: sign * amt });
-      modal.classList.add("hidden"); toast("Points updated.", "ok"); loadUsers();
+      modal.classList.add("hidden"); toast("Balance updated.", "ok"); loadUsers();
     } catch (e) { toast(e.message, "err"); }
   };
   $("mAdd").onclick = () => apply(1);
@@ -1448,7 +1450,7 @@ async function loadPromos() {
     const d = await api("/api/admin/promos");
     $("promoList").innerHTML = d.promos.length ? d.promos.map(p => `<div class="card"><div class="line">
       <span class="ib sm purple">${svg("gift")}</span>
-      <div class="x"><b>${esc(p.code)}</b><span>+${fmt(p.reward)} each · ${p.used_count}/${p.max_uses} used</span></div>
+      <div class="x"><b>${esc(p.code)}</b><span>+$${fmt(p.reward)} each · ${p.used_count}/${p.max_uses} used</span></div>
       <button class="btn red sm" data-pdel="${esc(p.code)}" style="width:auto;padding:9px 14px">Delete</button></div></div>`).join("")
       : '<div class="empty">No promo codes yet.</div>';
     $("promoList").querySelectorAll("button[data-pdel]").forEach(b => b.onclick = async () => {
@@ -1516,7 +1518,7 @@ async function loadFriends() {
         <div class="av"><span>${letter}</span>${img}</div>
         <div class="x"><b class="ellip">${esc(name)}</b><span>ID ${esc(f.telegram_id)}</span>
           <div class="mini"><span class="${f.joined ? "ok" : ""}">Channels: ${f.joined ? "joined" : "not joined"}</span><span class="${ads >= need ? "ok" : ""}">Ads: ${Math.min(ads, need)}/${need}</span></div></div>
-        <span class="badge ${f.verified ? "approved" : "pending"}">${f.verified ? "Verified" : "Unverified"}</span>
+        <span class="badge ${f.verified ? "approved" : "pending"}">${f.verified ? "+1% Boost" : "Unverified"}</span>
       </div></div>`;
     }).join("") : '<div class="empty">No friends yet. Share your link to invite friends.</div>';
   } catch (e) { $("friendList").innerHTML = '<div class="empty">' + esc(e.message) + "</div>"; }
@@ -1531,13 +1533,13 @@ async function loadTasks() {
     $("taskList").innerHTML = d.tasks.length ? d.tasks.map(t => {
       const started = t.completed ? false : (t.started || taskState[t.id]);
       let action;
-      if (t.completed) action = statusBadge("approved").replace("Approved", "Done");
-      else if (t.was_member) action = '<span class="muted" style="text-align:right">Already joined<br>No reward</span>';
-      else if (started) action = `<button class="btn green sm" data-claim="${esc(t.id)}" style="width:auto;padding:10px 18px">Claim</button>`;
+      if (t.completed) action = statusBadge("approved").replace("Approved", "Active");
+      else if (t.was_member) action = '<span class="muted" style="text-align:right">Already joined<br>No boost</span>';
+      else if (started) action = `<button class="btn green sm" data-claim="${esc(t.id)}" style="width:auto;padding:10px 18px">Claim Boost</button>`;
       else action = `<button class="btn sm" data-start="${esc(t.id)}" style="width:auto;padding:10px 18px">Start</button>`;
       return `<div class="card ${t.completed ? "task-done" : ""}"><div class="line">
         <span class="ib ${t.completed ? "green" : "orange"}">${svg(t.completed ? "check" : "star")}</span>
-        <div class="x"><b>${esc(t.title)}${t.sponsored ? ' <span style="color:#b45309">· Sponsored</span>' : ""}</b><span>${esc(t.description || "")}</span><span style="display:block;color:#b45309;font-weight:700">+${fmt(t.reward)} points</span></div>
+        <div class="x"><b>${esc(t.title)}${t.sponsored ? ' <span style="color:#b45309">· Sponsored</span>' : ""}</b><span>${esc(t.description || "")}</span><span style="display:block;color:#0f9d6b;font-weight:700">+${fmt(t.reward)}% Mining Rate Boost</span></div>
         ${action}</div></div>`;
     }).join("") : '<div class="empty">No tasks right now. Check back soon.</div>';
 
@@ -1556,7 +1558,7 @@ async function loadTasks() {
       b.disabled = true;
       try {
         const r = await api("/api/tasks/" + encodeURIComponent(b.dataset.claim) + "/claim", "POST");
-        toast("+" + fmt(r.reward) + " points", "ok");
+        toast("Mining rate boosted by +" + Number(r.reward || 0).toFixed(2) + "%!", "ok");
         await refreshMe(); loadTasks();
       } catch (e) { toast(e.message, "err"); b.disabled = false; }
     });
@@ -1569,7 +1571,7 @@ async function loadAdminTasks() {
     const d = await api("/api/admin/tasks");
     $("admTaskList").innerHTML = d.tasks.length ? d.tasks.map(t => `<div class="card"><div class="line">
       <span class="ib sm orange">${svg("star")}</span>
-      <div class="x"><b class="ellip">${esc(t.title)}</b><span>+${fmt(t.reward)} · ${t.completions} done${t.channel ? " · " + esc(t.channel) : ""}</span></div>
+      <div class="x"><b class="ellip">${esc(t.title)}</b><span>+${fmt(t.reward)}% mining boost · ${t.completions} completions${t.channel ? " · " + esc(t.channel) : ""}</span></div>
       <button class="btn red sm" data-del="${esc(t.id)}" style="width:auto;padding:9px 14px">Delete</button></div></div>`).join("")
       : '<div class="empty">No tasks yet.</div>';
     $("admTaskList").querySelectorAll("button[data-del]").forEach(b => b.onclick = async () => {
@@ -1594,17 +1596,15 @@ $("addTask").onclick = async () => {
 };
 
 /* =====================================================
-   GROWTH FEATURES (proof feed, spin, promotion, admin)
+   GROWTH FEATURES
 ===================================================== */
-const money = n => "$" + (Number(n) >= 1 ? Number(n).toFixed(2) : Number(n).toFixed(4));
+const money = n => "$" + Number(n || 0).toFixed(4);
 let SP = null;
 
 async function loadHomeExtras() { loadProof(); loadSpin(); }
 async function loadEarnExtras() { setupPartnerTask(); }
 
-/* ---- Adsgram partner tasks (visit a website, join a channel ... paid by the advertiser) ---- */
 let partnerKey = "";
-// how many partner tasks the user must do today (admin setting), shown as slots
 function partnerSlots() {
   const need = Number(((ME && ME.withdraw_req) || {}).partnerNeed || 0);
   return need > 0 ? need : 1;
@@ -1616,8 +1616,8 @@ function partnerDoneCount() {
 function updatePartnerStat() {
   const p = (ME && ME.partner) || { today: 0, points: 0, total: 0 };
   const need = Number(((ME && ME.withdraw_req) || {}).partnerNeed || 0);
-  $("partnerStat").textContent = "Completed today: " + p.today + " · Earned today: +" + fmt(p.points) +
-    " points · Total completed: " + p.total + (need > 0 ? "\nRequired to withdraw: " + Math.min(p.today, need) + " / " + need + " today" : "");
+  $("partnerStat").textContent = "Completed today: " + p.today + " · Boost earned: +" + fmt(p.points) +
+    "% · Total completed: " + p.total + (need > 0 ? "\nRequired to withdraw: " + Math.min(p.today, need) + " / " + need + " today" : "");
 }
 function partnerPts() { return Number(((ME && ME.settings) || {}).adsgram_task_reward ?? 2); }
 function setupPartnerTask() {
@@ -1632,28 +1632,28 @@ function setupPartnerTask() {
   partnerKey = key;
   let h = "";
   for (let i = 0; i < active; i++) {
-    if (i > 0) {   // only one live task at a time, the next one loads after this one is finished
+    if (i > 0) {
       h += '<div class="pt-slot pt-wait"><div class="pt-ic gray">' + svg("clock") + '</div>' +
            '<div class="pt-txt"><b>Next partner task</b><span>Finish the current task first</span></div></div>';
       continue;
     }
     h += '<div class="pt-slot"><div class="pt-ic orange">' + svg("star") + '</div>' +
          '<adsgram-task class="adsgram-task" data-block-id="' + esc(id) + '" data-debug="false">' +
-         '<span slot="reward" class="pt-reward">+' + fmt(partnerPts()) + ' points</span>' +
+          '<span slot="reward" class="pt-reward">+' + fmt(partnerPts()) + '% mining boost</span>' +
          '<div slot="button" class="pt-btn">Go</div>' +
          '<div slot="claim" class="pt-btn">Claim</div>' +
          '<div slot="done" class="pt-btn pt-done">Done</div></adsgram-task></div>';
   }
   for (let i = 0; i < done; i++) {
     h += '<div class="pt-slot pt-slot-done"><div class="pt-ic green">' + svg("check") + '</div>' +
-         '<div class="pt-txt"><b>Partner task</b><span>+' + fmt(partnerPts()) + ' points · Completed</span></div>' +
+         '<div class="pt-txt"><b>Partner task</b><span>+' + fmt(partnerPts()) + '% mining boost · Completed</span></div>' +
          '<div class="pt-chip">Done</div></div>';
   }
   $("partnerCard").innerHTML = h;
   $("partnerCard").querySelectorAll("adsgram-task").forEach(el => {
     el.addEventListener("reward", () => {
       const slot = el.closest(".pt-slot");
-      if (slot) { slot.style.opacity = ".5"; el.remove(); }   // remove the live task at once, so it cannot be claimed twice
+      if (slot) { slot.style.opacity = ".5"; el.remove(); }
       onPartnerReward();
     });
     el.addEventListener("onBannerNotFound", () => { const slot = el.closest(".pt-slot"); if (slot) slot.remove(); });
@@ -1661,33 +1661,31 @@ function setupPartnerTask() {
   });
   if (!$("partnerCard").children.length && !partnerDoneCount()) box.classList.add("hidden");
 }
-// Adsgram confirms the task on the server first; the points and the "Done" slot appear only after that
 async function onPartnerReward() {
-  const before = Number((ME && ME.partner && ME.partner.total) || 0), pointsBefore = Number((ME && ME.user && ME.user.points) || 0);
+  const before = Number((ME && ME.partner && ME.partner.total) || 0);
   toast("Checking your task...", "ok");
   for (let i = 0; i < 6; i++) {
     await new Promise(r => setTimeout(r, i === 0 ? 2500 : 3500));
     try { await refreshMe(); } catch (e) {}
     setupPartnerTask();
     if (Number((ME && ME.partner && ME.partner.total) || 0) > before) {
-      const gained = Number((ME && ME.user && ME.user.points) || 0) - pointsBefore;
-      toast("Task verified! +" + fmt(gained > 0 ? gained : partnerPts()) + " points added.", "ok");
+      toast("Partner task verified! Mining boost added.", "ok");
       return;
     }
   }
   partnerKey = "";
   setupPartnerTask();
-  toast("Not verified yet. Points are added only after the partner confirms the task.", "err");
+  toast("Not verified yet. Mining boost is added after the partner confirms.", "err");
 }
 
-/* ---- proof feed: one payout at a time, fades in and out ---- */
+/* ---- proof feed ---- */
 const PROOF_SHOW_MS = 2600, PROOF_FADE_MS = 700;
 let proofFeed = [], proofIdx = 0, proofTimer = null;
 function proofCard(p) {
   const rows = [];
-  if (p.points !== null && p.points !== undefined) rows.push("Withdrawn: <b>" + fmt(p.points) + " pts</b>");
-  if (p.fee) rows.push("Fee: " + fmt(p.fee) + " pts");
-  if (p.final !== null && p.final !== undefined) rows.push("Received: <b>" + fmt(p.final) + " pts</b>");
+  if (p.points !== null && p.points !== undefined) rows.push("Withdrawn: <b>$" + fmt(p.points) + " USD</b>");
+  if (p.fee) rows.push("Fee: $" + fmt(p.fee) + " USD");
+  if (p.final !== null && p.final !== undefined) rows.push("Received: <b>$" + fmt(p.final) + " USD</b>");
   if (p.wallet) rows.push("Wallet: " + esc(p.wallet));
   if (p.tx) rows.push("TX: " + esc(p.tx));
   return `<div class="card" style="padding:14px"><div class="line">
@@ -1704,11 +1702,11 @@ function proofStep() {
   slot.classList.remove("show");
   slot.innerHTML = proofCard(proofFeed[proofIdx % proofFeed.length]);
   proofIdx++;
-  void slot.offsetWidth;                       // restart the fade-in
+  void slot.offsetWidth;
   slot.classList.add("show");
   proofTimer = setTimeout(() => {
-    slot.classList.remove("show");             // fade out (opacity 0) ...
-    proofTimer = setTimeout(proofStep, PROOF_FADE_MS);   // ... then the next payout comes in
+    slot.classList.remove("show");
+    proofTimer = setTimeout(proofStep, PROOF_FADE_MS);
   }, PROOF_SHOW_MS);
 }
 async function loadProof() {
@@ -1723,7 +1721,7 @@ async function loadProof() {
   } catch (e) { clearTimeout(proofTimer); $("proofList").innerHTML = ""; }
 }
 
-/* ---- Lucky Spin with a real wheel ---- */
+/* ---- Lucky Spin ---- */
 const WHEEL_COLORS = ["#0b3a8a", "#2468dc", "#0e7490", "#1e40af", "#3b82f6", "#0369a1", "#1e3a8a", "#2563eb"];
 let wheelAngle = 0, wheelKey = "";
 function buildWheel() {
@@ -1737,14 +1735,13 @@ function buildWheel() {
   SP.prizes.forEach((p, i) => {
     const [x0, y0] = pt(i * seg, R), [x1, y1] = pt((i + 1) * seg, R), mid = i * seg + seg / 2;
     h += `<path d="M${C} ${C} L${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${WHEEL_COLORS[i % WHEEL_COLORS.length]}" stroke="#fff" stroke-width="2"/>`;
-    h += `<g transform="rotate(${mid} ${C} ${C})"><text x="${C}" y="${C - 58}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width=".6">+${fmt(p)}</text></g>`;
+    h += `<g transform="rotate(${mid} ${C} ${C})"><text x="${C}" y="${C - 58}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width=".6">+$${fmt(p)}</text></g>`;
   });
   h += `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#fbbf24" stroke-width="4"/><circle cx="${C}" cy="${C}" r="13" fill="#fff" stroke="#fbbf24" stroke-width="4"/>`;
   $("wheelSvg").innerHTML = h;
   setWheel(wheelAngle);
 }
 function setWheel(a) { wheelAngle = a; $("wheelSvg").style.transform = "rotate(" + a + "deg)"; }
-// spins freely while the server answers, then slows down and stops on the prize segment
 async function spinWheelTo(resultPromise) {
   let idx = null, speed = 0, last = performance.now();
   const t0 = last;
@@ -1793,7 +1790,7 @@ $("spinBtn").onclick = async () => {
   spinBusy = true;
   $("spinBtn").disabled = true;
   try {
-    if (SP.available <= 0) {                       // no spin left: an ad unlocks one extra spin
+    if (SP.available <= 0) {
       spinBusy = false; await watchAd(); spinBusy = true;
       await loadSpin();
       if (SP.available <= 0) return;
@@ -1803,8 +1800,8 @@ $("spinBtn").onclick = async () => {
     let r = null;
     const ok = await spinWheelTo(call.then(x => { r = x; return x.index || 0; }));
     if (!ok || !r) { $("spinRes").textContent = ""; await call; return; }
-    $("spinRes").textContent = "You won +" + fmt(r.prize) + " points!";
-    toast("+" + fmt(r.prize) + " points", "ok");
+    $("spinRes").textContent = "You won +$" + fmt(r.prize) + " USD!";
+    toast("+$" + fmt(r.prize) + " USD added to balance", "ok");
     await refreshMe();
   } catch (e) { $("spinRes").textContent = ""; toast(e.message, "err"); }
   finally { spinBusy = false; autoIdle = 0; await loadSpin(); }
@@ -1823,7 +1820,7 @@ $("segMore").onclick = () => admSeg("more");
 async function loadMore() {
   const s = ME.settings || {};
   $("f_spin").value = s.spin_enabled ?? 1; $("f_spinf").value = s.spin_free ?? 1; $("f_spinx").value = s.spin_max_extra ?? 3; $("f_spins").value = s.spin_scale ?? 1;
-   $("f_rem").value = s.remind_enabled ?? 1; $("f_ptr").value = s.adsgram_task_reward ?? 2; $("f_ptd").value = s.adsgram_task_daily ?? 10; $("f_ptq").value = s.partner_required ?? 1;
+  $("f_rem").value = s.remind_enabled ?? 1; $("f_ptr").value = s.adsgram_task_reward ?? 2; $("f_ptd").value = s.adsgram_task_daily ?? 10; $("f_ptq").value = s.partner_required ?? 1;
 }
 $("f_save").onclick = async () => {
   try {
@@ -1858,14 +1855,14 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b
 $("checkBtn").onclick = () => checkGate("manual");
 
 setIc("wScan", "qr");
+
 /* =====================================================
-   LANGUAGE (English / Amharic), THEME (light / dark), SAVED WALLET + QR
+   LANGUAGE & THEME
 ===================================================== */
 const lsGet = k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 const lsDel = k => { try { localStorage.removeItem(k); } catch (e) {} };
 
-/* ---------------- theme ---------------- */
 let THEME = lsGet("app_theme") === "dark" ? "dark" : "light";
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", THEME);
@@ -1874,85 +1871,25 @@ function applyTheme() {
   document.querySelectorAll('.tbtn[data-act="theme"]').forEach(b => { b.innerHTML = svg(THEME === "dark" ? "sun" : "moon") + "<span>" + (THEME === "dark" ? "Light" : "Dark") + "</span>"; });
 }
 
-/* ---------------- language ---------------- */
 const AM = {
-  "Welcome":"እንኳን ደህና መጡ","Reward Hub":"የሽልማት ማዕከል","Welcome back":"እንኳን ደህና ተመለሱ","User":"ተጠቃሚ",
+  "Welcome":"እንኳን ደህና መጡ","Reward Mining Hub":"የማዕድን ሽልማት ማዕከል","Welcome back":"እንኳን ደህና ተመለሱ","User":"ተጠቃሚ",
   "Verification required":"ማረጋገጫ ያስፈልጋል","Join all required channels to continue.":"ለመቀጠል ሁሉንም አስፈላጊ ቻናሎች ይቀላቀሉ።",
   "Check membership":"አባልነትን አረጋግጥ","Payment Channel":"የክፍያ ቻናል",
-  "My Wallet":"የእኔ ዋሌት","Available balance":"ያለዎት ቀሪ ሂሳብ","pts":"ነጥብ","Withdraw":"ገንዘብ አውጣ","Invite":"ጋብዝ",
-  "Ads watched":"የታዩ ማስታወቂያዎች","Invites":"ግብዣዎች","Today":"ዛሬ","Watch an ad":"ማስታወቂያ ይመልከቱ","Earn points instantly":"ወዲያውኑ ነጥብ ያግኙ",
-  "Watch ad & earn":"ማስታወቂያ ተመልከት እና አግኝ","Lucky Spin":"የዕድል ማዞሪያ","1 free spin every day":"በየቀኑ 1 ነጻ ዙር","Spin":"አሽከርክር",
+  "My Wallet":"የእኔ ዋሌት","Available balance":"ያለዎት ቀሪ ሂሳብ","Withdraw":"ገንዘብ አውጣ","Invite":"ጋብዝ",
+  "Ads watched":"የታዩ ማስታወቂያዎች","Invites":"ግብዣዎች","Today":"ዛሬ","Watch an ad":"ማስታወቂያ ይመልከቱ",
+  "Watch ad & earn":"ማስታወቂያ ተመልከት","Lucky Spin":"የዕድል ማዞሪያ","1 free spin every day":"በየቀኑ 1 ነጻ ዙር","Spin":"አሽከርክር",
   "Recent payouts":"የቅርብ ጊዜ ክፍያዎች","Top earners":"ከፍተኛ ገቢ ያላቸው",
-  "Earn points":"ነጥብ ያግኙ","Watch ads":"ማስታወቂያ ይመልከቱ","Promo code":"የፕሮሞ ኮድ","Enter a code to get points":"ነጥብ ለማግኘት ኮድ ያስገቡ","Redeem":"ተጠቀም",
+  "Mining & Boosts":"ማዕድን እና ጭማሪዎች","Watch ads":"ማስታወቂያ ይመልከቱ","Promo code":"የፕሮሞ ኮድ","Enter a code to get points":"ኮድ ያስገቡ","Redeem":"ተጠቀም",
   "Partner tasks":"የአጋር ተግባራት","Tasks":"ተግባራት","Invite friends":"ጓደኞችን ይጋብዙ","Share":"አጋራ","Copy":"ቅዳ",
-  "Friends invited":"የተጋበዙ ጓደኞች","Verified":"የተረጋገጠ","Your points":"ነጥቦችዎ","Bonus milestones":"የጉርሻ ደረጃዎች","Your friends":"ጓደኞችዎ",
+  "Friends invited":"የተጋበዙ ጓደኞች","Verified":"የተረጋገጠ","Bonus milestones":"የጉርሻ ደረጃዎች","Your friends":"ጓደኞችዎ",
   "Ads":"ማስታወቂያ","Rank":"ደረጃ","Withdraw (BEP20)":"ገንዘብ ማውጣት (BEP20)","BEP20 wallet address":"የBEP20 ዋሌት አድራሻ",
-  "BNB Smart Chain (BEP20) address only. Double check it, payments cannot be reversed.":"የBNB Smart Chain (BEP20) አድራሻ ብቻ። በጥንቃቄ ያረጋግጡ፤ ክፍያ መመለስ አይቻልም።",
-  "Amount (points)":"መጠን (ነጥብ)","Withdraw now":"አሁን አውጣ","Withdrawal history":"የማውጣት ታሪክ","Need help?":"እርዳታ ይፈልጋሉ?",
-  "For any question or promotion, contact admin.":"ለማንኛውም ጥያቄ ወይም ማስታወቂያ አድሚኑን ያነጋግሩ።","Contact admin":"አድሚኑን ያነጋግሩ",
-  "Home":"መነሻ","Earn":"ያግኙ","Profile":"መገለጫ",
-  "Spin now":"አሁን አሽከርክር","Watch ad for extra spin":"ለተጨማሪ ዙር ማስታወቂያ ይመልከቱ","No spins left":"ዙር አልቋል","Come back tomorrow":"ነገ ይመለሱ","Spinning...":"በማሽከርከር ላይ...",
-  "Join":"ተቀላቀል","Check":"አረጋግጥ","Checking...":"በማረጋገጥ ላይ...","Joined":"ተቀላቅለዋል","Tap Check after you join":"ከተቀላቀሉ በኋላ «አረጋግጥ»ን ይጫኑ",
-  "Join to continue":"ለመቀጠል ይቀላቀሉ","Bot must be admin in this channel":"ቦቱ በዚህ ቻናል አድሚን መሆን አለበት",
-  "Approved":"ጸድቋል","Reached":"ተሳክቷል","Done":"ተጠናቋል","Pending":"በመጠባበቅ ላይ","Processing":"በሂደት ላይ","Paid":"ተከፍሏል","Failed":"አልተሳካም","Unverified":"ያልተረጋገጠ",
-  "Start":"ጀምር","Claim":"ውሰድ","Already joined":"ቀድሞ ተቀላቅለዋል","No reward":"ሽልማት የለም","· Sponsored":"· ስፖንሰር የተደረገ",
-  "No tasks right now. Check back soon.":"አሁን ምንም ተግባር የለም። በቅርቡ ይመለሱ።","No users yet.":"እስካሁን ተጠቃሚ የለም።","No payouts yet.":"እስካሁን ምንም ክፍያ የለም።",
-  "No withdrawals yet.":"እስካሁን ምንም ማውጣት የለም።","No friends yet. Share your link to invite friends.":"እስካሁን ጓደኛ የለም። ጓደኞችዎን ለመጋበዝ ሊንክዎን ያጋሩ።",
-  "Next partner task":"ቀጣይ የአጋር ተግባር","Finish the current task first":"መጀመሪያ አሁን ያለውን ተግባር ይጨርሱ","Partner task":"የአጋር ተግባር","Go":"ሂድ",
-  "Your Withdraw request received":"የማውጣት ጥያቄዎ ተቀብሏል","Waiting for admin approval":"የአድሚን ማረጋገጫ በመጠበቅ ላይ","After fee amount":"ከክፍያ በኋላ",
-  "User account":"የተጠቃሚ መለያ","Amount":"መጠን","Service fee":"የአገልግሎት ክፍያ","Gateway":"መንገድ","Request":"ጥያቄ","Status":"ሁኔታ","OK":"እሺ","View tx":"ግብይቱን እይ",
-  "Withdrawn:":"የወጣ:","Received:":"የተቀበሉት:","Light":"ብርሃን","Dark":"ጨለማ",
-  "Join all required channels first.":"መጀመሪያ ሁሉንም አስፈላጊ ቻናሎች ይቀላቀሉ።","Confirming your ad...":"ማስታወቂያዎን በማረጋገጥ ላይ...",
-  "Ads not ready. Try again in a moment.":"ማስታወቂያ ዝግጁ አይደለም። ጥቂት ቆይተው ይሞክሩ።","Ad was not completed.":"ማስታወቂያው አልተጠናቀቀም።","Ad error":"የማስታወቂያ ስህተት",
-  "Link copied":"ሊንኩ ተቀድቷል","Copy failed.":"መቅዳት አልተሳካም።","Bot username is not configured.":"የቦት ስም አልተዋቀረም።","Bot username is not configured":"የቦት ስም አልተዋቀረም",
-  "Enter a valid BEP20 address (0x + 40 characters).":"ትክክለኛ የBEP20 አድራሻ ያስገቡ (0x + 40 ፊደላት)።","Enter a valid amount.":"ትክክለኛ መጠን ያስገቡ።","Enter a promo code.":"የፕሮሞ ኮድ ያስገቡ።",
-  "Verified!":"ተረጋግጧል!","You have not joined all channels yet.":"ሁሉንም ቻናሎች እስካሁን አልተቀላቀሉም።","Checking your task...":"ተግባርዎን በማረጋገጥ ላይ...",
-  "Not verified yet. Points are added only after the partner confirms the task.":"እስካሁን አልተረጋገጠም። ነጥብ የሚጨመረው አጋሩ ተግባሩን ካረጋገጠ በኋላ ብቻ ነው።",
-  "You were already a member of this channel, so this task gives no reward.":"ቀድሞ የዚህ ቻናል አባል ነበሩ፣ ስለዚህ ይህ ተግባር ሽልማት አይሰጥም።",
-  "Save this address for next time":"ይህን አድራሻ ለቀጣይ ያስቀምጡ","Remove":"አስወግድ","Wallet saved":"ዋሌት ተቀምጧል","Saved wallet removed.":"የተቀመጠው ዋሌት ተወግዷል።",
-  "QR scan is not supported on this device.":"QR መቃኘት በዚህ መሣሪያ አይደገፍም።","No BEP20 address found in this QR code.":"በዚህ QR ኮድ ውስጥ የBEP20 አድራሻ አልተገኘም።",
-  "Scan a BEP20 wallet QR code":"የBEP20 ዋሌት QR ኮድ ይቃኙ","Open in Telegram":"በቴሌግራም ይክፈቱ","Please open this app from the Telegram bot.":"እባክዎ ይህን መተግበሪያ ከቴሌግራም ቦት ይክፈቱ።",
-  "Access blocked":"መዳረሻ ታግዷል","Error":"ስህተት"
+  "Amount (USD)":"መጠን (USD)","Withdraw now":"አሁን አውጣ","Withdrawal history":"የማውጣት ታሪክ","Need help?":"እርዳታ ይፈልጋሉ?",
+  "Contact admin":"አድሚኑን ያነጋግሩ","Home":"መነሻ","Mining":"ማዕድን","Profile":"መገለጫ",
+  "Spin now":"አሁን አሽከርክር","Watch ad for extra spin":"ለተጨማሪ ዙር ማስታወቂያ ይመልከቱ","No spins left":"ዙር አልቋል","Come back tomorrow":"ነገ ይመለሱ"
 };
-const sp = s => s.replace(/\bpts\b/g, "ነጥብ");
 const AM_RULES = [
-  [/^\+([\d.,]+) points per ad$/, m => "+" + m[1] + " ነጥብ በአንድ ማስታወቂያ"],
-  [/^\+([\d.,]+) points · Completed$/, m => "+" + m[1] + " ነጥብ · ተጠናቋል"],
-  [/^\+([\d.,]+) points$/, m => "+" + m[1] + " ነጥብ"],
-  [/^Bonus \+([\d.,]+) points$/, m => "ጉርሻ +" + m[1] + " ነጥብ"],
-  [/^([\d.,]+) pts · BEP20$/, m => m[1] + " ነጥብ · BEP20"],
-  [/^([\d.,]+) pts$/, m => m[1] + " ነጥብ"],
-  [/^(\d+) \/ (\d+) ads today$/, m => "ዛሬ " + m[1] + " / " + m[2] + " ማስታወቂያ"],
-  [/^ID: (.+)$/, m => "መታወቂያ: " + m[1]],
-  [/^ID (.+)$/, m => "መታወቂያ " + m[1]],
-  [/^(\d+) verified friends$/, m => m[1] + " የተረጋገጡ ጓደኞች"],
-  [/^Channels: (joined|not joined)$/, m => m[1] === "joined" ? "ቻናሎች: ተቀላቅሏል" : "ቻናሎች: አልተቀላቀለም"],
-  [/^Ads: (\d+)\/(\d+)$/, m => "ማስታወቂያ: " + m[1] + "/" + m[2]],
-  [/^(.+) · Withdraw paid$/, m => m[1] + " · ክፍያ ተፈጽሟል"],
-  [/^Fee: (.+) pts$/, m => "ክፍያ: " + m[1] + " ነጥብ"],
-  [/^Wallet: (.+)$/, m => "ዋሌት: " + m[1]],
-  [/^TX: (.+)$/, m => "ግብይት: " + m[1]],
-  [/^Saved wallet: (.+)$/, m => "የተቀመጠ ዋሌት: " + m[1]],
-  [/^(\d+) free spins? ready!(?: \(\+(\d+) extra with ads\))?$/, m => m[1] + " ነጻ ዙር ዝግጁ ነው!" + (m[2] ? " (+" + m[2] + " ተጨማሪ በማስታወቂያ)" : "")],
-  [/^(\d+) extra spin\(s\) ready$/, m => m[1] + " ተጨማሪ ዙር ዝግጁ ነው"],
-  [/^Watch an ad for an extra spin \((\d+) left today\)$/, m => "ለተጨማሪ ዙር ማስታወቂያ ይመልከቱ (ዛሬ " + m[1] + " ቀርቷል)"],
-  [/^You won \+([\d.,]+) points!$/, m => "+" + m[1] + " ነጥብ አሸንፈዋል!"],
-  [/^Task verified! \+(.+) points added\.$/, m => "ተግባሩ ተረጋግጧል! +" + m[1] + " ነጥብ ታክሏል።"],
-  [/^Completed today: (.+) · Earned today: \+(.+) points · Total completed: (.+)$/, m => "ዛሬ የተጠናቀቁ: " + m[1] + " · ዛሬ የተገኘ: +" + m[2] + " ነጥብ · ጠቅላላ የተጠናቀቁ: " + m[3]],
-  [/^Required to withdraw: (.+) \/ (.+) today$/, m => "ለማውጣት የሚያስፈልግ: ዛሬ " + m[1] + " / " + m[2]],
-  [/^Min (.+?) · Daily (.+)$/, m => "ዝቅተኛ " + m[1] + " · ዕለታዊ " + m[2]],
   [/^Min (.+)$/, m => "ዝቅተኛ " + m[1]],
-  [/^1 point = (.+) USD · paid in (.+) \(BEP20\)$/, m => "1 ነጥብ = " + m[1] + " USD · በ" + m[2] + " (BEP20) ይከፈላል"],
-  [/^1 (\S+) = (.+) points · 1 point = \$(.+)$/, m => "1 " + m[1] + " = " + m[2] + " ነጥብ · 1 ነጥብ = $" + m[3]],
-  [/^Service fee (.+?)%: (.+?) · You receive: (.+)$/, m => "የአገልግሎት ክፍያ " + m[1] + "%: " + m[2] + " · ይቀበላሉ: " + sp(m[3])],
-  [/^Service fee (.+?)%$/, m => "የአገልግሎት ክፍያ " + m[1] + "%"],
-  [/^\u26D4 Withdraw requests are closed for today\. They open on (.+)\.$/, m => "\u26D4 ዛሬ የማውጣት ጥያቄዎች ዝግ ናቸው። በ" + m[1] + " ይከፈታሉ።"],
-  [/^\u23F3 Only one withdraw request per day\. You can send the next one on (.+)\.$/, m => "\u23F3 በቀን አንድ የማውጣት ጥያቄ ብቻ። ቀጣዩን በ" + m[1] + " መላክ ይችላሉ።"],
-  [/^Watch all of today's ads first: (.+) \/ (.+) done\.$/, m => "መጀመሪያ የዛሬውን ማስታወቂያዎች ሁሉ ይመልከቱ: " + m[1] + " / " + m[2] + " ተጠናቋል።"],
-  [/^Complete all tasks first: (.+) left\.$/, m => "መጀመሪያ ሁሉንም ተግባራት ያጠናቅቁ: " + m[1] + " ቀርተዋል።"],
-  [/^Complete the Partner tasks first: (.+) \/ (.+) done today\.$/, m => "መጀመሪያ የአጋር ተግባራትን ያጠናቅቁ: ዛሬ " + m[1] + " / " + m[2] + " ተጠናቋል።"],
-  [/^\u26A0\uFE0F Today's payout budget is finished\. Try again tomorrow\.$/, () => "\u26A0\uFE0F የዛሬው የክፍያ በጀት አልቋል። ነገ ይሞክሩ።"],
-  [/^Today's payout budget left: (.+)$/, m => "ዛሬ የቀረ የክፍያ በጀት: " + sp(m[1])]
+  [/^Service fee (.+?)%: (.+?) · You receive: (.+)$/, m => "የአገልግሎት ክፍያ " + m[1] + "%: " + m[2] + " · ይቀበላሉ: " + m[3]]
 ];
 function trCore(c) {
   if (AM[c] !== undefined) return AM[c];
@@ -1978,15 +1915,15 @@ function walkText(root, fn) {
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => SKIP.test(n.parentNode.nodeName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
   let n; while ((n = w.nextNode())) fn(n);
 }
-function trNode(n) {                       // text the app just wrote
+function trNode(n) {
   if (LANG !== "am") return;
   const cur = n.nodeValue;
-  if (shownText.get(n) === cur) return;    // that is our own translation
+  if (shownText.get(n) === cur) return;
   const out = trText(cur);
   origText.set(n, cur);
   if (out !== cur) { shownText.set(n, out); n.nodeValue = out; } else shownText.delete(n);
 }
-function retranslate() {                    // language switched: redo every text on the page
+function retranslate() {
   walkText(document.body, n => {
     const cur = n.nodeValue;
     const base = (shownText.has(n) && shownText.get(n) === cur) ? origText.get(n) : cur;
@@ -2008,11 +1945,11 @@ let invCache = "";
 function setInviteText() {
   const el = $("invTxt"); if (!el) return;
   const st = (ME && ME.settings) || {};
-  const r = fmt(st.invite_reward ?? 1), n = st.verify_ads ?? 1;
+  const r = Number(st.invite_mining_percent ?? 1).toFixed(1), n = st.verify_ads ?? 1;
   const b = v => '<b style="color:var(--text)">' + v + "</b>";
   const html = LANG === "am"
-    ? "የግል ሊንክዎን ያጋሩ። የሚያስፈልጉትን ቻናሎች ለተቀላቀለና " + b(n) + " ማስታወቂያ(ዎች) ለተመለከተ ለእያንዳንዱ ጓደኛ " + b(r) + " ነጥብ ያገኛሉ።"
-    : "Share your personal link. You earn " + b(r) + " points for each friend who joins the required channels and watches " + b(n) + " ad(s).";
+    ? "የግል ሊንክዎን ያጋሩ። እያንዳንዱ የተረጋገጠ ጓደኛ የማዕድን መጠንዎን " + b("+" + r + "%") + " ይጨምራል (ቻናሎችን ከተቀላቀለ እና " + b(n) + " ማስታወቂያ ከተመለከተ በኋላ)።"
+    : "Share your referral link. Each verified friend increases your mining speed by " + b("+" + r + "%") + " after joining channels and watching " + b(n) + " ad(s).";
   if (html !== invCache) { invCache = html; el.innerHTML = html; }
 }
 function applyLang() {
@@ -2057,7 +1994,7 @@ async function loadSavedWallet() {
   if (ADDR_RE.test(a)) { SAVED_ADDR = a; if (!$("wAddr").value) $("wAddr").value = a; }
   renderSaved();
 }
-function saveWallet(addr) {                 // returns true when a new address was stored
+function saveWallet(addr) {
   if (!$("wSaveChk").checked || !ADDR_RE.test(addr) || addr === SAVED_ADDR) return false;
   SAVED_ADDR = addr; storeSet(addr); renderSaved();
   return true;
@@ -2076,7 +2013,7 @@ $("wScan").onclick = () => {
       if (!m) { toast("No BEP20 address found in this QR code.", "err"); return false; }
       $("wAddr").value = m[0];
       $("wAddr").dispatchEvent(new Event("change"));
-      return true;                           // closes the scanner
+      return true;
     });
   } catch (e) { toast("QR scan is not supported on this device.", "err"); }
 };
@@ -2108,6 +2045,9 @@ async function init() {
   }
 }
 init();
+setInterval(() => {
+  if (ME && !document.hidden) refreshMe().catch(() => {});
+}, 30000);
 </script>
 </body>
 </html>
