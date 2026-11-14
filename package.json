@@ -1,0 +1,14 @@
+
+{
+  "name": "weekly-giveaway-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram Weekly Giveaway Mini App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.0"
+  }
+}
